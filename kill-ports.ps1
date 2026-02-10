@@ -1,5 +1,7 @@
 # kill-ports.ps1
-$ports = @(3000, 5000)
+param (
+    [int[]]$ports = @(3000)
+)
 
 foreach ($port in $ports) {
     $connections = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue

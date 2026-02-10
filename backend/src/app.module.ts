@@ -10,6 +10,8 @@ import { ChatModule } from './chat/chat.module';
 import { UsersModule } from './users/users.module';
 import { ListingsModule } from './listings/listings.module';
 import { MediaModule } from './media/media.module';
+import { AvailabilityModule } from './availability/availability.module';
+import { BookingsModule } from './bookings/bookings.module';
 
 @Module({
   imports: [
@@ -42,6 +44,8 @@ import { MediaModule } from './media/media.module';
     UsersModule,
     ListingsModule,
     MediaModule,
+    BookingsModule,
+    AvailabilityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

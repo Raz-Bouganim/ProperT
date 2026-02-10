@@ -2,37 +2,70 @@
 
 import { use } from "react";
 import { Button } from "@/components/ui/Button";
-import { Bed, Bath, Square, MapPin, Share2, Heart, ShieldCheck, Mail, Calendar } from "lucide-react";
+import { Bed, Bath, Square, MapPin, Share2, Heart, ShieldCheck, Mail, Calendar, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useState, useEffect } from "react";
+import { BookingWizard } from "@/components/BookingWizard";
+import api from "@/lib/api";
 
 export default function ListingDetail({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
-    // Mock data for design purposes
-    const listing = {
-        id,
-        title: "Modern Apartment in City Center",
-        description: "Experience luxury living in this stunning, fully renovated apartment located in the heart of the city. This home features high-end finishes throughout, including white oak floors, custom cabinetry, and premium appliances. Large floor-to-ceiling windows offer plenty of natural light and breathtaking views of the skyline.\n\nThe open-concept living area is perfect for entertaining, while the spacious bedrooms provide a peaceful retreat. The building also offers top-notch amenities, including a 24-hour concierge, a fully equipped fitness center, and a rooftop terrace with panoramic city views.",
-        price: 2500,
-        address: "123 Madison Ave, New York, NY 10001",
-        beds: 2,
-        baths: 1,
-        sqft: 850,
-        type: "APARTMENT",
-        images: [
-            "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80",
-            "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
-            "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=800&q=80",
-            "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80",
-            "https://images.unsplash.com/photo-1502005229762-ce132d8a923d?auto=format&fit=crop&w=800&q=80",
-        ],
-        features: ["Air Conditioning", "Dishwasher", "Walk-in Closet", "Hardwood Floors", "Pet Friendly", "Balcony"],
+    const [isBookingOpen, setIsBookingOpen] = useState(false);
+    const [listing, setListing] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchListing = async () => {
+            try {
+                const res = await api.get(`/listings/${id}`);
+                setListing(res.data);
+            } catch (error) {
+                console.error("Failed to fetch listing:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchListing();
+    }, [id]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                    <p className="text-muted-foreground font-medium">Loading property details...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!listing) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4 text-center">
+                <div>
+                    <h2 className="text-2xl font-bold mb-2">Listing not found</h2>
+                    <p className="text-muted-foreground mb-6">The property you're looking for doesn't exist or has been removed.</p>
+                    <Link href="/search">
+                        <Button variant="outline">Back to Search</Button>
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    const displayListing = {
+        ...listing,
+        images: (listing.images && listing.images.length > 0) ? listing.images : ["/placeholder-property.jpg"],
         owner: {
-            name: "John Smith",
-            avatar: "https://i.pravatar.cc/150?u=john",
-            joined: "Jan 2023",
-        }
+            name: listing.owner?.firstName ? `${listing.owner.firstName} ${listing.owner.lastName}` : "Property Owner",
+            avatar: listing.owner?.avatar || `https://ui-avatars.com/api/?name=${listing.owner?.firstName || 'O'}&background=random`,
+            joined: listing.owner?.createdAt ? new Date(listing.owner.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Recently",
+        },
+        features: listing.features || []
     };
+
+    const getImg = (index: number) => displayListing.images[index] || displayListing.images[0] || "/placeholder-property.jpg";
 
     return (
         <div className="min-h-screen bg-background pb-20">
@@ -67,19 +100,19 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                 {/* Masonry Gallery */}
                 <div className="grid grid-cols-4 grid-rows-2 gap-3 h-[500px] mb-12 rounded-2xl overflow-hidden">
                     <div className="col-span-2 row-span-2 relative">
-                        <Image src={listing.images[0]} alt="Property" fill className="object-cover hover:scale-[1.02] transition-transform duration-500 cursor-pointer" />
+                        <Image src={getImg(0)} alt="Property" fill priority sizes="(max-width: 768px) 100vw, 50vw" className="object-cover hover:scale-[1.02] transition-transform duration-500 cursor-pointer" />
                     </div>
                     <div className="relative">
-                        <Image src={listing.images[1]} alt="Property" fill className="object-cover hover:scale-[1.02] transition-transform duration-500 cursor-pointer" />
+                        <Image src={getImg(1)} alt="Property" fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover hover:scale-[1.02] transition-transform duration-500 cursor-pointer" />
                     </div>
                     <div className="relative">
-                        <Image src={listing.images[2]} alt="Property" fill className="object-cover hover:scale-[1.02] transition-transform duration-500 cursor-pointer" />
+                        <Image src={getImg(2)} alt="Property" fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover hover:scale-[1.02] transition-transform duration-500 cursor-pointer" />
                     </div>
                     <div className="relative">
-                        <Image src={listing.images[3]} alt="Property" fill className="object-cover hover:scale-[1.02] transition-transform duration-500 cursor-pointer" />
+                        <Image src={getImg(3)} alt="Property" fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover hover:scale-[1.02] transition-transform duration-500 cursor-pointer" />
                     </div>
                     <div className="relative">
-                        <Image src={listing.images[4]} alt="Property" fill className="object-cover hover:scale-[1.02] transition-transform duration-500 cursor-pointer" />
+                        <Image src={getImg(4)} alt="Property" fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover hover:scale-[1.02] transition-transform duration-500 cursor-pointer" />
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white pointer-events-none font-bold">
                             View all photos
                         </div>
@@ -102,7 +135,7 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                             </div>
                             <div className="flex flex-col items-center gap-1 min-w-[80px]">
                                 <Square className="w-6 h-6 text-primary" />
-                                <span className="font-bold text-lg">{listing.sqft}</span>
+                                <span className="font-bold text-lg">{listing.size}</span>
                                 <span className="text-xs text-muted-foreground uppercase tracking-widest">Sqft</span>
                             </div>
                             <div className="flex flex-col items-center gap-1 min-w-[80px]">
@@ -122,7 +155,7 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                         <section className="mb-12">
                             <h2 className="text-2xl font-bold mb-6">Amenities</h2>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8">
-                                {listing.features.map((feature) => (
+                                {listing.features?.map((feature: string) => (
                                     <div key={feature} className="flex items-center gap-3 text-muted-foreground">
                                         <div className="w-2 h-2 rounded-full bg-primary" />
                                         <span className="font-medium">{feature}</span>
@@ -156,7 +189,10 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                             </div>
 
                             <div className="space-y-4 mb-8">
-                                <div className="p-4 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group">
+                                <div
+                                    onClick={() => setIsBookingOpen(true)}
+                                    className="p-4 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
+                                >
                                     <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 group-hover:text-primary transition-colors">Select Dates</div>
                                     <div className="flex items-center gap-2 font-bold">
                                         <Calendar className="w-4 h-4" />
@@ -166,7 +202,13 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                             </div>
 
                             <div className="space-y-3">
-                                <Button size="lg" className="w-full h-14 text-lg rounded-2xl font-bold">Request a viewing</Button>
+                                <Button
+                                    size="lg"
+                                    className="w-full h-14 text-lg rounded-2xl font-bold"
+                                    onClick={() => setIsBookingOpen(true)}
+                                >
+                                    Request a viewing
+                                </Button>
                                 <Button size="lg" variant="outline" className="w-full h-14 text-lg rounded-2xl font-bold gap-2">
                                     <Mail className="w-5 h-5" /> Message Owner
                                 </Button>
@@ -174,12 +216,12 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
 
                             <div className="mt-8 pt-8 border-t flex items-center gap-4">
                                 <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
-                                    <Image src={listing.owner.avatar} alt={listing.owner.name} fill />
+                                    <Image src={displayListing.owner.avatar} alt={displayListing.owner.name} fill sizes="48px" />
                                 </div>
                                 <div>
                                     <div className="font-bold leading-tight uppercase tracking-widest text-[10px] text-muted-foreground">Managed by</div>
-                                    <div className="font-black text-lg">{listing.owner.name}</div>
-                                    <div className="text-xs text-muted-foreground">Joined {listing.owner.joined}</div>
+                                    <div className="font-black text-lg">{displayListing.owner.name}</div>
+                                    <div className="text-xs text-muted-foreground">Joined {displayListing.owner.joined}</div>
                                 </div>
                             </div>
 
@@ -190,6 +232,12 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                     </div>
                 </div>
             </main>
+
+            <BookingWizard
+                listingId={id}
+                isOpen={isBookingOpen}
+                onClose={() => setIsBookingOpen(false)}
+            />
         </div>
     );
 }

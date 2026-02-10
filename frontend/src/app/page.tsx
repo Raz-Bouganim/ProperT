@@ -1,51 +1,31 @@
+"use client";
+
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import Image from "next/image";
 import { ListingCard } from "@/components/ListingCard";
 
+import { useState, useEffect } from "react";
+import api from "@/lib/api";
+
 export default function Home() {
-  const featuredListings = [
-    {
-      id: "1",
-      title: "Modern Apartment in City Center",
-      address: "New York, NY 10001",
-      price: 2500,
-      beds: 2,
-      baths: 1,
-      sqft: 850,
-      image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80"
-    },
-    {
-      id: "2",
-      title: "Cozy Studio Near Central Park",
-      address: "Brooklyn, NY 11201",
-      price: 1800,
-      beds: 1,
-      baths: 1,
-      sqft: 500,
-      image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80"
-    },
-    {
-      id: "3",
-      title: "Luxury Penthouse Suite",
-      address: "Manhattan, NY 10013",
-      price: 8500,
-      beds: 3,
-      baths: 3,
-      sqft: 2200,
-      image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80"
-    },
-    {
-      id: "4",
-      title: "Suburban Family Dream Home",
-      address: "Queens, NY 11101",
-      price: 3200,
-      beds: 4,
-      baths: 2,
-      sqft: 1800,
-      image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=800&q=80"
+  const [featuredListings, setFeaturedListings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchFeatured() {
+      try {
+        const res = await api.get("/listings");
+        // Just take the first 4 for featured
+        setFeaturedListings(res.data.slice(0, 4));
+      } catch (error) {
+        console.error("Failed to fetch featured listings:", error);
+      } finally {
+        setLoading(false);
+      }
     }
-  ];
+    fetchFeatured();
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -105,9 +85,25 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {featuredListings.map((listing) => (
-            <ListingCard key={listing.id} {...listing} />
-          ))}
+          {loading ? (
+            [1, 2, 3, 4].map(i => <ListingCard key={i} id="" title="" address="" price={0} beds={0} baths={0} sqft={0} image="" isLoading />)
+          ) : featuredListings.length > 0 ? (
+            featuredListings.map((listing) => (
+              <ListingCard
+                key={listing.id}
+                id={listing.id}
+                title={listing.title}
+                address={listing.address}
+                price={Number(listing.price)}
+                beds={listing.beds || 2}
+                baths={listing.baths || 1}
+                sqft={listing.size}
+                image={listing.images[0] || "/placeholder.jpg"}
+              />
+            ))
+          ) : (
+            <p className="col-span-full text-center text-muted-foreground py-12">No properties listed yet.</p>
+          )}
         </div>
 
         {/* CTA Section */}

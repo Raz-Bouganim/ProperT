@@ -23,13 +23,23 @@ const DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
+const HighlightedIcon = L.icon({
+    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+});
+
 interface MapProps {
     listings: any[];
     center?: [number, number];
     zoom?: number;
+    hoveredListingId?: string | null;
 }
 
-export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13 }: MapProps) {
+export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13, hoveredListingId }: MapProps) {
     // Center map on first listing if available
     const mapCenter = listings.length > 0 && listings[0].latitude && listings[0].longitude
         ? [listings[0].latitude, listings[0].longitude] as [number, number]
@@ -48,7 +58,12 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13 
             />
             {listings.map((listing) => (
                 listing.latitude && listing.longitude ? (
-                    <Marker key={listing.id} position={[listing.latitude, listing.longitude]}>
+                    <Marker
+                        key={listing.id}
+                        position={[listing.latitude, listing.longitude]}
+                        icon={hoveredListingId === listing.id ? HighlightedIcon : DefaultIcon}
+                        zIndexOffset={hoveredListingId === listing.id ? 1000 : 0}
+                    >
                         <Popup>
                             <div className="min-w-[200px]">
                                 <img
