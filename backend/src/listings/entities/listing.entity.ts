@@ -1,10 +1,11 @@
 import { User } from '../../users/entities/user.entity';
 
 export enum PropertyType {
-    APARTMENT = 'apartment',
-    HOUSE = 'house',
-    STUDIO = 'studio',
-    COMMERCIAL = 'commercial',
+    APARTMENT = 'APARTMENT',
+    HOUSE = 'HOUSE',
+    STUDIO = 'STUDIO',
+    COMMERCIAL = 'COMMERCIAL',
+    LAND = 'LAND',
 }
 
 export class Listing {
@@ -12,12 +13,18 @@ export class Listing {
     title: string;
     description: string;
     price: number;
-    size: number; // in sq meters or ft
+    size: number;
     address: string;
+    latitude?: number;
+    longitude?: number;
     type: PropertyType;
+    ownerId: string;
     owner?: User;
     images: string[];
-    features: string[]; // e.g. ['pool', 'genome']
+    features: string[];
+    videoUrl?: string;
+    virtualTourUrl?: string;
+    views: number;
     createdAt: Date;
     updatedAt: Date;
 }

@@ -9,30 +9,33 @@ export class ListingsService {
   constructor(private prisma: PrismaService) { }
 
   create(createListingDto: CreateListingDto) {
-    return this.prisma.listing.create({
-      data: {
-        ...createListingDto,
-        // Default values for simplified schema
-        type: createListingDto.type.toString(),
-        images: '[]',
-        features: '[]',
-      },
-    });
+    const data: any = {
+      ...createListingDto,
+      price: createListingDto.price.toString(),
+    };
+    return this.prisma.listing.create({ data });
   }
 
   findAll() {
-    return this.prisma.listing.findMany();
+    return this.prisma.listing.findMany({
+      include: { owner: true } as any,
+      orderBy: { createdAt: 'desc' } as any,
+    });
   }
 
   findOne(id: string) {
-    return this.prisma.listing.findUnique({ where: { id } });
+    return this.prisma.listing.findUnique({
+      where: { id },
+      include: { owner: true, availabilities: true } as any,
+    });
   }
 
   update(id: string, updateListingDto: UpdateListingDto) {
-    // Handle type enum to string conversion if present
-    const data: any = { ...updateListingDto };
-    if (data.type) data.type = data.type.toString();
-
+    const { price, ...rest } = updateListingDto;
+    const data: any = {
+      ...rest,
+      price: price ? price.toString() : undefined,
+    };
     return this.prisma.listing.update({
       where: { id },
       data,
