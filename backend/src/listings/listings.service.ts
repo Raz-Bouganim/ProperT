@@ -23,6 +23,14 @@ export class ListingsService {
     });
   }
 
+  findAllByOwner(ownerId: string) {
+    return this.prisma.listing.findMany({
+      where: { ownerId },
+      include: { owner: true } as any,
+      orderBy: { createdAt: 'desc' } as any,
+    });
+  }
+
   async findAllWithinRadius(lat: number, lng: number, radiusInKm: number) {
     const radiusInMeters = radiusInKm * 1000;
 

@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request } from '@nestjs/common';
 import { ListingsService } from './listings.service';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
+import { JwtAuthGuard } from '../auth/auth.guards';
 
 @Controller('listings')
 export class ListingsController {
@@ -15,6 +16,12 @@ export class ListingsController {
   @Get()
   findAll() {
     return this.listingsService.findAll();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('my-listings')
+  findMyListings(@Request() req: any) {
+    return this.listingsService.findAllByOwner(req.user.userId);
   }
 
   @Get('search')
