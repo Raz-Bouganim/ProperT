@@ -1,73 +1,106 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { FilterModal } from '@/components/search/FilterModal';
-import { SlidersHorizontal } from 'lucide-react';
-import Link from 'next/link';
-import Image from 'next/image';
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { ListingCard } from "@/components/ListingCard";
+import dynamic from "next/dynamic";
+import { Loader2, MapPin } from "lucide-react";
+
+// Dynamically import Map to avoid SSR issues with Leaflet
+const Map = dynamic(() => import("@/components/Map"), {
+    ssr: false,
+    loading: () => (
+        <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
+            <Loader2 className="w-6 h-6 animate-spin" />
+        </div>
+    ),
+});
 
 export default function SearchPage() {
-    const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+    const searchParams = useSearchParams();
+    const [listings, setListings] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const listings = [
-        { id: 1, title: "Luxury Loft", location: "SoHo, NY", price: "$3,200/mo", specs: "1 Bed • 1 Bath", image: "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?auto=format&fit=crop&w=800&q=80" },
-        { id: 2, title: "Modern Condo", location: "Downtown, NY", price: "$4,500/mo", specs: "2 Beds • 2 Baths", image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80" },
-        { id: 3, title: "Classic Brownstone", location: "Brooklyn, NY", price: "$5,000/mo", specs: "3 Beds • 2 Baths", image: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=80" },
-        { id: 4, title: "Studio Apartment", location: "Queens, NY", price: "$1,900/mo", specs: "Studio • 1 Bath", image: "https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=800&q=80" },
-        { id: 5, title: "Penthouse View", location: "Manhattan, NY", price: "$9,200/mo", specs: "3 Beds • 3 Baths", image: "https://images.unsplash.com/photo-1512918766755-ee7a6c25118c?auto=format&fit=crop&w=800&q=80" },
-        { id: 6, title: "Garden House", location: "Staten Island, NY", price: "$2,800/mo", specs: "2 Beds • 1 Bath", image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=800&q=80" },
-        { id: 7, title: "Industrial Loft", location: "Williamsburg, NY", price: "$3,600/mo", specs: "1 Bed • 2 Baths", image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80" },
-        { id: 8, title: "River View Apt", location: "Battery Park, NY", price: "$4,100/mo", specs: "2 Beds • 2 Baths", image: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80" }
-    ];
+    // Default to NYC if no params
+    const lat = parseFloat(searchParams.get("lat") || "40.7128");
+    const lng = parseFloat(searchParams.get("lng") || "-74.0060");
+    const radius = parseFloat(searchParams.get("radius") || "10");
+
+    useEffect(() => {
+        async function fetchListings() {
+            setLoading(true);
+            try {
+                const res = await fetch(
+                    `http://localhost:5000/listings/search?lat=${lat}&lng=${lng}&radius=${radius}`
+                );
+                if (!res.ok) throw new Error("Failed to fetch");
+                const data = await res.json();
+                setListings(data);
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        fetchListings();
+    }, [lat, lng, radius]);
 
     return (
-        <div className="min-h-screen bg-background pb-20">
-            {/* Search Header */}
-            <div className="sticky top-16 z-40 bg-background/80 backdrop-blur-md border-b p-4 flex items-center gap-3">
-                <div className="flex-grow relative">
-                    <input
-                        type="text"
-                        placeholder="Search city, neighborhood, or address..."
-                        className="w-full pl-4 pr-10 py-2.5 rounded-full border bg-muted/50 focus:bg-background transition-all outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm"
-                    />
+        <div className="min-h-screen pt-20 pb-8 px-4 max-w-[1600px] mx-auto">
+            <div className="flex flex-col-reverse lg:flex-row gap-6 h-[calc(100vh-120px)]">
+
+                {/* Left: Listings List */}
+                <div className="w-full lg:w-3/5 xl:w-[55%] flex flex-col">
+                    <header className="mb-6 flex items-baseline justify-between">
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight">
+                                {listings.length} homes near you
+                            </h1>
+                            <p className="text-muted-foreground text-sm mt-1">
+                                Within {radius}km of current location
+                            </p>
+                        </div>
+                    </header>
+
+                    {loading ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {[1, 2, 3, 4].map((i) => (
+                                <ListingCard key={i} id="" title="" address="" price={0} beds={0} baths={0} sqft={0} image="" isLoading />
+                            ))}
+                        </div>
+                    ) : listings.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto pr-2 pb-4 no-scrollbar">
+                            {listings.map((listing) => (
+                                <ListingCard
+                                    key={listing.id}
+                                    id={listing.id}
+                                    title={listing.title}
+                                    address={listing.address}
+                                    price={Number(listing.price)}
+                                    beds={listing.originalBeds || 2} // Fallback if DB schema differs from UI
+                                    baths={listing.originalBaths || 1}
+                                    sqft={listing.size}
+                                    image={listing.images[0] || "/placeholder.jpg"}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-64 text-center border-2 border-dashed rounded-2xl">
+                            <MapPin className="w-10 h-10 text-muted-foreground mb-4" />
+                            <h3 className="font-bold text-lg">No homes found</h3>
+                            <p className="text-muted-foreground max-w-xs">
+                                Try expanding your search radius or moving the map to a different area.
+                            </p>
+                        </div>
+                    )}
                 </div>
-                <Button variant="outline" size="icon" className="rounded-full shrink-0 border-input w-11 h-11" onClick={() => setIsFiltersOpen(true)}>
-                    <SlidersHorizontal className="h-4 w-4" />
-                </Button>
-            </div>
 
-            {/* Results Grid */}
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {listings.map((item) => (
-                    <Link href={`/listings/${item.id}`} key={item.id} className="group cursor-pointer rounded-xl border bg-card overflow-hidden shadow-sm transition-all hover:shadow-md hover:scale-[1.02]">
-                        <div className="aspect-[4/3] bg-muted relative">
-                            <Image
-                                src={item.image}
-                                alt={item.title}
-                                fill
-                                className="object-cover"
-                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                            />
-                            <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-md">
-                                {item.price}
-                            </div>
-                        </div>
-                        <div className="p-4">
-                            <div className="flex justify-between items-start mb-1">
-                                <h3 className="font-semibold text-lg leading-tight truncate pr-2">{item.title}</h3>
-                                <div className="flex items-center gap-1 text-yellow-500 text-xs font-medium">⭐ 4.8</div>
-                            </div>
-                            <p className="text-sm text-muted-foreground truncate mb-3">{item.location}</p>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
-                                <span className="bg-muted px-2 py-1 rounded">{item.specs}</span>
-                            </div>
-                        </div>
-                    </Link>
-                ))}
+                {/* Right: Map */}
+                <div className="w-full lg:w-2/5 xl:w-[45%] h-[400px] lg:h-full sticky top-24 rounded-2xl overflow-hidden shadow-xl border border-zinc-200/50">
+                    <Map listings={listings} center={[lat, lng]} zoom={13} />
+                </div>
             </div>
-
-            <FilterModal isOpen={isFiltersOpen} onClose={() => setIsFiltersOpen(false)} />
         </div>
     );
 }
