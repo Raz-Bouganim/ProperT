@@ -9,7 +9,18 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'i.pravatar.cc',
       },
+      {
+        protocol: "https",
+        hostname: "ui-avatars.com",
+        port: "",
+        pathname: "/**",
+      },
     ],
+  },
+  experimental: {
+    turbopack: {
+      root: '..',
+    },
   },
 };
 

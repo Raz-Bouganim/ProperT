@@ -20,6 +20,9 @@ export interface ListingCardProps {
     sqft: number;
     image: string;
     isLoading?: boolean;
+    isHighlighted?: boolean;
+    onMouseEnter?: () => void;
+    onMouseLeave?: () => void;
 }
 
 export function ListingCard({
@@ -32,6 +35,9 @@ export function ListingCard({
     sqft,
     image,
     isLoading,
+    isHighlighted,
+    onMouseEnter,
+    onMouseLeave,
 }: ListingCardProps) {
     if (isLoading) {
         return (
@@ -53,7 +59,12 @@ export function ListingCard({
     return (
         <Link
             href={`/listings/${id}`}
-            className="group relative flex flex-col rounded-2xl border bg-card overflow-hidden shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
+            className={cn(
+                "group relative flex flex-col rounded-2xl border bg-card overflow-hidden shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1",
+                isHighlighted && "ring-2 ring-primary border-primary shadow-lg -translate-y-1"
+            )}
         >
             <div className="aspect-[4/3] relative overflow-hidden bg-muted">
                 <Image

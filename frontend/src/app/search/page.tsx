@@ -20,6 +20,7 @@ export default function SearchPage() {
     const searchParams = useSearchParams();
     const [listings, setListings] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [hoveredListingId, setHoveredListingId] = useState<string | null>(null);
 
     // Default to NYC if no params
     const lat = parseFloat(searchParams.get("lat") || "40.7128");
@@ -82,6 +83,9 @@ export default function SearchPage() {
                                     baths={listing.originalBaths || 1}
                                     sqft={listing.size}
                                     image={listing.images[0] || "/placeholder.jpg"}
+                                    isHighlighted={hoveredListingId === listing.id}
+                                    onMouseEnter={() => setHoveredListingId(listing.id)}
+                                    onMouseLeave={() => setHoveredListingId(null)}
                                 />
                             ))}
                         </div>
@@ -98,7 +102,7 @@ export default function SearchPage() {
 
                 {/* Right: Map */}
                 <div className="w-full lg:w-2/5 xl:w-[45%] h-[400px] lg:h-full sticky top-24 rounded-2xl overflow-hidden shadow-xl border border-zinc-200/50">
-                    <Map listings={listings} center={[lat, lng]} zoom={13} />
+                    <Map listings={listings} center={[lat, lng]} zoom={13} hoveredListingId={hoveredListingId} />
                 </div>
             </div>
         </div>
