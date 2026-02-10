@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import api from '@/lib/api';
 
 interface User {
     id: string;
@@ -27,19 +28,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('auth_token');
-        const storedUser = localStorage.getItem('auth_user');
-        if (storedToken && storedUser) {
-            try {
-                setUser(JSON.parse(storedUser));
-                setToken(storedToken);
-            } catch (error) {
-                console.error('Failed to parse user from local storage:', error);
-                localStorage.removeItem('auth_user');
-                localStorage.removeItem('auth_token');
+        const checkAuth = async () => {
+            const storedToken = localStorage.getItem('auth_token');
+            if (storedToken) {
+                try {
+                    // Optimistically set token to allow api interceptor to work if it relied on context (though it relies on LS)
+                    setToken(storedToken);
+
+                    const { data } = await api.get('/users/me');
+                    setUser(data);
+                    localStorage.setItem('auth_user', JSON.stringify(data));
+                } catch (error) {
+                    console.error('Session verification failed:', error);
+                    logout();
+                }
+            } else {
+                logout();
             }
-        }
-        setIsLoading(false);
+            setIsLoading(false);
+        };
+
+        checkAuth();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

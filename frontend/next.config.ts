@@ -1,4 +1,6 @@
-const nextConfig = {
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
   images: {
     dangerouslyAllowSVG: true,
     remotePatterns: [
@@ -18,11 +20,7 @@ const nextConfig = {
       },
     ],
   },
-  experimental: {
-    turbopack: {
-      root: '..',
-    },
-  },
+
 };
 
 export default nextConfig;

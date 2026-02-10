@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -14,17 +14,17 @@ import { useRouter } from "next/navigation";
 const listingSchema = z.object({
     title: z.string().min(5, "Title must be at least 5 characters"),
     description: z.string().min(20, "Description must be at least 20 characters"),
-    price: z.coerce.number().min(1, "Price must be positive"),
+    price: z.number().min(1, "Price must be positive"),
     address: z.string().min(5, "Address must be at least 5 characters"),
-    beds: z.coerce.number().min(0),
-    baths: z.coerce.number().min(0),
-    sqft: z.coerce.number().min(1, "Square footage must be positive"),
+    beds: z.number().min(0),
+    baths: z.number().min(0),
+    sqft: z.number().min(1, "Square footage must be positive"),
     type: z.enum(["APARTMENT", "HOUSE", "STUDIO", "LAND", "OFFICE"]),
 });
 
 type ListingFormValues = z.infer<typeof listingSchema>;
 
-export default function PostListing() {
+function PostListingContent() {
     const [step, setStep] = useState(1);
     const [images, setImages] = useState<{ file: File; preview: string; key?: string }[]>([]);
     const [isUploading, setIsUploading] = useState(false);
@@ -170,7 +170,7 @@ export default function PostListing() {
                                             <Input
                                                 type="number"
                                                 placeholder="2500"
-                                                {...form.register("price")}
+                                                {...form.register("price", { valueAsNumber: true })}
                                                 error={form.formState.errors.price?.message}
                                             />
                                         </div>
@@ -202,15 +202,15 @@ export default function PostListing() {
                                     <div className="grid grid-cols-3 gap-4">
                                         <div className="space-y-2">
                                             <Label>Beds</Label>
-                                            <Input type="number" {...form.register("beds")} />
+                                            <Input type="number" {...form.register("beds", { valueAsNumber: true })} />
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Baths</Label>
-                                            <Input type="number" {...form.register("baths")} />
+                                            <Input type="number" {...form.register("baths", { valueAsNumber: true })} />
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Sq Ft</Label>
-                                            <Input type="number" {...form.register("sqft")} error={form.formState.errors.sqft?.message} />
+                                            <Input type="number" {...form.register("sqft", { valueAsNumber: true })} error={form.formState.errors.sqft?.message} />
                                         </div>
                                     </div>
                                 </div>
@@ -280,5 +280,13 @@ export default function PostListing() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function PostListing() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <PostListingContent />
+        </Suspense>
     );
 }
