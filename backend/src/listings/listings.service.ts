@@ -23,6 +23,28 @@ export class ListingsService {
     });
   }
 
+  async findAllWithinRadius(lat: number, lng: number, radiusInKm: number) {
+    const radiusInMeters = radiusInKm * 1000;
+
+    // 1. Find IDs within radius using PostGIS
+    const rawListings = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Listing"
+      WHERE ST_DWithin(
+        ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
+        ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
+        ${radiusInMeters}
+      );
+    `;
+
+    const ids = rawListings.map(l => l.id);
+
+    // 2. Fetch full details with Prisma
+    return this.prisma.listing.findMany({
+      where: { id: { in: ids } },
+      include: { owner: true } as any,
+    });
+  }
+
   findOne(id: string) {
     return this.prisma.listing.findUnique({
       where: { id },
