@@ -16,7 +16,9 @@ const Map = dynamic(() => import("@/components/Map"), {
     ),
 });
 
-export default function SearchPage() {
+import { Suspense } from "react";
+
+function SearchPageContent() {
     const searchParams = useSearchParams();
     const [listings, setListings] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -106,5 +108,13 @@ export default function SearchPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function SearchPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <SearchPageContent />
+        </Suspense>
     );
 }

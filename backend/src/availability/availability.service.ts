@@ -31,18 +31,14 @@ export class AvailabilityService {
 
     // The "Smart" part: calculate discrete slots - booked slots
     async getOpenSlots(listingId: string, date: Date) {
-        console.log(`[AvailabilityService] Calculating slots for listing: ${listingId} on date: ${date.toISOString()}`);
-        const dayOfWeek = date.getDay(); // 0-6 (Sun-Sat)
+        const dayOfWeek = date.getDay();
 
         // 1. Get availability for this day
         const availability = await this.prisma.availability.findFirst({
             where: { listingId, dayOfWeek },
         });
 
-        if (!availability) {
-            console.log(`[AvailabilityService] No availability found for day of week: ${dayOfWeek}`);
-            return [];
-        }
+        if (!availability) return [];
 
         // 2. Get existing bookings for this day
         const startOfDay = new Date(date);
@@ -55,47 +51,38 @@ export class AvailabilityService {
                 listingId,
                 startTime: { gte: startOfDay },
                 endTime: { lte: endOfDay },
-                status: { not: 'REJECTED' }, // Pending or Confirmed blocks the slot
-                // also exclude cancelled?
+                status: { in: ['PENDING', 'CONFIRMED'] },
             },
         });
 
         // 3. Generate slots (30 min intervals)
         const slots: string[] = [];
-        let current = this.parseTime(availability.startTime);
-        const end = this.parseTime(availability.endTime);
+        const [startH, startM] = availability.startTime.split(':').map(Number);
+        const [endH, endM] = availability.endTime.split(':').map(Number);
 
-        while (current < end) {
-            const slotStart = this.formatTime(current);
-            // next slot is +30 mins
-            const nextTime = new Date(current.getTime() + 30 * 60000);
-            const slotEnd = this.formatTime(nextTime);
+        const current = new Date(date);
+        current.setHours(startH, startM, 0, 0);
 
-            if (nextTime > end) break;
+        const endLimit = new Date(date);
+        endLimit.setHours(endH, endM, 0, 0);
 
-            // Check collision
+        while (current < endLimit) {
+            const slotStart = new Date(current);
+            const slotEnd = new Date(current.getTime() + 30 * 60000);
+
+            if (slotEnd > endLimit) break;
+
             const isBooked = bookings.some(b => {
-                const bStart = b.startTime;
-                const bEnd = b.endTime;
-
-                // Construct Date objects for slot
-                const slotStartDate = new Date(date);
-                const [h, m] = slotStart.split(':').map(Number);
-                slotStartDate.setHours(h, m, 0, 0);
-
-                const slotEndDate = new Date(date);
-                const [eh, em] = slotEnd.split(':').map(Number);
-                slotEndDate.setHours(eh, em, 0, 0);
-
-                // Overlap check
-                return (slotStartDate < bEnd && slotEndDate > bStart);
+                const bStart = new Date(b.startTime);
+                const bEnd = new Date(b.endTime);
+                return (slotStart < bEnd && slotEnd > bStart);
             });
 
             if (!isBooked) {
-                slots.push(slotStart);
+                slots.push(this.formatTime(slotStart));
             }
 
-            current = nextTime;
+            current.setTime(current.getTime() + 30 * 60000);
         }
 
         return slots;

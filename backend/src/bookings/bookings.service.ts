@@ -18,11 +18,24 @@ export class BookingsService {
             throw new BadRequestException('End time must be after start time');
         }
 
-        // Check for conflicts
+        // Check if user already has a booking for this listing
+        const existingUserBooking = await this.prisma.booking.findFirst({
+            where: {
+                listingId: createBookingDto.listingId,
+                seekerId: createBookingDto.seekerId,
+                status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
+            },
+        });
+
+        if (existingUserBooking) {
+            throw new BadRequestException('You already have a booking for this property');
+        }
+
+        // Check for slot conflicts
         const conflict = await this.prisma.booking.findFirst({
             where: {
                 listingId: createBookingDto.listingId,
-                status: { not: 'REJECTED' },
+                status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
                 OR: [
                     {
                         startTime: { lt: createBookingDto.endTime },
@@ -33,7 +46,7 @@ export class BookingsService {
         });
 
         if (conflict) {
-            throw new BadRequestException('Slot already booked');
+            throw new BadRequestException('This slot is already booked');
         }
 
         return this.prisma.booking.create({

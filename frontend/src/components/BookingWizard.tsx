@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { format, addMonths, startOfToday } from "date-fns";
 import { DayPicker } from "react-day-picker";
@@ -9,6 +7,7 @@ import { X, Calendar as CalendarIcon, Clock, CheckCircle2, Loader2, ChevronRight
 import { Button } from "./ui/Button";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 interface BookingWizardProps {
     listingId: string;
@@ -40,6 +39,7 @@ export function BookingWizard({ listingId, isOpen, onClose }: BookingWizardProps
             setAvailabilityRules(res.data);
         } catch (error) {
             console.error(error);
+            toast.error("Failed to load availability.");
         }
     };
 
@@ -60,6 +60,7 @@ export function BookingWizard({ listingId, isOpen, onClose }: BookingWizardProps
         } catch (error) {
             console.error(error);
             setSlots([]);
+            toast.error("Failed to load time slots.");
         } finally {
             setLoading(false);
         }
@@ -77,7 +78,7 @@ export function BookingWizard({ listingId, isOpen, onClose }: BookingWizardProps
             const endTime = new Date(startTime.getTime() + 30 * 60000); // 30 min duration
 
             if (!user) {
-                alert("You must be logged in to book a viewing.");
+                toast.error("You must be logged in to book a viewing.");
                 return;
             }
 
@@ -103,7 +104,7 @@ export function BookingWizard({ listingId, isOpen, onClose }: BookingWizardProps
 
         } catch (error) {
             console.error(error);
-            alert("Something went wrong. Please try again.");
+            toast.error("Something went wrong. Please try again.");
         } finally {
             setSubmitting(false);
         }
@@ -175,9 +176,9 @@ export function BookingWizard({ listingId, isOpen, onClose }: BookingWizardProps
                                             selected: "bg-primary text-white rounded-lg",
                                             today: "text-primary font-bold"
                                         }}
-                                        styles={{
-                                            caption: { color: 'hsl(var(--primary))', fontWeight: 'bold' },
-                                            head_cell: { color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: '800' }
+                                        classNames={{
+                                            caption: "text-primary font-bold",
+                                            head_cell: "text-muted-foreground uppercase text-xs font-extrabold"
                                         }}
                                     />
                                 </div>
