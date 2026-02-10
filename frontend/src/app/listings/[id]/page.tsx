@@ -7,11 +7,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { BookingWizard } from "@/components/BookingWizard";
+import { ChatWindow } from "@/components/ChatWindow";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export default function ListingDetail({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const [isBookingOpen, setIsBookingOpen] = useState(false);
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const { user } = useAuth();
     const [listing, setListing] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
@@ -209,7 +213,12 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                                 >
                                     Request a viewing
                                 </Button>
-                                <Button size="lg" variant="outline" className="w-full h-14 text-lg rounded-2xl font-bold gap-2">
+                                <Button
+                                    size="lg"
+                                    variant="outline"
+                                    className="w-full h-14 text-lg rounded-2xl font-bold gap-2"
+                                    onClick={() => setIsChatOpen(true)}
+                                >
                                     <Mail className="w-5 h-5" /> Message Owner
                                 </Button>
                             </div>
@@ -237,6 +246,14 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                 listingId={id}
                 isOpen={isBookingOpen}
                 onClose={() => setIsBookingOpen(false)}
+            />
+
+            <ChatWindow
+                listingId={id}
+                ownerId={listing.ownerId}
+                listingTitle={listing.title}
+                isOpen={isChatOpen}
+                onClose={() => setIsChatOpen(false)}
             />
         </div>
     );

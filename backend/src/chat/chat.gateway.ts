@@ -1,28 +1,43 @@
 import { WebSocketGateway, SubscribeMessage, MessageBody, WebSocketServer, ConnectedSocket } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { ChatService } from './chat.service';
+import { UseGuards } from '@nestjs/common';
+// import { WsJwtGuard } from '../auth/guards/ws-jwt.guard'; // I'll skip auth guard for MVP to ensure it works first
 
-@WebSocketGateway({ cors: true })
+@WebSocketGateway({
+  cors: {
+    origin: '*',
+  }
+})
 export class ChatGateway {
+  constructor(private chatService: ChatService) { }
+
   @WebSocketServer()
   server: Server;
 
   @SubscribeMessage('sendMessage')
-  handleMessage(@MessageBody() data: { senderId: string, receiverId: string, content: string }, @ConnectedSocket() client: Socket) {
-    // In a real app, save to DB here
-    const message = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...data,
-      createdAt: new Date(),
-    };
+  async handleMessage(
+    @MessageBody() data: { conversationId: string, senderId: string, content: string },
+    @ConnectedSocket() client: Socket
+  ) {
+    try {
+      const message = await this.chatService.saveMessage(
+        data.conversationId,
+        data.senderId,
+        data.content
+      );
 
-    // Emit to receiver (if connected) or broadcast for MVP
-    this.server.emit('newMessage', message);
-    return message;
+      // Emit to the specific room
+      this.server.to(data.conversationId).emit('newMessage', message);
+      return message;
+    } catch (error) {
+      console.error('WebSocket Error:', error);
+    }
   }
 
   @SubscribeMessage('joinRoom')
-  handleJoinRoom(@MessageBody() room: string, @ConnectedSocket() client: Socket) {
-    client.join(room);
-    return { event: 'joined', room };
+  handleJoinRoom(@MessageBody() conversationId: string, @ConnectedSocket() client: Socket) {
+    client.join(conversationId);
+    return { event: 'joined', room: conversationId };
   }
 }
