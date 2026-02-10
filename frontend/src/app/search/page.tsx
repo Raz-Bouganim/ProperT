@@ -82,7 +82,7 @@ export default function SearchPage() {
                                     beds={listing.originalBeds || 2} // Fallback if DB schema differs from UI
                                     baths={listing.originalBaths || 1}
                                     sqft={listing.size}
-                                    image={listing.images[0] || "/placeholder.jpg"}
+                                    image={listing.images[0] || "/placeholder.svg"}
                                     isHighlighted={hoveredListingId === listing.id}
                                     onMouseEnter={() => setHoveredListingId(listing.id)}
                                     onMouseLeave={() => setHoveredListingId(null)}

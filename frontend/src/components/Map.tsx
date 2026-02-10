@@ -67,7 +67,7 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
                         <Popup>
                             <div className="min-w-[200px]">
                                 <img
-                                    src={listing.images[0] || "/placeholder.jpg"}
+                                    src={listing.images[0] || "/placeholder.svg"}
                                     alt={listing.title}
                                     className="w-full h-32 object-cover rounded-lg mb-2"
                                 />

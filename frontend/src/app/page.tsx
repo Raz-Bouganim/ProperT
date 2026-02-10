@@ -98,7 +98,7 @@ export default function Home() {
                 beds={listing.beds || 2}
                 baths={listing.baths || 1}
                 sqft={listing.size}
-                image={listing.images[0] || "/placeholder.jpg"}
+                image={listing.images[0] || "/placeholder.svg"}
               />
             ))
           ) : (

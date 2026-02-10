@@ -60,7 +60,7 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
 
     const displayListing = {
         ...listing,
-        images: (listing.images && listing.images.length > 0) ? listing.images : ["/placeholder-property.jpg"],
+        images: (listing.images && listing.images.length > 0) ? listing.images : ["/placeholder-property.svg"],
         owner: {
             name: listing.owner?.firstName ? `${listing.owner.firstName} ${listing.owner.lastName}` : "Property Owner",
             avatar: listing.owner?.avatar || `https://ui-avatars.com/api/?name=${listing.owner?.firstName || 'O'}&background=random`,
@@ -69,7 +69,7 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
         features: listing.features || []
     };
 
-    const getImg = (index: number) => displayListing.images[index] || displayListing.images[0] || "/placeholder-property.jpg";
+    const getImg = (index: number) => displayListing.images[index] || displayListing.images[0] || "/placeholder-property.svg";
 
     return (
         <div className="min-h-screen bg-background pb-20">

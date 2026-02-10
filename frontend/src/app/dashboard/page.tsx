@@ -195,7 +195,7 @@ export default function DashboardPage() {
                                         beds={0} // TODO: Add beds to listing typs
                                         baths={0}
                                         sqft={listing.size}
-                                        image={listing.images[0] || "/placeholder-property.jpg"}
+                                        image={listing.images[0] || "/placeholder-property.svg"}
                                     />
                                 ))
                             )}

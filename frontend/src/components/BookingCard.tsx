@@ -45,7 +45,7 @@ export function BookingCard({ booking, role, onStatusChange }: BookingCardProps)
             {/* Image */}
             <div className="w-full md:w-48 aspect-video md:aspect-square relative rounded-xl overflow-hidden bg-muted flex-shrink-0">
                 <Image
-                    src={booking.listing.images[0] || "/placeholder-property.jpg"}
+                    src={booking.listing.images[0] || "/placeholder-property.svg"}
                     alt={booking.listing.title}
                     fill
                     className="object-cover"
