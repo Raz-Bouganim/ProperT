@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Calendar as CalendarIcon, Clock, CheckCircle2, Loader2, ChevronRight, ChevronLeft } from "lucide-react";
 import { Button } from "./ui/Button";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 interface BookingWizardProps {
     listingId: string;
@@ -24,6 +25,7 @@ export function BookingWizard({ listingId, isOpen, onClose }: BookingWizardProps
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
+    const { user } = useAuth();
 
     // Fetch availability rules on mount
     useEffect(() => {
@@ -74,9 +76,14 @@ export function BookingWizard({ listingId, isOpen, onClose }: BookingWizardProps
 
             const endTime = new Date(startTime.getTime() + 30 * 60000); // 30 min duration
 
+            if (!user) {
+                alert("You must be logged in to book a viewing.");
+                return;
+            }
+
             await api.post("/bookings", {
                 listingId,
-                seekerId: "demo-user-id", // In real app, get from auth context
+                seekerId: user.id,
                 startTime: startTime.toISOString(),
                 endTime: endTime.toISOString(),
                 notes: "Interested in viewing the property.",
