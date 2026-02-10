@@ -38,6 +38,7 @@ model User {
   
   firstName String
   lastName  String
+  avatar    String?
   
   role      UserRole @default(SEEKER)
 
