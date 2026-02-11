@@ -3,20 +3,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '@/lib/api';
 import Cookies from 'js-cookie';
+import { toast } from 'sonner';
 
-interface User {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    role: 'SEEKER' | 'OWNER';
-}
+import { User } from '@/types/auth'; // updated path
+import { AUTH_TOKEN_KEY } from '@/lib/constants';
+
+// interface User removed
 
 interface AuthContextType {
     user: User | null;
     token: string | null;
     login: (token: string, user: User) => void;
-    logout: () => void;
+    logout: (showToast?: boolean) => void;
     isAuthenticated: boolean;
     isLoading: boolean;
 }
@@ -28,9 +26,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
+    const logout = (showToast = true) => {
+        setToken(null);
+        setUser(null);
+        Cookies.remove(AUTH_TOKEN_KEY);
+        if (showToast) {
+            toast.success('Logged out successfully');
+        }
+    };
+
     useEffect(() => {
         const checkAuth = async () => {
-            const storedToken = Cookies.get('auth_token');
+            const storedToken = Cookies.get(AUTH_TOKEN_KEY);
             if (storedToken) {
                 try {
                     setToken(storedToken);
@@ -38,10 +45,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setUser(data);
                 } catch (error) {
                     console.error('Session verification failed:', error);
-                    logout();
+                    logout(false);
                 }
             } else {
-                logout();
+                logout(false);
             }
             setIsLoading(false);
         };
@@ -69,11 +76,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 try {
                     const { data } = await api.post('/auth/refresh');
                     setToken(data.access_token);
-                    Cookies.set('auth_token', data.access_token);
+                    Cookies.set(AUTH_TOKEN_KEY, data.access_token);
                 } catch (error) {
                     console.error('Failed to refresh session:', error);
                     // If refresh fails (e.g., token already expired), logout
-                    logout();
+                    logout(false);
                 }
             }
         }, 10 * 60 * 1000); // Check every 10 minutes
@@ -88,13 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const login = (newToken: string, newUser: User) => {
         setToken(newToken);
         setUser(newUser);
-        Cookies.set('auth_token', newToken);
-    };
-
-    const logout = () => {
-        setToken(null);
-        setUser(null);
-        Cookies.remove('auth_token');
+        Cookies.set(AUTH_TOKEN_KEY, newToken);
     };
 
     return (
