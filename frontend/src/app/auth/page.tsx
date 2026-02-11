@@ -9,13 +9,13 @@ import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 type AuthMode = 'login' | 'register';
 
 export default function AuthPage() {
     const [mode, setMode] = useState<AuthMode>('login');
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const { login: saveAuth } = useAuth();
     const router = useRouter();
@@ -30,7 +30,6 @@ export default function AuthPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        setError(null);
 
         const body = mode === 'login'
             ? { email: formData.email, password: formData.password }
@@ -40,10 +39,38 @@ export default function AuthPage() {
             const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
             const { data } = await api.post(endpoint, body);
 
+            toast.success(mode === 'login' ? 'Welcome back!' : 'Account created successfully!');
             saveAuth(data.access_token, data.user);
-            router.push('/'); // Redirect to home after login
+            router.push('/');
         } catch (err: any) {
-            setError(err.response?.data?.message || err.message || 'Authentication failed');
+            const responseData = err.response?.data;
+
+            // Helper to extract a human-readable string from potentially nested error objects
+            const extractMessage = (data: any): string => {
+                if (!data) return '';
+                if (typeof data === 'string') return data;
+
+                // NestJS/Express common keys
+                const msg = data.message || data.msg || data.error;
+
+                if (Array.isArray(msg)) return String(msg[0]);
+                if (typeof msg === 'string') return msg;
+                if (typeof msg === 'object') return extractMessage(msg); // Recurse one level
+
+                return '';
+            };
+
+            let finalMsg = extractMessage(responseData);
+
+            // Special case for 401 Unauthorized (wrong password etc)
+            if (err.response?.status === 401) {
+                if (!finalMsg || finalMsg.toLowerCase() === 'unauthorized') {
+                    finalMsg = 'Invalid email or password';
+                }
+            }
+
+            finalMsg = finalMsg || err.response?.statusText || err.message || 'Authentication failed';
+            toast.error(finalMsg);
         } finally {
             setIsLoading(false);
         }
@@ -192,11 +219,6 @@ export default function AuthPage() {
                             </div>
                         </div>
 
-                        {error && (
-                            <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-red-600 text-sm font-medium animate-in shake duration-300">
-                                {error}
-                            </div>
-                        )}
 
                         <Button
                             type="submit"
@@ -239,7 +261,11 @@ export default function AuthPage() {
                     </div>
 
                     <p className="mt-10 text-center text-sm font-medium text-[#636f88]">
-                        Don't have an account? <button onClick={() => setMode('register')} className="font-bold text-[#1754cf] hover:underline cursor-pointer">Create an account</button>
+                        {mode === 'login' ? (
+                            <>Don&apos;t have an account? <button onClick={() => setMode('register')} className="font-bold text-[#1754cf] hover:underline cursor-pointer">Create an account</button></>
+                        ) : (
+                            <>Already have an account? <button onClick={() => setMode('login')} className="font-bold text-[#1754cf] hover:underline cursor-pointer">Sign In</button></>
+                        )}
                     </p>
                 </div>
             </div>
