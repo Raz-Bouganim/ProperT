@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useState } from "react";
 import { X, Plus, Minus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // Fix for default marker icons in Leaflet with Webpack/Next.js
 // ... (icons setup can remain, though we are overriding them)
@@ -14,6 +15,7 @@ interface MapProps {
     center?: [number, number];
     zoom?: number;
     hoveredListingId?: string | null;
+    className?: string;
 }
 
 function ZoomControls() {
@@ -58,7 +60,7 @@ function InvalidateMapSize() {
     return null;
 }
 
-export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13, hoveredListingId }: MapProps) {
+export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13, hoveredListingId, className }: MapProps) {
     const [selectedListing, setSelectedListing] = useState<any>(null);
 
     // Center map on first listing if available
@@ -93,7 +95,7 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
     };
 
     return (
-        <div className="relative h-full w-full rounded-2xl overflow-hidden group">
+        <div className={cn("relative h-full w-full rounded-2xl overflow-hidden group", className)}>
             <MapContainer
                 center={mapCenter}
                 zoom={zoom}

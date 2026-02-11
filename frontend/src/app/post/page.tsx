@@ -228,7 +228,7 @@ function PostListingContent() {
     return (
         <div className="min-h-screen bg-[#f6f6f8] font-sans text-slate-800 flex flex-col">
             {/* Top Navigation / Progress Stepper (Clean) */}
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+            <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200 sticky top-16 z-40 transition-all">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-center">
                     {/* Progress Bar */}
                     <div className="flex-1 max-w-2xl px-4 md:px-12">
@@ -462,7 +462,7 @@ function PostListingContent() {
                     </div>
 
                     <div className="lg:col-span-5">
-                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl sticky top-28 space-y-5">
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl sticky top-40 space-y-5">
                             <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 font-display tracking-tight">
                                 <MapPin className="text-primary w-6 h-6" /> Location
                             </h2>
@@ -501,6 +501,7 @@ function PostListingContent() {
                             {/* Real Map Integration */}
                             <div className="relative w-full h-80 rounded-xl overflow-hidden group border border-slate-200 shadow-sm">
                                 <Map
+                                    className="rounded-none"
                                     listings={watch("latitude") && watch("longitude") ? [{
                                         id: "preview",
                                         latitude: watch("latitude"),
