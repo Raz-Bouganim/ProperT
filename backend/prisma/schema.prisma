@@ -30,6 +30,11 @@ enum BookingStatus {
   CANCELLED
 }
 
+enum ListingStatus {
+  FOR_SALE
+  FOR_RENT
+}
+
 // Models
 model User {
   id        String   @id @default(uuid())
@@ -57,8 +62,11 @@ model Listing {
   id          String   @id @default(uuid())
   title       String
   description String
+  status      ListingStatus @default(FOR_SALE)
   price       Decimal  @db.Decimal(12, 2)
   size        Float
+  bedrooms    Int      @default(0)
+  bathrooms   Int      @default(0)
   
   type        PropertyType
   

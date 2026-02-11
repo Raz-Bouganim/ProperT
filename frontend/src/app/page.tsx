@@ -202,7 +202,7 @@ export default function Home() {
       </section>
 
       {/* Featured Properties Section */}
-      <section className="py-20 bg-white border-y border-slate-200">
+      <section className="py-20 bg-slate-50/50 border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-end gap-10 mb-16">
             <div className="text-left">
@@ -232,6 +232,7 @@ export default function Home() {
                   image={listing.images?.[0] || fallbackImages[index % 3]}
                   isFeatured
                   type={listing.type || "For Sale"}
+                  status={listing.status}
                 />
               ))
             ) : (

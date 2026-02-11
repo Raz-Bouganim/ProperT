@@ -29,11 +29,29 @@ export class ListingsController {
     @Query('lat') lat: string,
     @Query('lng') lng: string,
     @Query('radius') radius: string,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('beds') beds?: string,
+    @Query('baths') baths?: string,
+    @Query('propertyType') propertyType?: string,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     return this.listingsService.findAllWithinRadius(
       parseFloat(lat),
       parseFloat(lng),
-      parseFloat(radius)
+      parseFloat(radius),
+      {
+        minPrice: minPrice ? parseFloat(minPrice) : undefined,
+        maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
+        beds: beds ? parseInt(beds) : undefined,
+        baths: baths ? parseInt(baths) : undefined,
+        propertyType,
+        status,
+        page: page ? parseInt(page) : 1,
+        limit: limit ? parseInt(limit) : 9,
+      }
     );
   }
 

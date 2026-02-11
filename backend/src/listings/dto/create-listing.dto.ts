@@ -1,6 +1,6 @@
-import { PropertyType } from '../entities/listing.entity';
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PropertyType, ListingStatus } from '@prisma/client';
 
 export class CreateListingDto {
     @IsString()
@@ -12,13 +12,11 @@ export class CreateListingDto {
     description: string;
 
     @IsNumber()
-    @Min(0)
-    @Type(() => Number)
+    @IsNotEmpty()
     price: number;
 
     @IsNumber()
-    @Min(0)
-    @Type(() => Number)
+    @IsNotEmpty()
     size: number;
 
     @IsString()
@@ -26,10 +24,21 @@ export class CreateListingDto {
     address: string;
 
     @IsEnum(PropertyType)
+    @IsNotEmpty()
     type: PropertyType;
 
-    @IsString()
+    @IsEnum(ListingStatus)
+    @IsOptional()
+    status?: ListingStatus;
+
+    @IsNumber()
     @IsNotEmpty()
+    bedrooms: number;
+
+    @IsNumber()
+    @IsNotEmpty()
+    bathrooms: number;
+
     ownerId: string;
 
     @IsNumber()
