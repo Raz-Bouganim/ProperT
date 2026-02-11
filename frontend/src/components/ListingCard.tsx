@@ -17,6 +17,9 @@ export interface ListingCardProps {
     isLoading?: boolean;
     isFeatured?: boolean;
     type?: string;
+    status?: string;
+    onMouseEnter?: () => void;
+    onMouseLeave?: () => void;
 }
 
 export function ListingCard({
@@ -30,19 +33,23 @@ export function ListingCard({
     image,
     isLoading,
     isFeatured,
-    type = "For Sale",
+    type = "New Construction",
+    status = "For Sale",
+    onMouseEnter,
+    onMouseLeave,
 }: ListingCardProps) {
     if (isLoading) {
         return (
-            <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm animate-pulse">
-                <div className="aspect-[4/3] bg-slate-100 mb-4" />
-                <div className="p-4 space-y-3">
+            <div className="rounded-2xl bg-transparent overflow-hidden shadow-sm animate-pulse">
+                <div className="aspect-[4/3] bg-slate-100" />
+                <div className="p-5 space-y-4">
+                    <div className="h-6 bg-slate-100 rounded w-1/3" />
                     <div className="h-4 bg-slate-100 rounded w-3/4" />
                     <div className="h-3 bg-slate-100 rounded w-1/2" />
-                    <div className="flex gap-4 pt-2">
-                        <div className="h-3 bg-slate-100 rounded w-8" />
-                        <div className="h-3 bg-slate-100 rounded w-8" />
-                        <div className="h-3 bg-slate-100 rounded w-8" />
+                    <div className="flex gap-4 pt-4 border-t border-slate-100">
+                        <div className="h-4 bg-slate-100 rounded w-12" />
+                        <div className="h-4 bg-slate-100 rounded w-12" />
+                        <div className="h-4 bg-slate-100 rounded w-12" />
                     </div>
                 </div>
             </div>
@@ -52,56 +59,60 @@ export function ListingCard({
     return (
         <Link
             href={`/listings/${id}`}
-            className="group block rounded-2xl border border-slate-200 overflow-hidden bg-white hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1"
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
+            className="group bg-transparent border border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300"
         >
-            <div className="relative h-60 overflow-hidden">
+            <div className="relative aspect-[4/3] overflow-hidden">
                 <Image
                     src={image || "/placeholder.svg"}
                     alt={title}
                     fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 />
-                <div className="absolute top-4 left-4">
-                    <span className="bg-white/90 backdrop-blur-sm text-slate-900 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
-                        {type}
-                    </span>
+                <div className="absolute top-3 left-3 bg-[#FDF6F0] px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-[#1A1A1A] shadow-sm z-10 border border-[#F5E6D8]">
+                    {status?.replace(/_/g, " ")}
                 </div>
                 <button
                     onClick={(e) => {
                         e.preventDefault();
                         // Favorite logic
                     }}
-                    className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 backdrop-blur-md p-2 rounded-full transition-colors text-white"
+                    className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-red-500 transition-all shadow-sm z-10 cursor-pointer"
                 >
-                    <Heart className="w-5 h-5 fill-transparent" />
+                    <Heart className="w-5 h-5" />
                 </button>
             </div>
 
             <div className="p-5">
-                <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-bold text-slate-900 group-hover:text-primary transition-colors mb-1 truncate">
-                            {title}
-                        </h3>
-                        <p className="text-slate-400 text-sm flex items-center gap-1">
-                            <MapPin className="w-3.5 h-3.5" />
-                            <span className="truncate">{address}</span>
-                        </p>
-                    </div>
+                <div className="flex items-baseline justify-between gap-2">
+                    <h3 className="text-2xl font-bold text-primary">${price.toLocaleString()}</h3>
+                    <span className="text-xs font-medium text-slate-400">Est. ${(price / 180).toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo</span>
                 </div>
+                <h4 className="text-lg font-bold text-slate-900 mt-1 line-clamp-1">
+                    {title}
+                </h4>
+                <p className="text-slate-500 text-sm mt-1 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span className="truncate">{address}</span>
+                </p>
 
-                <div className="flex items-center gap-4 pt-4 border-t border-slate-100">
-                    <div className="flex items-center gap-1.5 text-slate-500">
-                        <Bed className="w-4 h-4" />
-                        <span className="text-sm font-semibold">{beds} Bed</span>
+                <div className="flex items-center gap-4 mt-5 pt-5 border-t border-slate-100">
+                    <div className="flex items-center gap-1.5">
+                        <Bed className="w-5 h-5 text-slate-400" />
+                        <span className="text-sm font-bold">{beds}</span>
+                        <span className="text-[10px] text-slate-500 uppercase font-medium">Beds</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-slate-500">
-                        <Bath className="w-4 h-4" />
-                        <span className="text-sm font-semibold">{baths} Bath</span>
+                    <div className="flex items-center gap-1.5">
+                        <Bath className="w-5 h-5 text-slate-400" />
+                        <span className="text-sm font-bold">{baths}</span>
+                        <span className="text-[10px] text-slate-500 uppercase font-medium">Baths</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-slate-500 ml-auto font-black text-primary">
-                        ${price.toLocaleString()}
+                    <div className="flex items-center gap-1.5">
+                        <Square className="w-4 h-4 text-slate-400" />
+                        <span className="text-sm font-bold">{sqft.toLocaleString()}</span>
+                        <span className="text-[10px] text-slate-500 uppercase font-medium">sqft</span>
                     </div>
                 </div>
             </div>

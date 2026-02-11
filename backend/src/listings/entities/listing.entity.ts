@@ -8,10 +8,16 @@ export enum PropertyType {
     LAND = 'LAND',
 }
 
+export enum ListingStatus {
+    FOR_SALE = 'FOR_SALE',
+    FOR_RENT = 'FOR_RENT',
+}
+
 export class Listing {
     id: string;
     title: string;
     description: string;
+    status: ListingStatus;
     price: number;
     size: number;
     address: string;

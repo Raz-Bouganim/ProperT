@@ -20,6 +20,7 @@ const listingSchema = z.object({
     baths: z.number().min(0),
     sqft: z.number().min(1, "Square footage must be positive"),
     type: z.enum(["APARTMENT", "HOUSE", "STUDIO", "LAND", "OFFICE"]),
+    status: z.enum(["FOR_SALE", "FOR_RENT"]),
 });
 
 type ListingFormValues = z.infer<typeof listingSchema>;
@@ -34,6 +35,7 @@ function PostListingContent() {
         resolver: zodResolver(listingSchema),
         defaultValues: {
             type: "APARTMENT",
+            status: "FOR_SALE",
             beds: 1,
             baths: 1,
         },
@@ -175,6 +177,27 @@ function PostListingContent() {
                                             />
                                         </div>
                                     </div>
+                                    <div className="space-y-2">
+                                        <Label>Listing Status</Label>
+                                        <div className="flex bg-zinc-100 p-1 rounded-xl">
+                                            {["FOR_SALE", "FOR_RENT"].map((status) => (
+                                                <button
+                                                    key={status}
+                                                    type="button"
+                                                    onClick={() => form.setValue("status", status as any)}
+                                                    className={cn(
+                                                        "flex-1 py-2.5 text-sm font-bold rounded-lg transition-all",
+                                                        form.watch("status") === status
+                                                            ? "bg-white text-primary shadow-sm"
+                                                            : "text-zinc-500 hover:text-zinc-700"
+                                                    )}
+                                                >
+                                                    {status === "FOR_SALE" ? "For Sale" : "For Rent"}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-2">
                                         <Label>Description</Label>
                                         <Textarea

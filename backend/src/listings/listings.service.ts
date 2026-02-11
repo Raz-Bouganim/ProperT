@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { PropertyType } from './entities/listing.entity';
+import { PropertyType, ListingStatus } from '@prisma/client';
 
 @Injectable()
 export class ListingsService {
@@ -31,8 +31,25 @@ export class ListingsService {
     });
   }
 
-  async findAllWithinRadius(lat: number, lng: number, radiusInKm: number) {
+  async findAllWithinRadius(
+    lat: number,
+    lng: number,
+    radiusInKm: number,
+    filters?: {
+      minPrice?: number;
+      maxPrice?: number;
+      beds?: number;
+      baths?: number;
+      propertyType?: string;
+      status?: string;
+      page?: number;
+      limit?: number;
+    }
+  ) {
     const radiusInMeters = radiusInKm * 1000;
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 9;
+    const skip = (page - 1) * limit;
 
     // 1. Find IDs within radius using PostGIS
     const rawListings = await this.prisma.$queryRaw<{ id: string }[]>`
@@ -46,11 +63,46 @@ export class ListingsService {
 
     const ids = rawListings.map(l => l.id);
 
-    // 2. Fetch full details with Prisma
-    return this.prisma.listing.findMany({
-      where: { id: { in: ids } },
-      include: { owner: true } as any,
-    });
+    // 2. Build where clause for filters
+    const where: any = { id: { in: ids } };
+
+    if (filters) {
+      if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+        where.price = {};
+        if (filters.minPrice !== undefined) {
+          where.price.gte = filters.minPrice;
+        }
+        if (filters.maxPrice !== undefined) {
+          where.price.lte = filters.maxPrice;
+        }
+      }
+      if (filters.beds !== undefined) {
+        where.bedrooms = { gte: filters.beds };
+      }
+      if (filters.baths !== undefined) {
+        where.bathrooms = { gte: filters.baths };
+      }
+      if (filters.propertyType) {
+        where.type = filters.propertyType as PropertyType;
+      }
+      if (filters.status) {
+        where.status = filters.status as ListingStatus;
+      }
+    }
+
+    // 3. Fetch count and details with Prisma
+    const [totalCount, listings] = await Promise.all([
+      this.prisma.listing.count({ where }),
+      this.prisma.listing.findMany({
+        where,
+        include: { owner: true } as any,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' } as any,
+      }),
+    ]);
+
+    return { listings, totalCount };
   }
 
   findOne(id: string) {
