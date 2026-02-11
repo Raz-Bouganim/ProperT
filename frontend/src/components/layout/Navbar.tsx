@@ -4,12 +4,15 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Home, Search, Heart, MessageCircle, PlusSquare, User as UserIcon, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { LoginModal } from '@/components/auth/LoginModal';
 import { useAuth } from '@/context/AuthContext';
+import { usePathname } from 'next/navigation';
 
 export function Navbar() {
-    const [isLoginOpen, setIsLoginOpen] = useState(false);
     const { isAuthenticated, user, logout } = useAuth();
+    const pathname = usePathname();
+
+    // Hide navbar on auth page
+    if (pathname === '/auth') return null;
 
     return (
         <>
@@ -33,7 +36,9 @@ export function Navbar() {
                             </Button>
                         </div>
                     ) : (
-                        <Button variant="ghost" onClick={() => setIsLoginOpen(true)}>Log in</Button>
+                        <Link href="/auth">
+                            <Button variant="ghost">Log in</Button>
+                        </Link>
                     )}
                     <Button>Post Ad</Button>
                 </div>
@@ -61,16 +66,14 @@ export function Navbar() {
                     <MessageCircle size={20} />
                     <span className="text-[10px]">Chat</span>
                 </Link>
-                <button
-                    onClick={() => !isAuthenticated && setIsLoginOpen(true)}
+                <Link
+                    href={isAuthenticated ? "/profile" : "/auth"}
                     className="flex flex-col items-center gap-1 text-muted-foreground hover:text-primary"
                 >
                     <UserIcon size={20} />
                     <span className="text-[10px]">{isAuthenticated ? user?.firstName : 'Profile'}</span>
-                </button>
+                </Link>
             </nav>
-
-            <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
         </>
     );
 }

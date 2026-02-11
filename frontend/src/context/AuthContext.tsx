@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '@/lib/api';
+import Cookies from 'js-cookie';
 
 interface User {
     id: string;
@@ -29,15 +30,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const checkAuth = async () => {
-            const storedToken = localStorage.getItem('auth_token');
+            const storedToken = Cookies.get('auth_token');
             if (storedToken) {
                 try {
-                    // Optimistically set token to allow api interceptor to work if it relied on context (though it relies on LS)
                     setToken(storedToken);
-
                     const { data } = await api.get('/users/me');
                     setUser(data);
-                    localStorage.setItem('auth_user', JSON.stringify(data));
                 } catch (error) {
                     console.error('Session verification failed:', error);
                     logout();
@@ -52,18 +50,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Rolling session: refresh logic
+    useEffect(() => {
+        if (!token) return;
+
+        let lastActivity = Date.now();
+        const handleActivity = () => {
+            lastActivity = Date.now();
+        };
+
+        window.addEventListener('mousedown', handleActivity);
+        window.addEventListener('keydown', handleActivity);
+
+        // Refresh token every 10 minutes if there was activity
+        const refreshInterval = setInterval(async () => {
+            const now = Date.now();
+            if (now - lastActivity < 10 * 60 * 1000) { // If active in last 10m
+                try {
+                    const { data } = await api.post('/auth/refresh');
+                    setToken(data.access_token);
+                    Cookies.set('auth_token', data.access_token);
+                } catch (error) {
+                    console.error('Failed to refresh session:', error);
+                    // If refresh fails (e.g., token already expired), logout
+                    logout();
+                }
+            }
+        }, 10 * 60 * 1000); // Check every 10 minutes
+
+        return () => {
+            window.removeEventListener('mousedown', handleActivity);
+            window.removeEventListener('keydown', handleActivity);
+            clearInterval(refreshInterval);
+        };
+    }, [token]);
+
     const login = (newToken: string, newUser: User) => {
         setToken(newToken);
         setUser(newUser);
-        localStorage.setItem('auth_token', newToken);
-        localStorage.setItem('auth_user', JSON.stringify(newUser));
+        Cookies.set('auth_token', newToken);
     };
 
     const logout = () => {
         setToken(null);
         setUser(null);
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
+        Cookies.remove('auth_token');
     };
 
     return (
