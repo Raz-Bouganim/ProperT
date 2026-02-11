@@ -18,9 +18,7 @@ enum UserRole {
 enum PropertyType {
   APARTMENT
   HOUSE
-  STUDIO
-  COMMERCIAL
-  LAND
+  OFFICE
 }
 
 enum BookingStatus {
@@ -83,6 +81,14 @@ model Listing {
   
   // Metrics
   views       Int      @default(0)
+
+  // Additional Details
+  yearBuilt   Int?
+  taxAnnual   Decimal? @db.Decimal(10, 2)
+  hoaMonthly  Decimal? @db.Decimal(10, 2)
+  currency    String   @default("USD")
+  floorPlanUrl String?
+  customFees  Json?    // Array of { name: string, amount: number }
 
   // Relations
   ownerId     String

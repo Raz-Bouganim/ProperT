@@ -39,6 +39,25 @@ function ZoomControls() {
     );
 }
 
+function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
+    const map = useMap();
+    useEffect(() => {
+        map.setView(center, zoom);
+    }, [center, zoom, map]);
+    return null;
+}
+
+function InvalidateMapSize() {
+    const map = useMap();
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            map.invalidateSize();
+        }, 100);
+        return () => clearTimeout(timer);
+    }, [map]);
+    return null;
+}
+
 export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13, hoveredListingId }: MapProps) {
     const [selectedListing, setSelectedListing] = useState<any>(null);
 
@@ -82,6 +101,8 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
                 scrollWheelZoom={true}
                 zoomControl={false}
             >
+                <ChangeView center={mapCenter} zoom={zoom} />
+                <InvalidateMapSize />
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'

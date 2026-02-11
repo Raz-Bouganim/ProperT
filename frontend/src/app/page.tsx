@@ -131,7 +131,7 @@ export default function Home() {
                     <option>All Types</option>
                     <option value="HOUSE">House</option>
                     <option value="APARTMENT">Apartment</option>
-                    <option value="Villa">Villa</option>
+                    <option value="OFFICE">Office</option>
                   </select>
                 </div>
               </div>

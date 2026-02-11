@@ -12,6 +12,8 @@ export class ListingsService {
     const data: any = {
       ...createListingDto,
       price: createListingDto.price.toString(),
+      taxAnnual: createListingDto.taxAnnual?.toString(),
+      hoaMonthly: createListingDto.hoaMonthly?.toString(),
     };
     return this.prisma.listing.create({ data });
   }

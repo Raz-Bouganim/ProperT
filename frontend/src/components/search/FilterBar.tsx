@@ -113,7 +113,7 @@ export function FilterBar({ onFilterChange, initialLocation = "San Francisco, CA
                         {activeDropdown === "type" && (
                             <div className="absolute top-full mt-2 left-0 w-48 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50">
                                 <div className="space-y-1">
-                                    {["APARTMENT", "HOUSE", "STUDIO", "COMMERCIAL", "LAND"].map((t) => (
+                                    {["APARTMENT", "HOUSE", "OFFICE"].map((t) => (
                                         <button
                                             key={t}
                                             onClick={() => handleFilterUpdate("type", t)}

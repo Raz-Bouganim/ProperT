@@ -39,6 +39,8 @@ export class CreateListingDto {
     @IsNotEmpty()
     bathrooms: number;
 
+    @IsString()
+    @IsNotEmpty()
     ownerId: string;
 
     @IsNumber()
@@ -66,4 +68,30 @@ export class CreateListingDto {
     @IsString()
     @IsOptional()
     virtualTourUrl?: string;
+
+    @IsNumber()
+    @IsOptional()
+    @Type(() => Number)
+    yearBuilt?: number;
+
+    @IsNumber()
+    @IsOptional()
+    @Type(() => Number)
+    taxAnnual?: number;
+
+    @IsNumber()
+    @IsOptional()
+    @Type(() => Number)
+    hoaMonthly?: number;
+
+    @IsString()
+    @IsOptional()
+    currency?: string;
+
+    @IsString()
+    @IsOptional()
+    floorPlanUrl?: string;
+
+    @IsOptional()
+    customFees?: any;
 }

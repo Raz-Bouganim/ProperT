@@ -1,46 +1,147 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea, Label } from "@/components/ui/Input";
-import { Bed, Bath, Square, MapPin, Upload, X, Check, ChevronRight, ChevronLeft } from "lucide-react";
+import {
+    Home, Building, Briefcase, MapPin, Upload, X, Check,
+    ChevronRight, ChevronLeft, Search, Tag, LandPlot,
+    FileText, Loader2
+} from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 
+// Dynamically import Map to avoid SSR issues
+const Map = dynamic(() => import("@/components/Map"), {
+    ssr: false,
+    loading: () => (
+        <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400">
+            <Loader2 className="w-6 h-6 animate-spin" />
+        </div>
+    ),
+});
+
+// --- Schema Definition ---
 const listingSchema = z.object({
-    title: z.string().min(5, "Title must be at least 5 characters"),
+    // Step 1: Basic Info
+    transactionType: z.enum(["FOR_SALE", "FOR_RENT"]),
+    type: z.enum(["APARTMENT", "HOUSE", "OFFICE"]),
+    title: z.string().min(5, "Title must be at least 5 characters").max(60, "Title max 60 chars"),
     description: z.string().min(20, "Description must be at least 20 characters"),
-    price: z.number().min(1, "Price must be positive"),
+
+    // Step 2: Details & Location
     address: z.string().min(5, "Address must be at least 5 characters"),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
+    sqft: z.number().min(1, "Square footage must be positive"),
     beds: z.number().min(0),
     baths: z.number().min(0),
-    sqft: z.number().min(1, "Square footage must be positive"),
-    type: z.enum(["APARTMENT", "HOUSE", "STUDIO", "LAND", "OFFICE"]),
-    status: z.enum(["FOR_SALE", "FOR_RENT"]),
+    yearBuilt: z.number().min(1800).max(new Date().getFullYear() + 5).optional(),
+    features: z.array(z.string()).optional(),
+
+    // Step 3: Media
+    images: z.array(z.string()).min(1, "At least one image is required"),
+    floorPlanUrl: z.string().optional(),
+    virtualTourUrl: z.string().optional(),
+
+    // Step 4: Pricing
+    currency: z.string().default("USD"),
+    price: z.number().min(1, "Price must be positive"),
+    taxAnnual: z.number().optional(),
+    hoaMonthly: z.number().optional(),
+    customFees: z.any().optional(),
 });
 
 type ListingFormValues = z.infer<typeof listingSchema>;
+
+// --- Constants ---
+const PROPERTY_TYPES = [
+    { id: "APARTMENT", label: "Apartment", icon: Building },
+    { id: "HOUSE", label: "House", icon: Home },
+    { id: "OFFICE", label: "Office", icon: Briefcase },
+];
+
+const AMENITIES = [
+    "Swimming Pool", "Gym & Fitness", "Parking Spot", "High-Speed Wifi",
+    "Air Conditioning", "Private Balcony", "Pet Friendly", "Elevator Access",
+    "24/7 Security", "In-unit Laundry", "Dishwasher", "Fireplace"
+];
+
+const STEPS = [
+    { step: 1, label: "Basic Info" },
+    { step: 2, label: "Details" },
+    { step: 3, label: "Media" },
+    { step: 4, label: "Review" }
+];
 
 function PostListingContent() {
     const [step, setStep] = useState(1);
     const [images, setImages] = useState<{ file: File; preview: string; key?: string }[]>([]);
     const [isUploading, setIsUploading] = useState(false);
+    const [mapCenter, setMapCenter] = useState<[number, number]>([40.7128, -74.0060]);
+    const [mapZoom, setMapZoom] = useState(13);
+    const [isGeocoding, setIsGeocoding] = useState(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
     const router = useRouter();
 
     const form = useForm<ListingFormValues>({
-        resolver: zodResolver(listingSchema),
+        resolver: zodResolver(listingSchema) as any,
         defaultValues: {
+            transactionType: "FOR_SALE",
             type: "APARTMENT",
-            status: "FOR_SALE",
             beds: 1,
             baths: 1,
+            currency: "USD",
+            features: [],
+            price: 0,
         },
     });
 
+    const { watch, setValue, register, formState: { errors }, trigger } = form;
+
+    const toggleFeature = (feature: string) => {
+        const current = watch("features") || [];
+        if (current.includes(feature)) {
+            setValue("features", current.filter(f => f !== feature));
+        } else {
+            setValue("features", [...current, feature]);
+        }
+    };
+
+    const handleAddressSearch = async () => {
+        const address = watch("address");
+        if (!address || address.length < 5) return;
+
+        setIsGeocoding(true);
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+                const { lat, lon } = data[0];
+                const latitude = parseFloat(lat);
+                const longitude = parseFloat(lon);
+                setValue("latitude", latitude);
+                setValue("longitude", longitude);
+                setMapCenter([latitude, longitude]);
+                setMapZoom(16);
+                setSearchError(null);
+            } else {
+                setSearchError("Location not found. Try being more specific.");
+            }
+        } catch (error) {
+            console.error("Geocoding failed", error);
+            setSearchError("Search failed. Please try again.");
+        } finally {
+            setIsGeocoding(false);
+        }
+    };
+
+    // --- Media Handlers ---
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         const newImages = files.map(file => ({
@@ -57,24 +158,20 @@ function PostListingContent() {
     const uploadImages = async () => {
         setIsUploading(true);
         const uploadedUrls: string[] = [];
-
         try {
             for (const img of images) {
-                // 1. Get Presigned URL
                 const res = await fetch("http://localhost:5000/media/presigned-url", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ fileName: img.file.name, contentType: img.file.type }),
                 });
+                if (!res.ok) throw new Error("Failed to get presigned URL");
                 const { url, publicUrl } = await res.json();
-
-                // 2. Upload to S3/MinIO
                 await fetch(url, {
                     method: "PUT",
                     body: img.file,
                     headers: { "Content-Type": img.file.type },
                 });
-
                 uploadedUrls.push(publicUrl);
             }
             return uploadedUrls;
@@ -89,10 +186,14 @@ function PostListingContent() {
     const onSubmit = async (values: ListingFormValues) => {
         const imageUrls = await uploadImages();
 
+        // Simple validation fallback
+        if (imageUrls.length === 0 && images.length > 0) {
+            console.warn("Images failed to upload properly");
+        }
+
         const listingData = {
             ...values,
             images: imageUrls,
-            features: [], // Can expand this later
         };
 
         try {
@@ -101,6 +202,7 @@ function PostListingContent() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(listingData),
             });
+            if (!res.ok) throw new Error("Failed to create listing");
             const data = await res.json();
             router.push(`/listings/${data.id}`);
         } catch (error) {
@@ -109,199 +211,370 @@ function PostListingContent() {
     };
 
     const nextStep = async () => {
-        const fields = step === 1
-            ? ["title", "description", "price", "type"]
-            : ["address", "beds", "baths", "sqft"];
+        let fields: (keyof ListingFormValues)[] = [];
+        if (step === 1) fields = ["title", "description", "transactionType", "type"];
+        if (step === 2) fields = ["address", "sqft", "beds", "baths", "yearBuilt"];
+        // Step 3 media validation is manual mainly
 
-        const isValid = await form.trigger(fields as any);
-        if (isValid) setStep(prev => prev + 1);
+        const isValid = await trigger(fields);
+        if (isValid) {
+            setStep(prev => prev + 1);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     };
 
+
+
     return (
-        <div className="min-h-screen bg-zinc-50 py-12 px-4">
-            <div className="max-w-3xl mx-auto">
-                <header className="mb-12 text-center">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary font-black text-[10px] uppercase tracking-widest mb-4">
-                        Step {step} of 3
+        <div className="min-h-screen bg-[#f6f6f8] font-sans text-slate-800 flex flex-col">
+            {/* Top Navigation / Progress Stepper (Clean) */}
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-center">
+                    {/* Progress Bar */}
+                    <div className="flex-1 max-w-2xl px-4 md:px-12">
+                        <div className="w-full">
+                            <div className="flex items-center justify-between text-[11px] font-black mb-2 uppercase tracking-[0.2em] font-display">
+                                {STEPS.map((s) => (
+                                    <span key={s.step} className={cn(
+                                        "transition-colors",
+                                        step === s.step ? "text-primary" : "text-slate-300"
+                                    )}>
+                                        {s.label}
+                                    </span>
+                                ))}
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                                    style={{ width: `${(step / 4) * 100}%` }}
+                                />
+                            </div>
+                        </div>
                     </div>
-                    <h1 className="text-4xl font-black tracking-tight mb-2">List your Property</h1>
-                    <div className="flex items-center justify-center gap-4 mt-8">
-                        {[1, 2, 3].map(i => (
-                            <div
-                                key={i}
-                                className={cn(
-                                    "h-1.5 w-12 rounded-full transition-all duration-500",
-                                    step >= i ? "bg-primary" : "bg-zinc-200"
-                                )}
-                            />
-                        ))}
-                    </div>
-                </header>
+                </div>
+            </header>
 
-                <div className="bg-white rounded-[2rem] border shadow-2xl shadow-zinc-200/50 p-8 md:p-12 overflow-hidden relative">
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+                <form onSubmit={form.handleSubmit(onSubmit as any)} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
 
-                        {/* Step 1: Basics */}
+                    {/* Left Column: Form Content */}
+                    <div className="lg:col-span-7 space-y-10 animate-in fade-in slide-in-from-left-4 duration-500">
+                        {/* Step 1: Basic Info */}
                         {step === 1 && (
-                            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                                <div className="grid gap-6">
-                                    <div className="space-y-2">
-                                        <Label>Property Title</Label>
-                                        <Input
-                                            placeholder="e.g. Modern Minimalist Penthouse"
-                                            {...form.register("title")}
-                                            error={form.formState.errors.title?.message}
-                                        />
-                                    </div>
+                            <>
+                                {/* Header Section */}
+                                <div className="space-y-2">
+                                    <h1 className="text-4xl font-black text-slate-900 tracking-tight font-display">Let&apos;s get started.</h1>
+                                    <p className="text-slate-500 text-lg font-medium">Tell us about your property. We&apos;ll help you fill in the details later.</p>
+                                </div>
+
+                                {/* Transaction Type */}
+                                <section className="space-y-4">
+                                    <h2 className="text-xl font-black flex items-center gap-2 text-slate-900 font-display tracking-tight">
+                                        <Tag className="text-primary w-5 h-5" /> Transaction Type
+                                    </h2>
                                     <div className="grid grid-cols-2 gap-4">
+                                        <label className="cursor-pointer group">
+                                            <input
+                                                type="radio"
+                                                value="FOR_SALE"
+                                                {...register("transactionType")}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="p-6 rounded-2xl border-2 border-slate-200 bg-white transition-all peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-primary hover:border-primary/30 flex flex-col items-center justify-center text-center h-28">
+                                                <span className="block text-xl font-bold">For Sale</span>
+                                                <span className="text-xs font-medium text-slate-400 group-peer-checked:text-primary/70">I want to sell my property</span>
+                                            </div>
+                                        </label>
+                                        <label className="cursor-pointer group">
+                                            <input
+                                                type="radio"
+                                                value="FOR_RENT"
+                                                {...register("transactionType")}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="p-6 rounded-2xl border-2 border-slate-200 bg-white transition-all peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-primary hover:border-primary/30 flex flex-col items-center justify-center text-center h-28">
+                                                <span className="block text-xl font-bold">For Rent</span>
+                                                <span className="text-xs font-medium text-slate-400 group-peer-checked:text-primary/70">I want to rent out my property</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </section>
+
+                                {/* Property Type */}
+                                <section className="space-y-4">
+                                    <h2 className="text-xl font-black flex items-center gap-2 text-slate-900 font-display tracking-tight">
+                                        <LandPlot className="text-primary w-5 h-5" /> Property Type
+                                    </h2>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        {PROPERTY_TYPES.map((pt) => (
+                                            <label key={pt.id} className="cursor-pointer group">
+                                                <input
+                                                    type="radio"
+                                                    value={pt.id}
+                                                    {...register("type")}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-slate-200 bg-white text-slate-400 transition-all peer-checked:border-primary peer-checked:text-primary peer-checked:bg-primary/5 hover:border-primary/30 h-32 text-center shadow-sm">
+                                                    <pt.icon className="w-8 h-8 mb-3 opacity-50 group-peer-checked:opacity-100" />
+                                                    <span className="font-black text-sm font-display uppercase tracking-widest leading-none">{pt.label}</span>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </section>
+
+                                {/* Property Details */}
+                                <section className="space-y-6">
+                                    <h2 className="text-xl font-black flex items-center gap-2 text-slate-900 font-display tracking-tight">
+                                        <FileText className="text-primary w-5 h-5" /> Property Details
+                                    </h2>
+                                    <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <Label>Property Type</Label>
-                                            <select
-                                                className="h-12 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                                {...form.register("type")}
-                                            >
-                                                <option value="APARTMENT">Apartment</option>
-                                                <option value="HOUSE">House</option>
-                                                <option value="STUDIO">Studio</option>
-                                                <option value="LAND">Land</option>
-                                                <option value="OFFICE">Office</option>
-                                            </select>
+                                            <Label className="text-slate-500 font-semibold ml-1 normal-case tracking-normal text-sm">Property Title</Label>
+                                            <div className="relative">
+                                                <Input
+                                                    placeholder="e.g. Spacious 2-Bedroom Apartment with Ocean View"
+                                                    {...register("title")}
+                                                    error={errors.title?.message}
+                                                    className="h-14 font-medium border-slate-200 focus:ring-primary/20 bg-white"
+                                                />
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                                                    {watch("title")?.length || 0}/60
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label>Monthly Rent ($)</Label>
-                                            <Input
-                                                type="number"
-                                                placeholder="2500"
-                                                {...form.register("price", { valueAsNumber: true })}
-                                                error={form.formState.errors.price?.message}
+                                        <div className="space-y-1.5">
+                                            <Label className="text-slate-500 font-semibold ml-1 normal-case tracking-normal text-sm">Description</Label>
+                                            <Textarea
+                                                placeholder="Highlight the key features of your property..."
+                                                {...register("description")}
+                                                error={errors.description?.message}
+                                                rows={6}
+                                                className="font-medium bg-white border-slate-200 focus:ring-primary/20 resize-none"
                                             />
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label>Listing Status</Label>
-                                        <div className="flex bg-zinc-100 p-1 rounded-xl">
-                                            {["FOR_SALE", "FOR_RENT"].map((status) => (
-                                                <button
-                                                    key={status}
-                                                    type="button"
-                                                    onClick={() => form.setValue("status", status as any)}
-                                                    className={cn(
-                                                        "flex-1 py-2.5 text-sm font-bold rounded-lg transition-all",
-                                                        form.watch("status") === status
-                                                            ? "bg-white text-primary shadow-sm"
-                                                            : "text-zinc-500 hover:text-zinc-700"
-                                                    )}
-                                                >
-                                                    {status === "FOR_SALE" ? "For Sale" : "For Rent"}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label>Description</Label>
-                                        <Textarea
-                                            placeholder="Describe the best features of your home..."
-                                            {...form.register("description")}
-                                            error={form.formState.errors.description?.message}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
+                                </section>
+                            </>
                         )}
 
-                        {/* Step 2: Location & Specs */}
+                        {/* Step 2: Details */}
                         {step === 2 && (
-                            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                                <div className="grid gap-6">
-                                    <div className="space-y-2">
-                                        <Label>Full Address</Label>
-                                        <Input
-                                            placeholder="Enter the property address"
-                                            {...form.register("address")}
-                                            error={form.formState.errors.address?.message}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Beds</Label>
-                                            <Input type="number" {...form.register("beds", { valueAsNumber: true })} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Baths</Label>
-                                            <Input type="number" {...form.register("baths", { valueAsNumber: true })} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Sq Ft</Label>
-                                            <Input type="number" {...form.register("sqft", { valueAsNumber: true })} error={form.formState.errors.sqft?.message} />
-                                        </div>
-                                    </div>
+                            <div className="space-y-10">
+                                <div className="space-y-2">
+                                    <h1 className="text-4xl font-black text-slate-900 tracking-tight font-display">Property Details.</h1>
+                                    <p className="text-slate-500 text-lg font-medium">Specify your property specifications.</p>
                                 </div>
+                                <section className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                    <div className="space-y-2">
+                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 font-display">Square Feet</Label>
+                                        <Input type="number" {...register("sqft", { valueAsNumber: true })} className="h-14 bg-white border-slate-200" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 font-display">Bedrooms</Label>
+                                        <Input type="number" {...register("beds", { valueAsNumber: true })} className="h-14 bg-white border-slate-200" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 font-display">Bathrooms</Label>
+                                        <Input type="number" {...register("baths", { valueAsNumber: true })} step="0.5" className="h-14 bg-white border-slate-200" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 font-display">Year Built</Label>
+                                        <Input type="number" {...register("yearBuilt", { valueAsNumber: true })} placeholder="YYYY" className="h-14 bg-white border-slate-200" />
+                                    </div>
+                                </section>
+                                <section className="space-y-4">
+                                    <h2 className="text-xl font-black text-slate-900 border-b pb-2 font-display tracking-tight">Amenities</h2>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                        {AMENITIES.map((amenity) => (
+                                            <label key={amenity} className="cursor-pointer group flex items-center gap-3 p-4 rounded-xl border border-slate-100 bg-white hover:border-primary/20 transition-all select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={watch("features")?.includes(amenity)}
+                                                    onChange={() => toggleFeature(amenity)}
+                                                    className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary/20"
+                                                />
+                                                <span className="text-sm font-bold text-slate-600">{amenity}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </section>
                             </div>
                         )}
 
                         {/* Step 3: Media */}
                         {step === 3 && (
-                            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                                <Label>Property Photos</Label>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div className="space-y-10">
+                                <div className="space-y-2">
+                                    <h1 className="text-4xl font-black text-slate-900 tracking-tight font-display">Media Gallery.</h1>
+                                    <p className="text-slate-500 text-lg font-medium">Upload high-quality photos to showcase your property.</p>
+                                </div>
+                                <div className="border-4 border-dashed border-slate-200 rounded-[2rem] p-16 bg-white flex flex-col items-center justify-center text-center group hover:border-primary/30 transition-all">
+                                    <div className="w-20 h-20 rounded-2xl bg-primary/5 flex items-center justify-center mb-6 text-primary group-hover:scale-110 transition-transform">
+                                        <Upload className="w-10 h-10" />
+                                    </div>
+                                    <h3 className="text-2xl font-black mb-2 text-slate-900 font-display">Click to upload photos</h3>
+                                    <p className="text-slate-400 mb-8 font-medium">PNG, JPG or GIF (max. 10MB)</p>
+                                    <label>
+                                        <div className="px-12 py-4 bg-primary text-white rounded-2xl shadow-xl shadow-primary/20 hover:bg-primary/90 cursor-pointer transition-all font-black text-[14px] uppercase tracking-widest font-display">
+                                            Select Images
+                                        </div>
+                                        <input type="file" multiple accept="image/*" onChange={handleImageChange} className="hidden" />
+                                    </label>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
                                     {images.map((img, i) => (
-                                        <div key={i} className="relative aspect-square rounded-2xl overflow-hidden border group">
+                                        <div key={i} className="relative aspect-square rounded-2xl overflow-hidden group border-2 border-white shadow-lg">
                                             <Image src={img.preview} alt="Preview" fill className="object-cover" />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeImage(i)}
-                                                className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
+                                            <button type="button" onClick={() => removeImage(i)} className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-4 h-4" /></button>
+                                            {i === 0 && <div className="absolute bottom-2 left-2 px-3 py-1 bg-black/70 text-white text-[10px] font-black rounded-lg uppercase tracking-widest">Main</div>}
                                         </div>
                                     ))}
-                                    <label className="aspect-square rounded-2xl border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center gap-2 hover:border-primary hover:bg-primary/5 transition-all cursor-pointer group">
-                                        <Upload className="w-6 h-6 text-zinc-400 group-hover:text-primary transition-colors" />
-                                        <span className="text-xs font-bold text-zinc-500 group-hover:text-primary">Add Photo</span>
-                                        <input type="file" multiple className="hidden" onChange={handleImageChange} accept="image/*" />
-                                    </label>
                                 </div>
                             </div>
                         )}
 
-                        <div className="flex items-center justify-between pt-8 border-t">
-                            {step > 1 ? (
-                                <Button
+                        {/* Step 4: Review */}
+                        {step === 4 && (
+                            <div className="space-y-10">
+                                <div className="space-y-2">
+                                    <h1 className="text-4xl font-black text-slate-900 tracking-tight font-display">Review & Publish.</h1>
+                                    <p className="text-slate-500 text-lg font-medium">Set your price and go live today.</p>
+                                </div>
+                                <section className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                        <div className="space-y-2">
+                                            <Label className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Currency</Label>
+                                            <select {...register("currency")} className="w-full h-14 rounded-xl border-slate-200 bg-slate-50 px-4 font-black">
+                                                <option value="USD">USD ($)</option>
+                                                <option value="EUR">EUR (€)</option>
+                                            </select>
+                                        </div>
+                                        <div className="md:col-span-2 space-y-2">
+                                            <Label className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Total Price</Label>
+                                            <Input type="number" {...register("price", { valueAsNumber: true })} className="h-14 bg-white border-slate-200 text-2xl font-black" />
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="lg:col-span-5">
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl sticky top-28 space-y-5">
+                            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 font-display tracking-tight">
+                                <MapPin className="text-primary w-6 h-6" /> Location
+                            </h2>
+
+                            {/* Address Search */}
+                            <div className="relative group">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-primary transition-colors" />
+                                <input
+                                    type="text"
+                                    {...register("address")}
+                                    placeholder="Enter address..."
+                                    className="w-full pl-12 pr-28 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all outline-none font-medium text-slate-700 bg-slate-50/50 placeholder:text-slate-400 placeholder:font-medium shadow-sm"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleAddressSearch();
+                                        }
+                                    }}
+                                />
+                                <button
                                     type="button"
-                                    variant="ghost"
-                                    onClick={() => setStep(prev => prev - 1)}
-                                    className="rounded-full gap-2 px-6"
+                                    onClick={handleAddressSearch}
+                                    disabled={isGeocoding}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-white text-[10px] font-bold px-4 py-2 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer uppercase tracking-widest flex items-center gap-2"
                                 >
-                                    <ChevronLeft className="w-4 h-4" /> Back
-                                </Button>
-                            ) : (
-                                <div />
+                                    {isGeocoding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Search"}
+                                </button>
+                            </div>
+
+                            {searchError && (
+                                <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest animate-in fade-in slide-in-from-top-1">
+                                    {searchError}
+                                </p>
                             )}
 
-                            {step < 3 ? (
-                                <Button
-                                    type="button"
-                                    onClick={nextStep}
-                                    className="rounded-full gap-2 px-8 min-w-[140px]"
-                                >
-                                    Continue <ChevronRight className="w-4 h-4" />
-                                </Button>
-                            ) : (
-                                <Button
-                                    type="submit"
-                                    disabled={isUploading || images.length === 0}
-                                    className="rounded-full gap-2 px-8 min-w-[140px] shadow-lg shadow-primary/30"
-                                >
-                                    {isUploading ? "Uploading..." : "Publish Listing"}
-                                    <Check className="w-4 h-4" />
-                                </Button>
-                            )}
+                            {/* Real Map Integration */}
+                            <div className="relative w-full h-80 rounded-xl overflow-hidden group border border-slate-200 shadow-sm">
+                                <Map
+                                    listings={watch("latitude") && watch("longitude") ? [{
+                                        id: "preview",
+                                        latitude: watch("latitude"),
+                                        longitude: watch("longitude"),
+                                        title: watch("title") || "New Listing",
+                                        address: watch("address") || "Property Location",
+                                        price: watch("price") || 0,
+                                        images: images.map(img => img.preview)
+                                    }] : []}
+                                    center={mapCenter}
+                                    zoom={mapZoom}
+                                />
+                            </div>
+
+                            {/* Info Box */}
+                            <div className="p-4 rounded-xl bg-primary/5 border border-slate-200 flex items-start gap-4 shadow-sm transition-all hover:border-primary/20 group">
+                                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-[10px] shrink-0 mt-0.5 font-bold">i</div>
+                                <p className="text-xs font-bold text-slate-500 leading-relaxed">
+                                    Drag the map to pinpoint the exact entrance location. This helps buyers find you easily.
+                                </p>
+                            </div>
+
+                            {/* Unit/Zip Fields */}
+                            <div className="grid grid-cols-2 gap-4 pt-2">
+                                <input className="h-12 bg-slate-50 rounded-lg border border-slate-200 focus:border-primary/20 focus:ring-4 focus:ring-primary/5 px-4 text-xs font-medium text-slate-900 transition-all placeholder:text-slate-400 shadow-sm" placeholder="Unit Number" />
+                                <input className="h-12 bg-slate-50 rounded-lg border border-slate-200 focus:border-primary/20 focus:ring-4 focus:ring-primary/5 px-4 text-xs font-medium text-slate-900 transition-all placeholder:text-slate-400 shadow-sm" placeholder="Zip Code" />
+                            </div>
                         </div>
-                    </form>
+                    </div>
+                </form>
+            </main>
+
+            {/* Bottom Action Bar */}
+            <footer className="bg-white border-t border-slate-200 py-3 sticky bottom-0 z-40 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (step > 1) setStep(prev => prev - 1);
+                            else router.back();
+                        }}
+                        className={cn(
+                            "flex items-center gap-2 px-6 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all font-display",
+                            step === 1 ? "text-slate-300 cursor-not-allowed" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                        )}
+                        disabled={step === 1}
+                    >
+                        <ChevronLeft className="w-5 h-5" /> Back
+                    </button>
+
+                    <div className="flex items-center gap-8">
+                        <span className="text-xs font-semibold text-slate-400 hidden sm:block">Step {step} of 4</span>
+                        {step < 4 ? (
+                            <Button
+                                type="button"
+                                onClick={nextStep}
+                                className="bg-primary text-white text-xs font-bold px-6 py-2 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-3 uppercase tracking-wider"
+                            >
+                                Continue to {STEPS[step]?.label || "Next"} <ChevronRight className="w-4 h-4" />
+                            </Button>
+                        ) : (
+                            <Button
+                                type="button"
+                                onClick={form.handleSubmit(onSubmit as any)}
+                                disabled={isUploading || images.length === 0}
+                                className="bg-green-600 text-white text-xs font-bold px-6 py-2 rounded-lg shadow-lg shadow-green-600/20 hover:bg-green-700 transition-all cursor-pointer flex items-center gap-3 uppercase tracking-wider"
+                            >
+                                {isUploading ? "Publishing..." : "Finish & Publish"}
+                                <Check className="w-4 h-4" />
+                            </Button>
+                        )}
+                    </div>
                 </div>
-            </div>
+            </footer>
         </div>
     );
 }
