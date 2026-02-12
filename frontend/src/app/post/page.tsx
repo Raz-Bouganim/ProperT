@@ -291,14 +291,14 @@ function PostListingContent() {
 
 
     return (
-        <div className="min-h-screen bg-[#f6f6f8] font-sans text-slate-800 flex flex-col">
+        <div className="min-h-screen bg-[#f8f9fc] font-sans text-slate-800 flex flex-col">
             {/* Top Navigation / Progress Stepper (Clean) */}
             <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200 sticky top-16 z-40 transition-all">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-center">
                     {/* Progress Bar */}
                     <div className="flex-1 max-w-2xl px-4 md:px-12">
                         <div className="w-full">
-                            <div className="flex items-center justify-between text-[11px] font-black mb-2 uppercase tracking-[0.2em] font-display">
+                            <div className="flex items-center justify-between text-[11px] font-black mb-3 uppercase tracking-[0.2em] font-display">
                                 {STEPS.map((s) => (
                                     <span key={s.step} className={cn(
                                         "transition-colors",
@@ -328,8 +328,8 @@ function PostListingContent() {
                         {step === 1 && (
                             <>
                                 {/* Header Section */}
-                                <div className="space-y-2">
-                                    <h1 className="text-4xl font-black text-slate-900 tracking-tight font-display">Let&apos;s get started.</h1>
+                                <div className="space-y-3">
+                                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight font-display drop-shadow-sm">Let&apos;s get started.</h1>
                                     <p className="text-slate-500 text-lg font-medium">Tell us about your property. We&apos;ll help you fill in the details later.</p>
                                 </div>
 
@@ -339,28 +339,28 @@ function PostListingContent() {
                                         <Tag className="text-primary w-5 h-5" /> Transaction Type
                                     </h2>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <label className="cursor-pointer group">
+                                        <label className="cursor-pointer group relative">
                                             <input
                                                 type="radio"
                                                 value="FOR_SALE"
                                                 {...register("transactionType")}
                                                 className="sr-only peer"
                                             />
-                                            <div className="p-6 rounded-2xl border-2 border-slate-200 bg-white transition-all peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-primary hover:border-primary/30 flex flex-col items-center justify-center text-center h-28">
-                                                <span className="block text-xl font-bold">For Sale</span>
-                                                <span className="text-xs font-medium text-slate-400 group-peer-checked:text-primary/70">I want to sell my property</span>
+                                            <div className="p-6 rounded-2xl border-2 border-slate-100 bg-white transition-all duration-300 peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-primary peer-checked:shadow-xl peer-checked:shadow-primary/10 hover:border-primary/30 flex flex-col items-center justify-center text-center h-32 hover:-translate-y-1">
+                                                <span className="block text-xl font-black font-display tracking-tight mb-1">For Sale</span>
+                                                <span className="text-xs font-bold text-slate-400 group-peer-checked:text-primary/70 uppercase tracking-widest">I want to sell</span>
                                             </div>
                                         </label>
-                                        <label className="cursor-pointer group">
+                                        <label className="cursor-pointer group relative">
                                             <input
                                                 type="radio"
                                                 value="FOR_RENT"
                                                 {...register("transactionType")}
                                                 className="sr-only peer"
                                             />
-                                            <div className="p-6 rounded-2xl border-2 border-slate-200 bg-white transition-all peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-primary hover:border-primary/30 flex flex-col items-center justify-center text-center h-28">
-                                                <span className="block text-xl font-bold">For Rent</span>
-                                                <span className="text-xs font-medium text-slate-400 group-peer-checked:text-primary/70">I want to rent out my property</span>
+                                            <div className="p-6 rounded-2xl border-2 border-slate-100 bg-white transition-all duration-300 peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-primary peer-checked:shadow-xl peer-checked:shadow-primary/10 hover:border-primary/30 flex flex-col items-center justify-center text-center h-32 hover:-translate-y-1">
+                                                <span className="block text-xl font-black font-display tracking-tight mb-1">For Rent</span>
+                                                <span className="text-xs font-bold text-slate-400 group-peer-checked:text-primary/70 uppercase tracking-widest">I want to rent</span>
                                             </div>
                                         </label>
                                     </div>
@@ -373,16 +373,16 @@ function PostListingContent() {
                                     </h2>
                                     <div className="grid grid-cols-3 gap-4">
                                         {PROPERTY_TYPES.map((pt) => (
-                                            <label key={pt.id} className="cursor-pointer group">
+                                            <label key={pt.id} className="cursor-pointer group relative">
                                                 <input
                                                     type="radio"
                                                     value={pt.id}
                                                     {...register("type")}
                                                     className="sr-only peer"
                                                 />
-                                                <div className="flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-slate-200 bg-white text-slate-400 transition-all peer-checked:border-primary peer-checked:text-primary peer-checked:bg-primary/5 hover:border-primary/30 h-32 text-center shadow-sm">
-                                                    <pt.icon className="w-8 h-8 mb-3 opacity-50 group-peer-checked:opacity-100" />
-                                                    <span className="font-black text-sm font-display uppercase tracking-widest leading-none">{pt.label}</span>
+                                                <div className="flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-slate-100 bg-white text-slate-400 transition-all duration-300 peer-checked:border-primary peer-checked:text-primary peer-checked:bg-primary/5 peer-checked:shadow-xl peer-checked:shadow-primary/10 hover:border-primary/30 h-36 text-center hover:-translate-y-1">
+                                                    <pt.icon className="w-8 h-8 mb-4 opacity-50 group-peer-checked:opacity-100 transition-opacity" />
+                                                    <span className="font-black text-[13px] font-display uppercase tracking-widest leading-none">{pt.label}</span>
                                                 </div>
                                             </label>
                                         ))}
@@ -396,18 +396,21 @@ function PostListingContent() {
                                     </h2>
                                     <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <Label className="text-slate-500 font-semibold ml-1 normal-case tracking-normal text-sm">Property Title</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    placeholder="e.g. Spacious 2-Bedroom Apartment with Ocean View"
-                                                    {...register("title")}
-                                                    error={errors.title?.message}
-                                                    className="h-14 font-medium border-slate-200 focus:ring-primary/20 bg-white"
-                                                />
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                                            <div className="flex items-center justify-between ml-1">
+                                                <Label className="text-slate-500 font-semibold normal-case tracking-normal text-sm">Property Title</Label>
+                                                <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
                                                     {watch("title")?.length || 0}/60
                                                 </div>
                                             </div>
+                                            <Input
+                                                placeholder="e.g. Spacious 2-Bedroom Apartment with Ocean View"
+                                                {...register("title")}
+                                                error={errors.title?.message}
+                                                className={cn(
+                                                    "h-12 font-semibold bg-white rounded-xl placeholder:font-medium transition-all",
+                                                    errors.title ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/10"
+                                                )}
+                                            />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-slate-500 font-semibold ml-1 normal-case tracking-normal text-sm">Description</Label>
@@ -416,7 +419,10 @@ function PostListingContent() {
                                                 {...register("description")}
                                                 error={errors.description?.message}
                                                 rows={6}
-                                                className="font-medium bg-white border-slate-200 focus:ring-primary/20 resize-none"
+                                                className={cn(
+                                                    "font-semibold bg-white resize-none placeholder:font-medium transition-all",
+                                                    errors.description ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/10"
+                                                )}
                                             />
                                         </div>
                                     </div>
@@ -438,15 +444,31 @@ function PostListingContent() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 font-display">Bedrooms</Label>
-                                        <Input type="number" {...register("beds", { valueAsNumber: true })} className="h-14 bg-white border-slate-200" />
+                                        <Input type="number" {...register("beds", { valueAsNumber: true })}
+                                            className={cn(
+                                                "h-12 bg-white rounded-xl font-semibold text-sm transition-all",
+                                                errors.beds ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/10"
+                                            )}
+                                            placeholder="0" />
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 font-display">Bathrooms</Label>
-                                        <Input type="number" {...register("baths", { valueAsNumber: true })} step="0.5" className="h-14 bg-white border-slate-200" />
+                                        <Input type="number" {...register("baths", { valueAsNumber: true })} step="0.5"
+                                            className={cn(
+                                                "h-12 bg-white rounded-xl font-semibold text-sm transition-all",
+                                                errors.baths ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/10"
+                                            )}
+                                            placeholder="0" />
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 font-display">Year Built</Label>
-                                        <Input type="number" {...register("yearBuilt", { valueAsNumber: true })} placeholder="YYYY" className="h-14 bg-white border-slate-200" />
+                                        <Input type="number" {...register("yearBuilt", { valueAsNumber: true })}
+                                            placeholder="YYYY"
+                                            className={cn(
+                                                "h-12 bg-white rounded-xl font-semibold text-sm placeholder:font-medium transition-all",
+                                                errors.yearBuilt ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/10"
+                                            )}
+                                        />
                                     </div>
                                 </section>
                                 <section className="space-y-4">
@@ -511,14 +533,19 @@ function PostListingContent() {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                         <div className="space-y-2">
                                             <Label className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Currency</Label>
-                                            <select {...register("currency")} className="w-full h-14 rounded-xl border-slate-200 bg-slate-50 px-4 font-black">
+                                            <select {...register("currency")} className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 px-4 text-sm font-bold shadow-sm transition-all focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none">
                                                 <option value="USD">USD ($)</option>
                                                 <option value="EUR">EUR (€)</option>
                                             </select>
                                         </div>
                                         <div className="md:col-span-2 space-y-2">
                                             <Label className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Total Price</Label>
-                                            <Input type="number" {...register("price", { valueAsNumber: true })} className="h-14 bg-white border-slate-200 text-2xl font-black" />
+                                            <Input type="number" {...register("price", { valueAsNumber: true })}
+                                                className={cn(
+                                                    "h-12 bg-white text-2xl font-black rounded-xl transition-all",
+                                                    errors.price ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/10"
+                                                )}
+                                                placeholder="0.00" />
                                         </div>
                                     </div>
                                 </section>
@@ -533,15 +560,18 @@ function PostListingContent() {
                             </h2>
 
                             {/* Address Search */}
-                            <div className="relative group">
+                            <div className="space-y-2 group">
                                 <div className="relative">
                                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-primary transition-colors z-10" />
                                     <Input
                                         type="text"
                                         {...register("address")}
-                                        error={errors.address?.message}
+                                        error={undefined} // Pass undefined to handle error display manually below
                                         placeholder="Enter address..."
-                                        className="pl-12 pr-28 h-14"
+                                        className={cn(
+                                            "pl-12 pr-28 h-12 bg-white rounded-xl border-slate-200 font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-medium focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all",
+                                            errors.address && "border-red-500 focus-visible:ring-red-500"
+                                        )}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                                 e.preventDefault();
@@ -553,15 +583,20 @@ function PostListingContent() {
                                         type="button"
                                         onClick={handleAddressSearch}
                                         disabled={isGeocoding}
-                                        className="absolute right-2 top-[7px] bg-primary text-white text-[10px] font-bold px-4 py-2.5 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer uppercase tracking-widest flex items-center gap-2 z-10"
+                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-primary text-white text-[10px] font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer uppercase tracking-wider flex items-center gap-2 z-10"
                                     >
                                         {isGeocoding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Search"}
                                     </button>
                                 </div>
+                                {errors.address && (
+                                    <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider ml-1">
+                                        {errors.address.message}
+                                    </span>
+                                )}
                             </div>
 
                             {searchError && (
-                                <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest animate-in fade-in slide-in-from-top-1">
+                                <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider ml-1 mt-1 animate-in fade-in slide-in-from-top-1">
                                     {searchError}
                                 </p>
                             )}
@@ -588,11 +623,11 @@ function PostListingContent() {
 
                             <div className="p-4 rounded-xl bg-primary/5 border border-slate-200 flex items-start gap-4 shadow-sm transition-all hover:border-primary/20 group">
                                 <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-[10px] shrink-0 mt-0.5 font-bold shadow-md shadow-primary/20">i</div>
-                                <div className="space-y-1">
+                                <div className="space-y-0.5">
                                     <p className="text-xs font-bold text-slate-600 leading-relaxed font-manrope">
                                         Drag the map to pinpoint the exact entrance location.
                                     </p>
-                                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                                         Click map to move pin
                                     </p>
                                 </div>
@@ -601,12 +636,18 @@ function PostListingContent() {
                             {/* Unit/Zip Fields */}
                             <div className="grid grid-cols-2 gap-4 pt-2">
                                 <Input
-                                    className="h-12 bg-slate-50 rounded-lg border border-slate-200 focus:border-primary/20 focus:ring-4 focus:ring-primary/5 px-4 text-xs font-medium text-slate-900 transition-all placeholder:text-slate-400 shadow-sm"
+                                    className={cn(
+                                        "h-12 bg-slate-50 rounded-xl px-4 text-sm font-semibold text-slate-900 transition-all placeholder:font-medium shadow-sm",
+                                        errors.houseNumber ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/5 focus:border-primary/20"
+                                    )}
                                     placeholder="Unit Number"
                                     {...register("houseNumber")}
                                 />
                                 <Input
-                                    className="h-12 bg-slate-50 rounded-lg border border-slate-200 focus:border-primary/20 focus:ring-4 focus:ring-primary/5 px-4 text-xs font-medium text-slate-900 transition-all placeholder:text-slate-400 shadow-sm"
+                                    className={cn(
+                                        "h-12 bg-slate-50 rounded-xl px-4 text-sm font-semibold text-slate-900 transition-all placeholder:font-medium shadow-sm",
+                                        errors.zipCode ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/5 focus:border-primary/20"
+                                    )}
                                     placeholder="Zip Code"
                                     {...register("zipCode")}
                                 />
@@ -632,7 +673,7 @@ function PostListingContent() {
                             else router.back();
                         }}
                         className={cn(
-                            "flex items-center gap-2 px-6 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all font-display",
+                            "flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-all",
                             step === 1 ? "text-slate-300 cursor-not-allowed" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
                         )}
                         disabled={step === 1}
@@ -646,7 +687,7 @@ function PostListingContent() {
                             <Button
                                 type="button"
                                 onClick={nextStep}
-                                className="bg-primary text-white text-xs font-bold px-6 py-2 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-3 uppercase tracking-wider"
+                                className="bg-primary text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-2 uppercase"
                             >
                                 Continue to {STEPS[step]?.label || "Next"} <ChevronRight className="w-4 h-4" />
                             </Button>
@@ -655,7 +696,7 @@ function PostListingContent() {
                                 type="button"
                                 onClick={form.handleSubmit(onSubmit as any)}
                                 disabled={isUploading || images.length === 0}
-                                className="bg-green-600 text-white text-xs font-bold px-6 py-2 rounded-lg shadow-lg shadow-green-600/20 hover:bg-green-700 transition-all cursor-pointer flex items-center gap-3 uppercase tracking-wider"
+                                className="bg-green-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-green-600/20 hover:bg-green-700 transition-all cursor-pointer flex items-center gap-2 uppercase"
                             >
                                 {isUploading ? "Publishing..." : "Finish & Publish"}
                                 <Check className="w-4 h-4" />
