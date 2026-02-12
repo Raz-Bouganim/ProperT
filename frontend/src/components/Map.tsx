@@ -1,14 +1,9 @@
-"use client";
-
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { X, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// Fix for default marker icons in Leaflet with Webpack/Next.js
-// ... (icons setup can remain, though we are overriding them)
 
 interface MapProps {
     listings: any[];
@@ -16,6 +11,8 @@ interface MapProps {
     zoom?: number;
     hoveredListingId?: string | null;
     className?: string;
+    onLocationSelect?: (lat: number, lng: number) => void;
+    isInteractive?: boolean;
 }
 
 function ZoomControls() {
@@ -24,6 +21,7 @@ function ZoomControls() {
     return (
         <div className="absolute top-6 right-6 flex flex-col gap-2 z-[400] isolate">
             <button
+                type="button"
                 onClick={() => map.zoomIn()}
                 className="w-10 h-10 bg-white rounded-lg shadow-xl border border-slate-100 flex items-center justify-center text-slate-600 hover:text-primary hover:bg-slate-50 transition-all active:scale-95 cursor-pointer"
                 aria-label="Zoom In"
@@ -31,6 +29,7 @@ function ZoomControls() {
                 <Plus size={20} strokeWidth={2.5} />
             </button>
             <button
+                type="button"
                 onClick={() => map.zoomOut()}
                 className="w-10 h-10 bg-white rounded-lg shadow-xl border border-slate-100 flex items-center justify-center text-slate-600 hover:text-primary hover:bg-slate-50 transition-all active:scale-95 cursor-pointer"
                 aria-label="Zoom Out"
@@ -49,6 +48,17 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom: number }
     return null;
 }
 
+function MapEvents({ onLocationSelect, isInteractive }: { onLocationSelect?: (lat: number, lng: number) => void, isInteractive?: boolean }) {
+    useMapEvents({
+        click(e) {
+            if (isInteractive && onLocationSelect) {
+                onLocationSelect(e.latlng.lat, e.latlng.lng);
+            }
+        },
+    });
+    return null;
+}
+
 function InvalidateMapSize() {
     const map = useMap();
     useEffect(() => {
@@ -60,13 +70,16 @@ function InvalidateMapSize() {
     return null;
 }
 
-export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13, hoveredListingId, className }: MapProps) {
+export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13, hoveredListingId, className, onLocationSelect, isInteractive }: MapProps) {
     const [selectedListing, setSelectedListing] = useState<any>(null);
 
     // Center map on first listing if available
-    const mapCenter = listings.length > 0 && listings[0].latitude && listings[0].longitude
-        ? [listings[0].latitude, listings[0].longitude] as [number, number]
-        : center;
+    const mapCenter = useMemo(() => {
+        if (listings.length > 0 && listings[0].latitude && listings[0].longitude) {
+            return [listings[0].latitude, listings[0].longitude] as [number, number];
+        }
+        return center;
+    }, [listings, center]);
 
     // Effect to auto-select highlighted listing
     useEffect(() => {
@@ -105,6 +118,7 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
             >
                 <ChangeView center={mapCenter} zoom={zoom} />
                 <InvalidateMapSize />
+                <MapEvents onLocationSelect={onLocationSelect} isInteractive={isInteractive} />
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -116,18 +130,24 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
                             key={listing.id}
                             position={[listing.latitude, listing.longitude]}
                             icon={createCustomIcon(hoveredListingId === listing.id || selectedListing?.id === listing.id)}
+                            draggable={isInteractive && listing.id === "preview"}
                             eventHandlers={{
                                 click: () => setSelectedListing(listing),
+                                dragend: (e) => {
+                                    if (isInteractive && onLocationSelect) {
+                                        const marker = e.target;
+                                        const position = marker.getLatLng();
+                                        onLocationSelect(position.lat, position.lng);
+                                    }
+                                }
                             }}
                         />
                     ) : null
                 ))}
             </MapContainer>
 
-            {/* Custom Zoom Controls (Optional, if we removed default) */}
-
             {/* Floating Property Card */}
-            {selectedListing && (
+            {selectedListing && selectedListing.id !== "preview" && (
                 <div className="absolute bottom-6 left-6 right-6 md:right-auto md:w-80 bg-white p-4 rounded-xl shadow-2xl z-[1000] animate-in slide-in-from-bottom-4 duration-300 border border-slate-100">
                     <div className="flex gap-4">
                         <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-slate-100">
@@ -143,6 +163,7 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
                             <div className="flex items-center justify-between mt-2">
                                 <span className="font-bold text-primary">${Number(selectedListing.price).toLocaleString()}</span>
                                 <button
+                                    type="button"
                                     className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 transition-colors cursor-pointer"
                                     onClick={() => setSelectedListing(null)}
                                 >

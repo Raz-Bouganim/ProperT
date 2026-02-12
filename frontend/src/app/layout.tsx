@@ -38,7 +38,7 @@ export default function RootLayout({
             <Navbar />
             <main className="flex-grow">{children}</main>
           </div>
-          <Toaster />
+          <Toaster position="bottom-right" offset={80} />
         </AuthProvider>
       </body>
     </html>

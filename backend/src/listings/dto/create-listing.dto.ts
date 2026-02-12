@@ -23,6 +23,30 @@ export class CreateListingDto {
     @IsNotEmpty()
     address: string;
 
+    @IsString()
+    @IsNotEmpty()
+    country: string;
+
+    @IsString()
+    @IsNotEmpty()
+    city: string;
+
+    @IsString()
+    @IsOptional()
+    state?: string;
+
+    @IsString()
+    @IsOptional()
+    zipCode?: string;
+
+    @IsString()
+    @IsOptional()
+    street?: string;
+
+    @IsString()
+    @IsOptional()
+    houseNumber?: string;
+
     @IsEnum(PropertyType)
     @IsNotEmpty()
     type: PropertyType;

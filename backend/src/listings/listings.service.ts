@@ -9,11 +9,12 @@ export class ListingsService {
   constructor(private prisma: PrismaService) { }
 
   create(createListingDto: CreateListingDto) {
+    const { price, taxAnnual, hoaMonthly, ...rest } = createListingDto;
     const data: any = {
-      ...createListingDto,
-      price: createListingDto.price.toString(),
-      taxAnnual: createListingDto.taxAnnual?.toString(),
-      hoaMonthly: createListingDto.hoaMonthly?.toString(),
+      ...rest,
+      price: price.toString(),
+      taxAnnual: taxAnnual?.toString(),
+      hoaMonthly: hoaMonthly?.toString(),
     };
     return this.prisma.listing.create({ data });
   }

@@ -15,6 +15,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { toast } from "sonner";
 
 // Dynamically import Map to avoid SSR issues
 const Map = dynamic(() => import("@/components/Map"), {
@@ -31,11 +32,17 @@ const listingSchema = z.object({
     // Step 1: Basic Info
     transactionType: z.enum(["FOR_SALE", "FOR_RENT"]),
     type: z.enum(["APARTMENT", "HOUSE", "OFFICE"]),
-    title: z.string().min(5, "Title must be at least 5 characters").max(60, "Title max 60 chars"),
-    description: z.string().min(20, "Description must be at least 20 characters"),
+    title: z.string().min(1, "field should not be empty").max(60, "Title max 60 chars"),
+    description: z.string().min(1, "field should not be empty"),
 
     // Step 2: Details & Location
-    address: z.string().min(5, "Address must be at least 5 characters"),
+    address: z.string().min(1, "please enter a valid address"),
+    country: z.string().min(1, "Country is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().optional(),
+    zipCode: z.string().optional(),
+    street: z.string().optional(),
+    houseNumber: z.string().optional(),
     latitude: z.number().optional(),
     longitude: z.number().optional(),
     sqft: z.number().min(1, "Square footage must be positive"),
@@ -115,18 +122,37 @@ function PostListingContent() {
 
     const handleAddressSearch = async () => {
         const address = watch("address");
-        if (!address || address.length < 5) return;
+        if (!address || address.length < 1) return;
 
         setIsGeocoding(true);
         try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
+            const res = await fetch(`http://localhost:5000/geo/search?q=${encodeURIComponent(address)}`);
             const data = await res.json();
             if (data && data.length > 0) {
-                const { lat, lon } = data[0];
+                const { lat, lon, address: addrDetails } = data[0];
                 const latitude = parseFloat(lat);
                 const longitude = parseFloat(lon);
-                setValue("latitude", latitude);
-                setValue("longitude", longitude);
+
+                setValue("latitude", latitude, { shouldValidate: true });
+                setValue("longitude", longitude, { shouldValidate: true });
+                setValue("country", addrDetails.country || "", { shouldValidate: true });
+                setValue("city", addrDetails.city || addrDetails.town || addrDetails.village || addrDetails.city_district || addrDetails.hamlet || addrDetails.suburb || "", { shouldValidate: true });
+                setValue("state", addrDetails.state || "", { shouldValidate: true });
+                setValue("zipCode", addrDetails.postcode || "", { shouldValidate: true });
+                setValue("street", addrDetails.road || "", { shouldValidate: true });
+                setValue("houseNumber", addrDetails.house_number || "", { shouldValidate: true });
+
+                // Update display address if detailed parts exist
+                if (addrDetails.road && addrDetails.city) {
+                    const fullAddr = [
+                        addrDetails.house_number,
+                        addrDetails.road,
+                        addrDetails.city,
+                        addrDetails.country
+                    ].filter(Boolean).join(", ");
+                    setValue("address", fullAddr, { shouldValidate: true });
+                }
+
                 setMapCenter([latitude, longitude]);
                 setMapZoom(16);
                 setSearchError(null);
@@ -136,6 +162,40 @@ function PostListingContent() {
         } catch (error) {
             console.error("Geocoding failed", error);
             setSearchError("Search failed. Please try again.");
+        } finally {
+            setIsGeocoding(false);
+        }
+    };
+
+    const handleLocationSelect = async (lat: number, lng: number) => {
+        setValue("latitude", lat, { shouldValidate: true });
+        setValue("longitude", lng, { shouldValidate: true });
+        setMapCenter([lat, lng]);
+
+        setIsGeocoding(true);
+        try {
+            const res = await fetch(`http://localhost:5000/geo/reverse?lat=${lat}&lon=${lng}`);
+            const data = await res.json();
+            if (data && data.address) {
+                const addrDetails = data.address;
+                setValue("country", addrDetails.country || "", { shouldValidate: true });
+                setValue("city", addrDetails.city || addrDetails.town || addrDetails.village || addrDetails.city_district || addrDetails.hamlet || addrDetails.suburb || "", { shouldValidate: true });
+                setValue("state", addrDetails.state || "", { shouldValidate: true });
+                setValue("zipCode", addrDetails.postcode || "", { shouldValidate: true });
+                setValue("street", addrDetails.road || "", { shouldValidate: true });
+                setValue("houseNumber", addrDetails.house_number || "", { shouldValidate: true });
+
+                const fullAddr = [
+                    addrDetails.house_number,
+                    addrDetails.road,
+                    addrDetails.city,
+                    addrDetails.country
+                ].filter(Boolean).join(", ");
+                setValue("address", fullAddr, { shouldValidate: true });
+                setSearchError(null);
+            }
+        } catch (error) {
+            console.error("Reverse geocoding failed", error);
         } finally {
             setIsGeocoding(false);
         }
@@ -212,14 +272,19 @@ function PostListingContent() {
 
     const nextStep = async () => {
         let fields: (keyof ListingFormValues)[] = [];
-        if (step === 1) fields = ["title", "description", "transactionType", "type"];
-        if (step === 2) fields = ["address", "sqft", "beds", "baths", "yearBuilt"];
+        if (step === 1) fields = ["title", "description", "transactionType", "type", "address", "country", "city"];
+        if (step === 2) fields = ["sqft", "beds", "baths", "yearBuilt"];
         // Step 3 media validation is manual mainly
 
         const isValid = await trigger(fields);
         if (isValid) {
             setStep(prev => prev + 1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+            toast.error("Please fill in all required fields", {
+                description: "Make sure you haven't missed any important information.",
+                position: "bottom-right"
+            });
         }
     };
 
@@ -469,27 +534,30 @@ function PostListingContent() {
 
                             {/* Address Search */}
                             <div className="relative group">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-primary transition-colors" />
-                                <input
-                                    type="text"
-                                    {...register("address")}
-                                    placeholder="Enter address..."
-                                    className="w-full pl-12 pr-28 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all outline-none font-medium text-slate-700 bg-slate-50/50 placeholder:text-slate-400 placeholder:font-medium shadow-sm"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            handleAddressSearch();
-                                        }
-                                    }}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleAddressSearch}
-                                    disabled={isGeocoding}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-white text-[10px] font-bold px-4 py-2 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer uppercase tracking-widest flex items-center gap-2"
-                                >
-                                    {isGeocoding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Search"}
-                                </button>
+                                <div className="relative">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-primary transition-colors z-10" />
+                                    <Input
+                                        type="text"
+                                        {...register("address")}
+                                        error={errors.address?.message}
+                                        placeholder="Enter address..."
+                                        className="pl-12 pr-28 h-14"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleAddressSearch();
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleAddressSearch}
+                                        disabled={isGeocoding}
+                                        className="absolute right-2 top-[7px] bg-primary text-white text-[10px] font-bold px-4 py-2.5 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer uppercase tracking-widest flex items-center gap-2 z-10"
+                                    >
+                                        {isGeocoding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Search"}
+                                    </button>
+                                </div>
                             </div>
 
                             {searchError && (
@@ -513,22 +581,42 @@ function PostListingContent() {
                                     }] : []}
                                     center={mapCenter}
                                     zoom={mapZoom}
+                                    onLocationSelect={handleLocationSelect}
+                                    isInteractive={true}
                                 />
                             </div>
 
-                            {/* Info Box */}
                             <div className="p-4 rounded-xl bg-primary/5 border border-slate-200 flex items-start gap-4 shadow-sm transition-all hover:border-primary/20 group">
-                                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-[10px] shrink-0 mt-0.5 font-bold">i</div>
-                                <p className="text-xs font-bold text-slate-500 leading-relaxed">
-                                    Drag the map to pinpoint the exact entrance location. This helps buyers find you easily.
-                                </p>
+                                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-[10px] shrink-0 mt-0.5 font-bold shadow-md shadow-primary/20">i</div>
+                                <div className="space-y-1">
+                                    <p className="text-xs font-bold text-slate-600 leading-relaxed font-manrope">
+                                        Drag the map to pinpoint the exact entrance location.
+                                    </p>
+                                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">
+                                        Click map to move pin
+                                    </p>
+                                </div>
                             </div>
 
                             {/* Unit/Zip Fields */}
                             <div className="grid grid-cols-2 gap-4 pt-2">
-                                <input className="h-12 bg-slate-50 rounded-lg border border-slate-200 focus:border-primary/20 focus:ring-4 focus:ring-primary/5 px-4 text-xs font-medium text-slate-900 transition-all placeholder:text-slate-400 shadow-sm" placeholder="Unit Number" />
-                                <input className="h-12 bg-slate-50 rounded-lg border border-slate-200 focus:border-primary/20 focus:ring-4 focus:ring-primary/5 px-4 text-xs font-medium text-slate-900 transition-all placeholder:text-slate-400 shadow-sm" placeholder="Zip Code" />
+                                <Input
+                                    className="h-12 bg-slate-50 rounded-lg border border-slate-200 focus:border-primary/20 focus:ring-4 focus:ring-primary/5 px-4 text-xs font-medium text-slate-900 transition-all placeholder:text-slate-400 shadow-sm"
+                                    placeholder="Unit Number"
+                                    {...register("houseNumber")}
+                                />
+                                <Input
+                                    className="h-12 bg-slate-50 rounded-lg border border-slate-200 focus:border-primary/20 focus:ring-4 focus:ring-primary/5 px-4 text-xs font-medium text-slate-900 transition-all placeholder:text-slate-400 shadow-sm"
+                                    placeholder="Zip Code"
+                                    {...register("zipCode")}
+                                />
                             </div>
+
+                            {/* Hidden fields for other location details if not visible */}
+                            <input type="hidden" {...register("city")} />
+                            <input type="hidden" {...register("country")} />
+                            <input type="hidden" {...register("state")} />
+                            <input type="hidden" {...register("street")} />
                         </div>
                     </div>
                 </form>

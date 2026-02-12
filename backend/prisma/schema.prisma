@@ -70,6 +70,12 @@ model Listing {
   
   // Address & Location
   address     String
+  country     String   @default("Unknown")
+  city        String   @default("Unknown")
+  state       String?
+  zipCode     String?
+  street      String?
+  houseNumber String?
   latitude    Float?
   longitude   Float?
   
