@@ -48,6 +48,7 @@ export function LivePreview({ data, className }: LivePreviewProps) {
 
     const formattedPrice = price ? price.toLocaleString() : "0";
     const statusText = transactionType === "FOR_RENT" ? "For Rent" : "For Sale";
+    const priceDisplay = transactionType === "FOR_RENT" ? `$${formattedPrice}/mo` : `$${formattedPrice}`;
 
     return (
         <div className={cn("space-y-4 sticky top-32", className)}>
@@ -85,7 +86,7 @@ export function LivePreview({ data, className }: LivePreviewProps) {
                     </div>
 
                     {/* Heart Icon */}
-                    <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white cursor-pointer hover:bg-white/30 transition-colors">
+                    <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white pointer-events-none">
                         <span className="material-icons-outlined text-sm">favorite_border</span>
                     </div>
                 </div>
@@ -129,7 +130,7 @@ export function LivePreview({ data, className }: LivePreviewProps) {
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Price</p>
                             <div className="text-2xl font-black text-[#2563EB] tracking-tight">
-                                ${formattedPrice}
+                                {priceDisplay}
                             </div>
                         </div>
                     </div>
