@@ -4,13 +4,19 @@ import { PropertyType, ListingStatus } from '@prisma/client';
 
 export class CreateAvailabilityDto {
     @IsNumber()
-    dayOfWeek: number;
+    @IsOptional()
+    dayOfWeek?: number;
+
+    @IsString()
+    @IsOptional()
+    date?: string;
 
     @IsString()
     startTime: string;
 
     @IsString()
     endTime: string;
+
 }
 
 export class CreateListingDto {

@@ -11,6 +11,12 @@ export class ListingsController {
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@Request() req: any, @Body() createListingDto: CreateListingDto) {
+    console.log("Create Listing Request User:", req.user);
+    console.log("Create Listing DTO:", createListingDto);
+    if (!req.user || !req.user.userId) {
+      console.error("User ID missing in request");
+      throw new Error("User ID missing in request");
+    }
     createListingDto.ownerId = req.user.userId;
     return this.listingsService.create(createListingDto);
   }

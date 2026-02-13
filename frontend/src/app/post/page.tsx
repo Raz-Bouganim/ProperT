@@ -1,5 +1,9 @@
 "use client";
 
+import { format } from "date-fns";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/style.css";
+
 import { useState, Suspense, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -53,7 +57,7 @@ const listingSchema = z.object({
     sqft: z.number().min(1, "Square footage must be positive"), // Renamed from size to match backend
     beds: z.number().min(0),
     baths: z.number().min(0),
-    yearBuilt: z.number().min(1800).max(new Date().getFullYear() + 5).optional(),
+    yearBuilt: z.number().min(1800).max(new Date().getFullYear()),
     features: z.array(z.string()).optional(),
 
     // Step 3: Media
@@ -77,7 +81,8 @@ const listingSchema = z.object({
 
     // Availability
     availabilities: z.array(z.object({
-        dayOfWeek: z.number(),
+        dayOfWeek: z.number().optional(),
+        date: z.string().optional(),
         startTime: z.string(),
         endTime: z.string()
     })).optional()
@@ -123,6 +128,13 @@ function PostListingContent() {
     const [mapZoom, setMapZoom] = useState(13);
     const [isGeocoding, setIsGeocoding] = useState(false);
     const [searchError, setSearchError] = useState<string | null>(null);
+
+    // Availability State
+    const [selectedDate, setSelectedDate] = useState<Date>();
+    const [startTime, setStartTime] = useState("09:00");
+    const [endTime, setEndTime] = useState("17:00");
+    const [isRecurring, setIsRecurring] = useState(false);
+
     const router = useRouter();
     const { isAuthenticated, isLoading } = useAuth();
 
@@ -146,6 +158,80 @@ function PostListingContent() {
     });
 
     const { watch, setValue, register, formState: { errors }, trigger } = form;
+
+    const addAvailabilitySlot = () => {
+        if (!startTime || !endTime) return;
+
+        const startMin = parseInt(startTime.split(":")[0]) * 60 + parseInt(startTime.split(":")[1]);
+        const endMin = parseInt(endTime.split(":")[0]) * 60 + parseInt(endTime.split(":")[1]);
+
+        if (startMin >= endMin) {
+            toast.error("End time must be after start time");
+            return;
+        }
+
+        const currentSlots = form.getValues("availabilities") || [];
+
+        // Helper to check overlap
+        const hasOverlap = currentSlots.some(slot => {
+            const slotStart = parseInt(slot.startTime.split(":")[0]) * 60 + parseInt(slot.startTime.split(":")[1]);
+            const slotEnd = parseInt(slot.endTime.split(":")[0]) * 60 + parseInt(slot.endTime.split(":")[1]);
+
+            // Check time overlap first
+            const timeOverlap = (startMin < slotEnd && endMin > slotStart);
+
+            if (!timeOverlap) return false;
+
+            // Check day/date collision
+            if (isRecurring && selectedDate) {
+                // Trying to add recurring. 
+                // Color with existing recurring on same day
+                if (slot.dayOfWeek === selectedDate.getDay()) return true;
+                // Conflict with specific date if that date is on this day of week? (Optional: strict vs loose)
+                // For now, let's just prevent exact type duplicates
+            } else if (selectedDate) {
+                // Trying to add specific date
+                // Conflict with existing specific date
+                if (slot.date && slot.date.split("T")[0] === selectedDate.toISOString().split("T")[0]) return true;
+                // Conflict if there's a recurring rule for this day?
+                if (slot.dayOfWeek === selectedDate.getDay()) return true;
+            }
+
+            return false;
+        });
+
+        if (hasOverlap) {
+            toast.error("This slot overlaps with an existing availability.");
+            return;
+        }
+
+        let newSlot;
+        // If recurring, we use the day of week from the selected date
+        if (isRecurring && selectedDate) {
+            newSlot = {
+                dayOfWeek: selectedDate.getDay(),
+                startTime,
+                endTime
+            };
+        }
+        // If not recurring, we use the specific date
+        else if (selectedDate) {
+            newSlot = {
+                date: selectedDate.toISOString(),
+                startTime,
+                endTime
+            };
+        } else {
+            toast.error("Please select a date");
+            return;
+        }
+
+        form.setValue("availabilities", [...currentSlots, newSlot]);
+        toast.success("Availability slot added");
+
+        // Reset selection if needed, or keep for rapid entry
+        // setSelectedDate(undefined); 
+    };
 
     // Redirect if not authenticated
     useEffect(() => {
@@ -214,7 +300,7 @@ function PostListingContent() {
         if (step === 2) {
             // Address is complex, check if lat/lng are set (via geocoding) or address string exists
             const yearValue = watch("yearBuilt");
-            const isYearValid = !yearValue || (yearValue >= 1800 && yearValue <= new Date().getFullYear() + 5);
+            const isYearValid = !!yearValue && (yearValue >= 1800 && yearValue <= new Date().getFullYear());
             return !!(watch("address") && watch("sqft") > 0 && watch("beds") >= 0 && watch("baths") >= 0 && isYearValid);
         }
         if (step === 3) {
@@ -465,32 +551,6 @@ function PostListingContent() {
 
     return (
         <div className="min-h-screen bg-[#f8f9fc] font-sans text-slate-800 flex flex-col">
-            {/* Top Navigation / Progress Stepper (Clean) */}
-            <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200 sticky top-16 z-40 transition-all">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-center">
-                    {/* Progress Bar */}
-                    <div className="flex-1 max-w-2xl px-4 md:px-12">
-                        <div className="w-full">
-                            <div className="flex items-center justify-between text-[11px] font-black mb-3 uppercase tracking-[0.2em] font-display">
-                                {STEPS.map((s) => (
-                                    <span key={s.step} className={cn(
-                                        "transition-colors",
-                                        step === s.step ? "text-primary" : "text-slate-300"
-                                    )}>
-                                        {s.label}
-                                    </span>
-                                ))}
-                            </div>
-                            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                                    style={{ width: `${(step / 4) * 100}%` }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </header>
 
             <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
                 <form onSubmit={form.handleSubmit(onSubmit as any)} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -612,7 +672,7 @@ function PostListingContent() {
                                 </div>
 
                                 {/* Core Metrics Section */}
-                                <section className="mb-16">
+                                <section className="mb-8">
                                     <h2 className="text-xl font-black flex items-center gap-2 text-slate-900 font-display tracking-tight mb-6">
                                         <span className="material-icons-outlined text-primary">analytics</span>
                                         Property Specs
@@ -700,10 +760,10 @@ function PostListingContent() {
                                     </div>
                                 </section>
 
-                                <div className="w-full h-px bg-slate-200 mb-16"></div>
+                                <div className="w-full h-px bg-slate-200 mb-8"></div>
 
                                 {/* Amenities Section */}
-                                <section className="mb-24 space-y-8">
+                                <section className="space-y-8">
                                     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                                         <div>
                                             <h2 className="text-xl font-black flex items-center gap-2 text-slate-900 font-display tracking-tight">
@@ -1029,72 +1089,121 @@ function PostListingContent() {
 
                                 </section>
 
-                                {/* Availability Section */}
                                 <section className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
                                     <div className="border-b border-slate-100 pb-6">
                                         <h2 className="text-xl font-black text-slate-900 font-display tracking-tight flex items-center gap-2">
                                             <span className="material-icons-outlined text-primary">schedule</span>
                                             Viewing Availability
                                         </h2>
-                                        <p className="text-sm text-slate-500 mt-1 font-medium">When can potential buyers/tenants view the property?</p>
+                                        <p className="text-sm text-slate-500 mt-1 font-medium">Add specific dates or recurring days when your property is available for viewing.</p>
                                     </div>
 
-                                    <div className="space-y-4">
-                                        {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, index) => {
-                                            const availabilities = watch("availabilities") || [];
-                                            const dayAvailability = availabilities.find(a => a.dayOfWeek === index);
-                                            const isEnabled = !!dayAvailability;
+                                    <div className="flex flex-col md:flex-row gap-8">
+                                        {/* Calendar & Input Area */}
+                                        <div className="flex-1 space-y-6">
+                                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col items-center">
+                                                <DayPicker
+                                                    mode="single"
+                                                    selected={selectedDate}
+                                                    onSelect={setSelectedDate}
+                                                    className="bg-white p-4 rounded-lg shadow-sm"
+                                                    disabled={{ before: new Date() }}
+                                                />
+                                            </div>
 
-                                            return (
-                                                <div key={day} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors bg-slate-50/50">
-                                                    <div className="flex items-center gap-4">
-                                                        <label className="relative inline-flex items-center cursor-pointer">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={isEnabled}
-                                                                onChange={(e) => {
-                                                                    const current = watch("availabilities") || [];
-                                                                    if (e.target.checked) {
-                                                                        setValue("availabilities", [...current, { dayOfWeek: index, startTime: "09:00", endTime: "17:00" }]);
-                                                                    } else {
-                                                                        setValue("availabilities", current.filter(a => a.dayOfWeek !== index));
-                                                                    }
-                                                                }}
-                                                                className="sr-only peer"
-                                                            />
-                                                            <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                                                        </label>
-                                                        <span className={cn("font-bold text-sm w-24", isEnabled ? "text-slate-900" : "text-slate-400")}>{day}</span>
-                                                    </div>
-
-                                                    {isEnabled && (
-                                                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-200">
-                                                            <input
-                                                                type="time"
-                                                                value={dayAvailability.startTime}
-                                                                onChange={(e) => {
-                                                                    const current = watch("availabilities") || [];
-                                                                    const updated = current.map(a => a.dayOfWeek === index ? { ...a, startTime: e.target.value } : a);
-                                                                    setValue("availabilities", updated);
-                                                                }}
-                                                                className="h-9 rounded-lg border-slate-200 bg-white text-xs font-bold text-slate-700 focus:border-primary focus:ring-primary/10"
-                                                            />
-                                                            <span className="text-slate-400 font-bold">-</span>
-                                                            <input
-                                                                type="time"
-                                                                value={dayAvailability.endTime}
-                                                                onChange={(e) => {
-                                                                    const current = watch("availabilities") || [];
-                                                                    const updated = current.map(a => a.dayOfWeek === index ? { ...a, endTime: e.target.value } : a);
-                                                                    setValue("availabilities", updated);
-                                                                }}
-                                                                className="h-9 rounded-lg border-slate-200 bg-white text-xs font-bold text-slate-700 focus:border-primary focus:ring-primary/10"
-                                                            />
-                                                        </div>
-                                                    )}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Start Time</Label>
+                                                    <input
+                                                        type="time"
+                                                        value={startTime}
+                                                        onChange={(e) => setStartTime(e.target.value)}
+                                                        className="w-full h-10 rounded-lg border-slate-200 bg-white font-bold text-slate-900 focus:border-primary focus:ring-primary/10"
+                                                    />
                                                 </div>
-                                            );
-                                        })}
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">End Time</Label>
+                                                    <input
+                                                        type="time"
+                                                        value={endTime}
+                                                        onChange={(e) => setEndTime(e.target.value)}
+                                                        className="w-full h-10 rounded-lg border-slate-200 bg-white font-bold text-slate-900 focus:border-primary focus:ring-primary/10"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                                <input
+                                                    type="checkbox"
+                                                    id="repeat-weekly"
+                                                    checked={isRecurring}
+                                                    onChange={(e) => setIsRecurring(e.target.checked)}
+                                                    className="w-5 h-5 rounded text-primary focus:ring-primary/20 border-slate-300"
+                                                />
+                                                <label htmlFor="repeat-weekly" className="text-sm font-bold text-slate-700 cursor-pointer select-none">
+                                                    Repeat every {selectedDate ? format(selectedDate, "EEEE") : "week"}
+                                                </label>
+                                            </div>
+
+                                            <Button
+                                                type="button"
+                                                onClick={addAvailabilitySlot}
+                                                disabled={!selectedDate || !startTime || !endTime}
+                                                className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                            >
+                                                <Plus className="w-5 h-5" /> Add Availability
+                                            </Button>
+                                        </div>
+
+                                        {/* Added Slots List */}
+                                        <div className="flex-1 border-l border-slate-100 pl-4 md:pl-8 space-y-4">
+                                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Added Slots</h3>
+
+                                            {(watch("availabilities") || []).length === 0 ? (
+                                                <div className="text-center py-12 text-slate-400">
+                                                    <span className="material-icons-outlined text-4xl mb-2 opacity-50">event_busy</span>
+                                                    <p className="text-sm">No availability slots added yet.</p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                                                    {(watch("availabilities") || []).map((slot, index) => (
+                                                        <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/30 transition-all group">
+                                                            <div className="flex items-start gap-3">
+                                                                <div className={cn(
+                                                                    "p-2 rounded-lg",
+                                                                    slot.dayOfWeek !== undefined ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"
+                                                                )}>
+                                                                    <span className="material-icons-outlined text-lg">
+                                                                        {slot.dayOfWeek !== undefined ? "update" : "event"}
+                                                                    </span>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-bold text-slate-900 text-sm">
+                                                                        {slot.dayOfWeek !== undefined
+                                                                            ? `Every ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][slot.dayOfWeek]}`
+                                                                            : slot.date ? format(new Date(slot.date), "MMM d, yyyy") : "Specific Date"
+                                                                        }
+                                                                    </p>
+                                                                    <p className="text-xs font-medium text-slate-500">
+                                                                        {slot.startTime} - {slot.endTime}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const current = watch("availabilities") || [];
+                                                                    setValue("availabilities", current.filter((_, i) => i !== index));
+                                                                }}
+                                                                className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                                                            >
+                                                                <X className="w-5 h-5" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </section>
 
@@ -1177,7 +1286,7 @@ function PostListingContent() {
 
                     <div className="lg:col-span-5 relative">
                         {step === 1 ? (
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl sticky top-40 space-y-5">
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl sticky top-24 space-y-5">
                                 <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 font-display tracking-tight">
                                     <MapPin className="text-primary w-6 h-6" /> Location
                                 </h2>
@@ -1284,15 +1393,15 @@ function PostListingContent() {
                             </div>
                         ) : (
                             /* Live Preview for Step 2+ */
-                            <div className="sticky top-40">
+                            <div className="sticky top-24">
                                 <LivePreview
                                     data={{
                                         title: watch("title"),
-                                        price: watch("price"),
-                                        address: watch("address"),
-                                        beds: watch("beds"),
-                                        baths: watch("baths"),
-                                        sqft: watch("sqft"),
+                                        price: watch("price") || 0,
+                                        address: watch("address") || "Property Location",
+                                        beds: watch("beds") || 0,
+                                        baths: watch("baths") || 0,
+                                        sqft: watch("sqft") || 0,
                                         image: images[0]?.preview,
                                         transactionType: watch("transactionType"),
                                         latitude: watch("latitude"),
@@ -1311,8 +1420,28 @@ function PostListingContent() {
             </main>
 
             {/* Bottom Action Bar */}
-            <footer className="bg-white border-t border-slate-200 py-3 sticky bottom-0 z-40 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            <footer className="bg-white border-t border-slate-200 sticky bottom-0 z-40 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row items-center justify-between gap-4 md:gap-0">
+
+                    {/* Mobile Progress (Text only) */}
+                    <div className="md:hidden w-full flex items-center justify-between mb-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (step > 1) setStep(prev => prev - 1);
+                                else router.back();
+                            }}
+                            className={cn(
+                                "text-slate-500 hover:text-slate-900 font-bold text-xs flex items-center gap-1",
+                                step === 1 && "invisible"
+                            )}
+                        >
+                            <ChevronLeft className="w-4 h-4" /> Back
+                        </button>
+                        <span className="text-xs font-bold text-slate-400">Step {step} of 4</span>
+                    </div>
+
+                    {/* Desktop Back Button */}
                     <button
                         type="button"
                         onClick={() => {
@@ -1320,7 +1449,7 @@ function PostListingContent() {
                             else router.back();
                         }}
                         className={cn(
-                            "flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-bold text-xs transition-all",
+                            "hidden md:flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-sm transition-all",
                             step === 1 ? "text-slate-300 cursor-not-allowed" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
                         )}
                         disabled={step === 1}
@@ -1328,21 +1457,60 @@ function PostListingContent() {
                         <ChevronLeft className="w-5 h-5" /> Back
                     </button>
 
-                    <div className="flex items-center gap-8">
-                        <span className="text-xs font-semibold text-slate-400 hidden sm:block">Step {step} of 4</span>
+                    {/* Desktop Stepper */}
+                    <div className="hidden md:flex items-center gap-2">
+                        {STEPS.map((s) => {
+                            const isCompleted = step > s.step;
+                            const isCurrent = step === s.step;
+
+                            return (
+                                <div key={s.step} className="flex items-center">
+                                    <div className={cn(
+                                        "flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300",
+                                        isCurrent ? "bg-primary/5 ring-1 ring-primary/20" : "",
+                                        isCompleted ? "text-primary" : isCurrent ? "text-primary" : "text-slate-300"
+                                    )}>
+                                        <div className={cn(
+                                            "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors",
+                                            isCompleted ? "bg-primary border-primary text-white" :
+                                                isCurrent ? "bg-primary text-white border-primary" :
+                                                    "bg-transparent border-slate-300 text-slate-400"
+                                        )}>
+                                            {isCompleted ? <Check className="w-3.5 h-3.5" /> : s.step}
+                                        </div>
+                                        <span className={cn(
+                                            "text-sm font-bold",
+                                            isCompleted || isCurrent ? "text-slate-900" : "text-slate-400"
+                                        )}>
+                                            {s.label}
+                                        </span>
+                                    </div>
+                                    {s.step < STEPS.length && (
+                                        <div className={cn(
+                                            "w-8 h-0.5 mx-2 rounded-full transition-colors",
+                                            step > s.step ? "bg-primary" : "bg-slate-200"
+                                        )} />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Next / Submit Button */}
+                    <div className="w-full md:w-auto flex justify-end">
                         {step < 4 ? (
                             <Button
                                 type="button"
                                 onClick={nextStep}
                                 disabled={!isStepValid}
                                 className={cn(
-                                    "text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg transition-all flex items-center gap-2",
+                                    "w-full md:w-auto text-white text-sm font-bold px-6 py-2.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2",
                                     !isStepValid
                                         ? "bg-slate-300 shadow-none cursor-not-allowed opacity-70"
-                                        : "bg-primary shadow-primary/20 hover:bg-primary/90 cursor-pointer"
+                                        : "bg-primary shadow-primary/20 hover:bg-primary/90 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                                 )}
                             >
-                                Continue to {STEPS[step]?.label || "Next"} <ChevronRight className="w-4 h-4" />
+                                Continue <ChevronRight className="w-4 h-4" />
                             </Button>
                         ) : (
                             <Button
@@ -1356,14 +1524,21 @@ function PostListingContent() {
                                 })}
                                 disabled={isUploading || !isStepValid}
                                 className={cn(
-                                    "text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg transition-all flex items-center gap-2",
+                                    "w-full md:w-auto text-white text-sm font-bold px-6 py-2.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2",
                                     (isUploading || !isStepValid)
                                         ? "bg-slate-300 shadow-none cursor-not-allowed opacity-70"
-                                        : "bg-green-600 shadow-green-600/20 hover:bg-green-700 cursor-pointer"
+                                        : "bg-green-600 shadow-green-600/20 hover:bg-green-700 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                                 )}
                             >
-                                {isUploading ? "Publishing..." : "Finish & Publish"}
-                                <Check className="w-4 h-4" />
+                                {isUploading ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" /> Publishing...
+                                    </>
+                                ) : (
+                                    <>
+                                        Finish & Publish <Check className="w-4 h-4" />
+                                    </>
+                                )}
                             </Button>
                         )}
                     </div>

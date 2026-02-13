@@ -8,16 +8,29 @@ import { PropertyType, ListingStatus } from '@prisma/client';
 export class ListingsService {
   constructor(private prisma: PrismaService) { }
 
-  create(createListingDto: CreateListingDto) {
-    const { price, taxAnnual, hoaMonthly, ...rest } = createListingDto;
-    const data: any = {
-      ...rest,
-      price: price.toString(),
-      availabilities: rest.availabilities ? { create: rest.availabilities } : undefined,
-      taxAnnual: taxAnnual?.toString(),
-      hoaMonthly: hoaMonthly?.toString(),
-    };
-    return this.prisma.listing.create({ data });
+  async create(createListingDto: CreateListingDto) {
+    try {
+      const { price, taxAnnual, hoaMonthly, ownerId, ...rest } = createListingDto;
+
+      const availabilities = rest.availabilities?.map(a => ({
+        ...a,
+        date: a.date ? new Date(a.date) : undefined,
+      }));
+
+      const data: any = {
+        ...rest,
+        price: price.toString(),
+        availabilities: availabilities ? { create: availabilities } : undefined,
+        taxAnnual: taxAnnual?.toString(),
+        hoaMonthly: hoaMonthly?.toString(),
+        owner: { connect: { id: ownerId } }
+      };
+
+      return await this.prisma.listing.create({ data });
+    } catch (error) {
+      console.error("Error creating listing:", error);
+      throw error;
+    }
   }
 
   findAll() {

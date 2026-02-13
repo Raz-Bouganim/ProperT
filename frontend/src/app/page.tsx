@@ -230,7 +230,7 @@ export default function Home() {
                   price={Number(listing.price) || 0}
                   beds={listing.bedrooms || 2}
                   baths={listing.bathrooms || 1}
-                  sqft={listing.size || 0}
+                  sqft={listing.sqft || 0}
                   image={listing.images?.[0] || fallbackImages[index % 3]}
                   isFeatured
                   type={listing.type || "For Sale"}

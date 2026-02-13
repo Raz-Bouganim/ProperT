@@ -117,7 +117,8 @@ model Listing {
 model Availability {
   id        String   @id @default(uuid())
   
-  dayOfWeek Int      // 0-6 (Sun-Sat)
+  dayOfWeek Int?      // 0-6 (Sun-Sat) - Optional if date is set
+  date      DateTime? // Specific date
   startTime String   // "09:00"
   endTime   String   // "17:00"
   

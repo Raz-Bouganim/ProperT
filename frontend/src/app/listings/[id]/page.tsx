@@ -139,7 +139,7 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                             </div>
                             <div className="flex flex-col items-center gap-1 min-w-[80px]">
                                 <Square className="w-6 h-6 text-primary" />
-                                <span className="font-bold text-lg">{listing.size}</span>
+                                <span className="font-bold text-lg">{listing.sqft}</span>
                                 <span className="text-xs text-muted-foreground uppercase tracking-widest">Sqft</span>
                             </div>
                             <div className="flex flex-col items-center gap-1 min-w-[80px]">
