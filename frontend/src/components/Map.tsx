@@ -113,7 +113,12 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
                 center={mapCenter}
                 zoom={zoom}
                 style={{ height: "100%", width: "100%" }}
-                scrollWheelZoom={true}
+                scrollWheelZoom={isInteractive}
+                dragging={isInteractive}
+                doubleClickZoom={isInteractive}
+                touchZoom={isInteractive}
+                boxZoom={isInteractive}
+                keyboard={isInteractive}
                 zoomControl={false}
             >
                 <ChangeView center={mapCenter} zoom={zoom} />
@@ -123,7 +128,7 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
                     url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
                 />
-                <ZoomControls />
+                {isInteractive && <ZoomControls />}
                 {listings.map((listing) => (
                     listing.latitude && listing.longitude ? (
                         <Marker

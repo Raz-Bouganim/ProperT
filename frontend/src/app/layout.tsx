@@ -31,6 +31,8 @@ export default function RootLayout({
     <html lang="en" className={cn(inter.variable, manrope.variable)}>
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Internal:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className={cn(inter.className, "bg-background text-foreground antialiased")}>
         <AuthProvider>

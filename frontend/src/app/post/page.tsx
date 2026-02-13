@@ -9,13 +9,14 @@ import { Input, Textarea, Label } from "@/components/ui/Input";
 import {
     Home, Building, Briefcase, MapPin, Upload, X, Check,
     ChevronRight, ChevronLeft, Search, Tag, LandPlot,
-    FileText, Loader2
+    FileText, Loader2, Plus, Minus
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
+import { LivePreview } from "@/components/LivePreview";
 
 // Dynamically import Map to avoid SSR issues
 const Map = dynamic(() => import("@/components/Map"), {
@@ -323,7 +324,7 @@ function PostListingContent() {
                 <form onSubmit={form.handleSubmit(onSubmit as any)} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
 
                     {/* Left Column: Form Content */}
-                    <div className="lg:col-span-7 space-y-10 animate-in fade-in slide-in-from-left-4 duration-500">
+                    <div className="lg:col-span-7 space-y-10">
                         {/* Step 1: Basic Info */}
                         {step === 1 && (
                             <>
@@ -346,7 +347,7 @@ function PostListingContent() {
                                                 {...register("transactionType")}
                                                 className="sr-only peer"
                                             />
-                                            <div className="p-6 rounded-2xl border-2 border-slate-100 bg-white transition-all duration-300 peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-primary peer-checked:shadow-xl peer-checked:shadow-primary/10 hover:border-primary/30 flex flex-col items-center justify-center text-center h-32 hover:-translate-y-1">
+                                            <div className="p-6 rounded-2xl border-2 border-slate-100 bg-white peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-primary peer-checked:shadow-xl peer-checked:shadow-primary/10 hover:border-primary/30 flex flex-col items-center justify-center text-center h-32">
                                                 <span className="block text-xl font-black font-display tracking-tight mb-1">For Sale</span>
                                                 <span className="text-xs font-bold text-slate-400 group-peer-checked:text-primary/70 uppercase tracking-widest">I want to sell</span>
                                             </div>
@@ -358,7 +359,7 @@ function PostListingContent() {
                                                 {...register("transactionType")}
                                                 className="sr-only peer"
                                             />
-                                            <div className="p-6 rounded-2xl border-2 border-slate-100 bg-white transition-all duration-300 peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-primary peer-checked:shadow-xl peer-checked:shadow-primary/10 hover:border-primary/30 flex flex-col items-center justify-center text-center h-32 hover:-translate-y-1">
+                                            <div className="p-6 rounded-2xl border-2 border-slate-100 bg-white peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-primary peer-checked:shadow-xl peer-checked:shadow-primary/10 hover:border-primary/30 flex flex-col items-center justify-center text-center h-32">
                                                 <span className="block text-xl font-black font-display tracking-tight mb-1">For Rent</span>
                                                 <span className="text-xs font-bold text-slate-400 group-peer-checked:text-primary/70 uppercase tracking-widest">I want to rent</span>
                                             </div>
@@ -380,7 +381,7 @@ function PostListingContent() {
                                                     {...register("type")}
                                                     className="sr-only peer"
                                                 />
-                                                <div className="flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-slate-100 bg-white text-slate-400 transition-all duration-300 peer-checked:border-primary peer-checked:text-primary peer-checked:bg-primary/5 peer-checked:shadow-xl peer-checked:shadow-primary/10 hover:border-primary/30 h-36 text-center hover:-translate-y-1">
+                                                <div className="flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-slate-100 bg-white text-slate-400 peer-checked:border-primary peer-checked:text-primary peer-checked:bg-primary/5 peer-checked:shadow-xl peer-checked:shadow-primary/10 hover:border-primary/30 h-36 text-center">
                                                     <pt.icon className="w-8 h-8 mb-4 opacity-50 group-peer-checked:opacity-100 transition-opacity" />
                                                     <span className="font-black text-[13px] font-display uppercase tracking-widest leading-none">{pt.label}</span>
                                                 </div>
@@ -433,58 +434,151 @@ function PostListingContent() {
                         {/* Step 2: Details */}
                         {step === 2 && (
                             <div className="space-y-10">
-                                <div className="space-y-2">
-                                    <h1 className="text-4xl font-black text-slate-900 tracking-tight font-display">Property Details.</h1>
-                                    <p className="text-slate-500 text-lg font-medium">Specify your property specifications.</p>
+                                <div className="space-y-3">
+                                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight font-display drop-shadow-sm">Let&apos;s get into the details.</h1>
+                                    <p className="text-slate-500 text-lg font-medium">Tell us what makes your property unique. Accurate details help match you with the right tenants.</p>
                                 </div>
-                                <section className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                                    <div className="space-y-2">
-                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 font-display">Square Feet</Label>
-                                        <Input type="number" {...register("sqft", { valueAsNumber: true })} className="h-14 bg-white border-slate-200" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 font-display">Bedrooms</Label>
-                                        <Input type="number" {...register("beds", { valueAsNumber: true })}
-                                            className={cn(
-                                                "h-12 bg-white rounded-xl font-semibold text-sm transition-all",
-                                                errors.beds ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/10"
-                                            )}
-                                            placeholder="0" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 font-display">Bathrooms</Label>
-                                        <Input type="number" {...register("baths", { valueAsNumber: true })} step="0.5"
-                                            className={cn(
-                                                "h-12 bg-white rounded-xl font-semibold text-sm transition-all",
-                                                errors.baths ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/10"
-                                            )}
-                                            placeholder="0" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 font-display">Year Built</Label>
-                                        <Input type="number" {...register("yearBuilt", { valueAsNumber: true })}
-                                            placeholder="YYYY"
-                                            className={cn(
-                                                "h-12 bg-white rounded-xl font-semibold text-sm placeholder:font-medium transition-all",
-                                                errors.yearBuilt ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/10"
-                                            )}
-                                        />
+
+                                {/* Core Metrics Section */}
+                                <section className="mb-16">
+                                    <h2 className="text-xl font-black flex items-center gap-2 text-slate-900 font-display tracking-tight mb-6">
+                                        <span className="material-icons-outlined text-primary">analytics</span>
+                                        Property Specs
+                                    </h2>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        {/* Square Footage */}
+                                        {/* Square Footage */}
+                                        <div className="relative group p-1">
+                                            <Label className="text-slate-500 font-semibold normal-case tracking-normal text-sm mb-2 block">Square Footage</Label>
+                                            <div className="relative">
+                                                <Input
+                                                    type="number"
+                                                    placeholder="0"
+                                                    {...register("sqft", { valueAsNumber: true })}
+                                                    className={cn(
+                                                        "block w-full px-4 py-4 rounded-xl border-slate-200 bg-white text-slate-900 text-xl font-medium focus:ring-primary/10 transition-all shadow-sm group-hover:border-primary/30 h-16",
+                                                        errors.sqft ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:border-primary"
+                                                    )}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Bedrooms */}
+                                        <div className="relative group p-1">
+                                            <Label className="text-slate-500 font-semibold normal-case tracking-normal text-sm mb-2 block">Bedrooms</Label>
+                                            <div className="relative">
+                                                <Input
+                                                    type="number"
+                                                    {...register("beds", { valueAsNumber: true })}
+                                                    className={cn(
+                                                        "block w-full px-4 py-4 rounded-xl border-slate-200 bg-white text-slate-900 text-xl font-medium focus:ring-primary/10 transition-all shadow-sm group-hover:border-primary/30 h-16",
+                                                        errors.beds ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:border-primary"
+                                                    )}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Bathrooms */}
+                                        <div className="relative group p-1">
+                                            <Label className="text-slate-500 font-semibold normal-case tracking-normal text-sm mb-2 block">Bathrooms</Label>
+                                            <div className="relative">
+                                                <Input
+                                                    type="number"
+                                                    step="0.5"
+                                                    {...register("baths", { valueAsNumber: true })}
+                                                    className={cn(
+                                                        "block w-full px-4 py-4 rounded-xl border-slate-200 bg-white text-slate-900 text-xl font-medium focus:ring-primary/10 transition-all shadow-sm group-hover:border-primary/30 h-16",
+                                                        errors.baths ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:border-primary"
+                                                    )}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Year Built */}
+                                        <div className="relative group p-1">
+                                            <Label className="text-slate-500 font-semibold normal-case tracking-normal text-sm mb-2 block">Year Built</Label>
+                                            <div className="relative">
+                                                <Input
+                                                    type="number"
+                                                    placeholder="YYYY"
+                                                    {...register("yearBuilt", { valueAsNumber: true })}
+                                                    className={cn(
+                                                        "block w-full px-4 py-4 rounded-xl border-slate-200 bg-white text-slate-900 text-xl font-medium focus:ring-primary/10 transition-all shadow-sm group-hover:border-primary/30 h-16",
+                                                        errors.yearBuilt ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:border-primary"
+                                                    )}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </section>
-                                <section className="space-y-4">
-                                    <h2 className="text-xl font-black text-slate-900 border-b pb-2 font-display tracking-tight">Amenities</h2>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                        {AMENITIES.map((amenity) => (
-                                            <label key={amenity} className="cursor-pointer group flex items-center gap-3 p-4 rounded-xl border border-slate-100 bg-white hover:border-primary/20 transition-all select-none">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={watch("features")?.includes(amenity)}
-                                                    onChange={() => toggleFeature(amenity)}
-                                                    className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary/20"
-                                                />
-                                                <span className="text-sm font-bold text-slate-600">{amenity}</span>
-                                            </label>
-                                        ))}
+
+                                <div className="w-full h-px bg-slate-200 mb-16"></div>
+
+                                {/* Amenities Section */}
+                                <section className="mb-24 space-y-8">
+                                    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                                        <div>
+                                            <h2 className="text-xl font-black flex items-center gap-2 text-slate-900 font-display tracking-tight">
+                                                <span className="material-icons-outlined text-primary">stars</span>
+                                                Amenities & Features
+                                            </h2>
+                                            <p className="text-sm text-slate-500 mt-1 font-medium">Select all that apply to your property.</p>
+                                        </div>
+                                        <div className="flex items-center text-sm text-primary cursor-pointer hover:underline gap-1 font-bold">
+                                            <Plus className="w-4 h-4" />
+                                            <span>Suggest new amenity</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                        {AMENITIES.map((amenity) => {
+                                            const isSelected = watch("features")?.includes(amenity);
+                                            return (
+                                                <label key={amenity} className="cursor-pointer group relative">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="peer sr-only"
+                                                        checked={isSelected}
+                                                        onChange={() => toggleFeature(amenity)}
+                                                    />
+                                                    <div className={cn(
+                                                        "p-4 rounded-xl border-2 h-full flex flex-col items-start gap-3 relative overflow-hidden",
+                                                        isSelected
+                                                            ? "border-primary bg-primary/5 shadow-xl shadow-primary/10"
+                                                            : "border-slate-100 bg-white hover:border-primary/30"
+                                                    )}>
+                                                        <div className={cn(
+                                                            "h-10 w-10 rounded-lg border flex items-center justify-center transition-colors",
+                                                            isSelected
+                                                                ? "bg-primary text-white border-primary"
+                                                                : "bg-slate-50 border-slate-100 text-slate-500"
+                                                        )}>
+                                                            {/* Placeholder icons based on amenity name logic or just consistent icons */}
+                                                            {amenity.includes("Pool") && <span className="material-icons-outlined">pool</span>}
+                                                            {amenity.includes("Gym") && <span className="material-icons-outlined">fitness_center</span>}
+                                                            {amenity.includes("Parking") && <span className="material-icons-outlined">local_parking</span>}
+                                                            {amenity.includes("Wifi") && <span className="material-icons-outlined">wifi</span>}
+                                                            {amenity.includes("Air") && <span className="material-icons-outlined">ac_unit</span>}
+                                                            {amenity.includes("Balcony") && <span className="material-icons-outlined">deck</span>}
+                                                            {amenity.includes("Pet") && <span className="material-icons-outlined">pets</span>}
+                                                            {amenity.includes("Elevator") && <span className="material-icons-outlined">elevator</span>}
+                                                            {amenity.includes("Security") && <span className="material-icons-outlined">security</span>}
+                                                            {amenity.includes("Laundry") && <span className="material-icons-outlined">local_laundry_service</span>}
+                                                            {amenity.includes("Dishwasher") && <span className="material-icons-outlined">kitchen</span>}
+                                                            {amenity.includes("Fireplace") && <span className="material-icons-outlined">fireplace</span>}
+                                                            {/* Fallback */}
+                                                            {!amenity.match(/(Pool|Gym|Parking|Wifi|Air|Balcony|Pet|Elevator|Security|Laundry|Dishwasher|Fireplace)/) && (
+                                                                <span className="material-icons-outlined">check</span>
+                                                            )}
+                                                        </div>
+                                                        <span className={cn(
+                                                            "font-bold text-sm transition-colors",
+                                                            isSelected ? "text-primary" : "text-slate-700"
+                                                        )}>{amenity}</span>
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
                                     </div>
                                 </section>
                             </div>
@@ -553,112 +647,136 @@ function PostListingContent() {
                         )}
                     </div>
 
-                    <div className="lg:col-span-5">
-                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl sticky top-40 space-y-5">
-                            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 font-display tracking-tight">
-                                <MapPin className="text-primary w-6 h-6" /> Location
-                            </h2>
+                    <div className="lg:col-span-5 relative">
+                        {step === 1 ? (
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl sticky top-40 space-y-5">
+                                <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 font-display tracking-tight">
+                                    <MapPin className="text-primary w-6 h-6" /> Location
+                                </h2>
 
-                            {/* Address Search */}
-                            <div className="space-y-2 group">
-                                <div className="relative">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-primary transition-colors z-10" />
-                                    <Input
-                                        type="text"
-                                        {...register("address")}
-                                        error={undefined} // Pass undefined to handle error display manually below
-                                        placeholder="Enter address..."
-                                        className={cn(
-                                            "pl-12 pr-28 h-12 bg-white rounded-xl border-slate-200 font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-medium focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all",
-                                            errors.address && "border-red-500 focus-visible:ring-red-500"
-                                        )}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                handleAddressSearch();
-                                            }
-                                        }}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleAddressSearch}
-                                        disabled={isGeocoding}
-                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-primary text-white text-[10px] font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer uppercase tracking-wider flex items-center gap-2 z-10"
-                                    >
-                                        {isGeocoding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Search"}
-                                    </button>
+                                {/* Address Search */}
+                                <div className="space-y-2 group">
+                                    <div className="relative">
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-primary transition-colors z-10" />
+                                        <Input
+                                            type="text"
+                                            {...register("address")}
+                                            error={undefined} // Pass undefined to handle error display manually below
+                                            placeholder="Enter address..."
+                                            className={cn(
+                                                "pl-12 pr-24 h-12 bg-white rounded-xl border-slate-200 font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-medium focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all truncate",
+                                                errors.address && "border-red-500 focus-visible:ring-red-500"
+                                            )}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    handleAddressSearch();
+                                                }
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleAddressSearch}
+                                            disabled={isGeocoding}
+                                            className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-primary text-white text-[10px] font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-2 z-10"
+                                        >
+                                            {isGeocoding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Search"}
+                                        </button>
+                                    </div>
+                                    {errors.address && (
+                                        <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider ml-1">
+                                            {errors.address.message}
+                                        </span>
+                                    )}
                                 </div>
-                                {errors.address && (
-                                    <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider ml-1">
-                                        {errors.address.message}
-                                    </span>
+
+                                {searchError && (
+                                    <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider ml-1 mt-1 animate-in fade-in slide-in-from-top-1">
+                                        {searchError}
+                                    </p>
                                 )}
+
+                                {/* Real Map Integration */}
+                                <div className="relative w-full h-80 rounded-xl overflow-hidden group border border-slate-200 shadow-sm">
+                                    <Map
+                                        className="rounded-none"
+                                        listings={watch("latitude") && watch("longitude") ? [{
+                                            id: "preview",
+                                            latitude: watch("latitude"),
+                                            longitude: watch("longitude"),
+                                            title: watch("title") || "New Listing",
+                                            address: watch("address") || "Property Location",
+                                            price: watch("price") || 0,
+                                            images: images.map(img => img.preview)
+                                        }] : []}
+                                        center={mapCenter}
+                                        zoom={mapZoom}
+                                        onLocationSelect={handleLocationSelect}
+                                        isInteractive={true}
+                                    />
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-primary/5 border border-slate-200 flex items-start gap-4 shadow-sm transition-all hover:border-primary/20 group">
+                                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-[10px] shrink-0 mt-0.5 font-bold shadow-md shadow-primary/20">i</div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-xs font-bold text-slate-600 leading-relaxed font-manrope">
+                                            Drag the map to pinpoint the exact entrance location.
+                                        </p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                            Click map to move pin
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Unit/Zip Fields */}
+                                <div className="grid grid-cols-2 gap-4 pt-2">
+                                    <Input
+                                        className={cn(
+                                            "h-12 bg-slate-50 rounded-xl px-4 text-sm font-semibold text-slate-900 transition-all placeholder:font-medium shadow-sm",
+                                            errors.houseNumber ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/5 focus:border-primary/20"
+                                        )}
+                                        placeholder="Unit Number"
+                                        {...register("houseNumber")}
+                                    />
+                                    <Input
+                                        className={cn(
+                                            "h-12 bg-slate-50 rounded-xl px-4 text-sm font-semibold text-slate-900 transition-all placeholder:font-medium shadow-sm",
+                                            errors.zipCode ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/5 focus:border-primary/20"
+                                        )}
+                                        placeholder="Zip Code"
+                                        {...register("zipCode")}
+                                    />
+                                </div>
+
+                                {/* Hidden fields for other location details if not visible */}
+                                <input type="hidden" {...register("city")} />
+                                <input type="hidden" {...register("country")} />
+                                <input type="hidden" {...register("state")} />
+                                <input type="hidden" {...register("street")} />
                             </div>
-
-                            {searchError && (
-                                <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider ml-1 mt-1 animate-in fade-in slide-in-from-top-1">
-                                    {searchError}
-                                </p>
-                            )}
-
-                            {/* Real Map Integration */}
-                            <div className="relative w-full h-80 rounded-xl overflow-hidden group border border-slate-200 shadow-sm">
-                                <Map
-                                    className="rounded-none"
-                                    listings={watch("latitude") && watch("longitude") ? [{
-                                        id: "preview",
+                        ) : (
+                            /* Live Preview for Step 2+ */
+                            <div className="sticky top-40">
+                                <LivePreview
+                                    data={{
+                                        title: watch("title"),
+                                        price: watch("price"),
+                                        address: watch("address"),
+                                        beds: watch("beds"),
+                                        baths: watch("baths"),
+                                        sqft: watch("sqft"),
+                                        image: images[0]?.preview,
+                                        transactionType: watch("transactionType"),
                                         latitude: watch("latitude"),
-                                        longitude: watch("longitude"),
-                                        title: watch("title") || "New Listing",
-                                        address: watch("address") || "Property Location",
-                                        price: watch("price") || 0,
-                                        images: images.map(img => img.preview)
-                                    }] : []}
-                                    center={mapCenter}
-                                    zoom={mapZoom}
-                                    onLocationSelect={handleLocationSelect}
-                                    isInteractive={true}
+                                        longitude: watch("longitude")
+                                    }}
                                 />
-                            </div>
-
-                            <div className="p-4 rounded-xl bg-primary/5 border border-slate-200 flex items-start gap-4 shadow-sm transition-all hover:border-primary/20 group">
-                                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-[10px] shrink-0 mt-0.5 font-bold shadow-md shadow-primary/20">i</div>
-                                <div className="space-y-0.5">
-                                    <p className="text-xs font-bold text-slate-600 leading-relaxed font-manrope">
-                                        Drag the map to pinpoint the exact entrance location.
-                                    </p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                        Click map to move pin
-                                    </p>
+                                <div className="mt-6 p-4 rounded-xl bg-slate-100 border border-slate-200 flex items-center gap-3 text-slate-500">
+                                    <span className="material-icons-outlined text-xl">visibility</span>
+                                    <p className="text-xs font-medium">This is how your listing will appear to potential tenants.</p>
                                 </div>
                             </div>
-
-                            {/* Unit/Zip Fields */}
-                            <div className="grid grid-cols-2 gap-4 pt-2">
-                                <Input
-                                    className={cn(
-                                        "h-12 bg-slate-50 rounded-xl px-4 text-sm font-semibold text-slate-900 transition-all placeholder:font-medium shadow-sm",
-                                        errors.houseNumber ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/5 focus:border-primary/20"
-                                    )}
-                                    placeholder="Unit Number"
-                                    {...register("houseNumber")}
-                                />
-                                <Input
-                                    className={cn(
-                                        "h-12 bg-slate-50 rounded-xl px-4 text-sm font-semibold text-slate-900 transition-all placeholder:font-medium shadow-sm",
-                                        errors.zipCode ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:ring-primary/5 focus:border-primary/20"
-                                    )}
-                                    placeholder="Zip Code"
-                                    {...register("zipCode")}
-                                />
-                            </div>
-
-                            {/* Hidden fields for other location details if not visible */}
-                            <input type="hidden" {...register("city")} />
-                            <input type="hidden" {...register("country")} />
-                            <input type="hidden" {...register("state")} />
-                            <input type="hidden" {...register("street")} />
-                        </div>
+                        )}
                     </div>
                 </form>
             </main>
@@ -673,7 +791,7 @@ function PostListingContent() {
                             else router.back();
                         }}
                         className={cn(
-                            "flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-all",
+                            "flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-bold text-xs transition-all",
                             step === 1 ? "text-slate-300 cursor-not-allowed" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
                         )}
                         disabled={step === 1}
@@ -687,7 +805,7 @@ function PostListingContent() {
                             <Button
                                 type="button"
                                 onClick={nextStep}
-                                className="bg-primary text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-2 uppercase"
+                                className="bg-primary text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-2"
                             >
                                 Continue to {STEPS[step]?.label || "Next"} <ChevronRight className="w-4 h-4" />
                             </Button>
@@ -696,7 +814,7 @@ function PostListingContent() {
                                 type="button"
                                 onClick={form.handleSubmit(onSubmit as any)}
                                 disabled={isUploading || images.length === 0}
-                                className="bg-green-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-green-600/20 hover:bg-green-700 transition-all cursor-pointer flex items-center gap-2 uppercase"
+                                className="bg-green-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-green-600/20 hover:bg-green-700 transition-all cursor-pointer flex items-center gap-2"
                             >
                                 {isUploading ? "Publishing..." : "Finish & Publish"}
                                 <Check className="w-4 h-4" />
