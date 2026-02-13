@@ -6,7 +6,7 @@ import { Toaster } from "sonner";
 export function GlobalToaster() {
     const pathname = usePathname();
     // The post page has a sticky footer, so we need more offset to avoid overlap
-    const isPostPropertyPage = pathname?.startsWith("/post");
+    const isPostPropertyPage = pathname?.startsWith("/properties/create");
 
     return (
         <Toaster

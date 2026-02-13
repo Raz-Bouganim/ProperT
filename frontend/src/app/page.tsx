@@ -93,7 +93,7 @@ export default function Home() {
             >
               Start Searching
             </Button>
-            <Link href={isAuthenticated ? "/post" : "/auth?redirect=/post"}>
+            <Link href={isAuthenticated ? "/properties/create" : "/auth?redirect=/properties/create"}>
               <Button
                 variant="outline"
                 className="bg-white/10 backdrop-blur-md border border-white/20 text-white h-14 px-8 rounded-xl text-lg font-bold hover:bg-white/20 transition-all cursor-pointer"
@@ -243,7 +243,7 @@ export default function Home() {
                   <HomeIcon className="text-slate-300 w-8 h-8" />
                 </div>
                 <p className="text-slate-400 text-xl font-bold mb-8 tracking-tight">No properties listed yet.</p>
-                <Link href={isAuthenticated ? "/post" : "/auth?redirect=/post"}>
+                <Link href={isAuthenticated ? "/properties/create" : "/auth?redirect=/properties/create"}>
                   <Button size="lg" className="rounded-xl h-14 px-10 text-lg font-black shadow-xl shadow-primary/20 cursor-pointer">
                     Be the first to list!
                   </Button>
