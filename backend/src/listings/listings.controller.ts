@@ -8,8 +8,10 @@ import { JwtAuthGuard } from '../auth/auth.guards';
 export class ListingsController {
   constructor(private readonly listingsService: ListingsService) { }
 
+  @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Body() createListingDto: CreateListingDto) {
+  create(@Request() req: any, @Body() createListingDto: CreateListingDto) {
+    createListingDto.ownerId = req.user.userId;
     return this.listingsService.create(createListingDto);
   }
 

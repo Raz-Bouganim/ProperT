@@ -1,6 +1,17 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsArray, ValidateNested, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PropertyType, ListingStatus } from '@prisma/client';
+
+export class CreateAvailabilityDto {
+    @IsNumber()
+    dayOfWeek: number;
+
+    @IsString()
+    startTime: string;
+
+    @IsString()
+    endTime: string;
+}
 
 export class CreateListingDto {
     @IsString()
@@ -17,7 +28,11 @@ export class CreateListingDto {
 
     @IsNumber()
     @IsNotEmpty()
-    size: number;
+    sqft: number;
+
+    @IsBoolean()
+    @IsOptional()
+    negotiable?: boolean;
 
     @IsString()
     @IsNotEmpty()
@@ -64,8 +79,8 @@ export class CreateListingDto {
     bathrooms: number;
 
     @IsString()
-    @IsNotEmpty()
-    ownerId: string;
+    @IsOptional()
+    ownerId?: string;
 
     @IsNumber()
     @IsOptional()
@@ -114,8 +129,22 @@ export class CreateListingDto {
 
     @IsString()
     @IsOptional()
+    availableDate?: string;
+
+    @IsString()
+    @IsOptional()
+    leaseDuration?: string;
+
+    @IsString()
+    @IsOptional()
     floorPlanUrl?: string;
 
     @IsOptional()
     customFees?: any;
+
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => CreateAvailabilityDto)
+    @IsOptional()
+    availabilities?: CreateAvailabilityDto[];
 }

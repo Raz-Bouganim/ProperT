@@ -5,7 +5,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { cn } from '@/lib/utils';
 
 import { AuthProvider } from '@/context/AuthContext';
-import { Toaster } from 'sonner';
+import { GlobalToaster } from '@/components/ui/GlobalToaster';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -40,7 +40,7 @@ export default function RootLayout({
             <Navbar />
             <main className="flex-grow">{children}</main>
           </div>
-          <Toaster position="bottom-right" offset={80} />
+          <GlobalToaster />
         </AuthProvider>
       </body>
     </html>

@@ -16,9 +16,11 @@ import {
 import { Button } from "@/components/ui/Button";
 import { ListingCard } from "@/components/ListingCard";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { Footer } from "@/components/layout/Footer";
 
 export default function Home() {
+  const { isAuthenticated } = useAuth();
   const [featuredListings, setFeaturedListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchLocation, setSearchLocation] = useState("");
@@ -91,7 +93,7 @@ export default function Home() {
             >
               Start Searching
             </Button>
-            <Link href="/post">
+            <Link href={isAuthenticated ? "/post" : "/auth?redirect=/post"}>
               <Button
                 variant="outline"
                 className="bg-white/10 backdrop-blur-md border border-white/20 text-white h-14 px-8 rounded-xl text-lg font-bold hover:bg-white/20 transition-all cursor-pointer"
@@ -162,10 +164,10 @@ export default function Home() {
             </Button>
           </div>
         </div>
-      </section>
+      </section >
 
       {/* Value Proposition Section */}
-      <section className="py-20 px-6 max-w-7xl mx-auto">
+      < section className="py-20 px-6 max-w-7xl mx-auto" >
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-4 tracking-tight">Why ProperT?</h2>
           <p className="text-slate-500 max-w-2xl mx-auto text-lg leading-relaxed font-medium">
@@ -199,10 +201,10 @@ export default function Home() {
             </div>
           ))}
         </div>
-      </section>
+      </section >
 
       {/* Featured Properties Section */}
-      <section className="py-20 bg-slate-50/50 border-y border-slate-200">
+      < section className="py-20 bg-slate-50/50 border-y border-slate-200" >
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-end gap-10 mb-16">
             <div className="text-left">
@@ -241,7 +243,7 @@ export default function Home() {
                   <HomeIcon className="text-slate-300 w-8 h-8" />
                 </div>
                 <p className="text-slate-400 text-xl font-bold mb-8 tracking-tight">No properties listed yet.</p>
-                <Link href="/post">
+                <Link href={isAuthenticated ? "/post" : "/auth?redirect=/post"}>
                   <Button size="lg" className="rounded-xl h-14 px-10 text-lg font-black shadow-xl shadow-primary/20 cursor-pointer">
                     Be the first to list!
                   </Button>
@@ -250,9 +252,9 @@ export default function Home() {
             )}
           </div>
         </div>
-      </section>
+      </section >
 
       <Footer />
-    </div>
+    </div >
   );
 }

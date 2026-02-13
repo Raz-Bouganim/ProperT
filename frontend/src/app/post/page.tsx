@@ -13,10 +13,13 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { LivePreview } from "@/components/LivePreview";
+import { useAuth } from "@/context/AuthContext";
+import { useEffect } from "react";
 
 // Dynamically import Map to avoid SSR issues
 const Map = dynamic(() => import("@/components/Map"), {
@@ -37,23 +40,24 @@ const listingSchema = z.object({
     description: z.string().min(1, "field should not be empty"),
 
     // Step 2: Details & Location
+    // Step 2: Details & Location
     address: z.string().min(1, "please enter a valid address"),
-    country: z.string().min(1, "Country is required"),
-    city: z.string().min(1, "City is required"),
+    country: z.string().optional(),
+    city: z.string().optional(),
     state: z.string().optional(),
     zipCode: z.string().optional(),
     street: z.string().optional(),
     houseNumber: z.string().optional(),
     latitude: z.number().optional(),
     longitude: z.number().optional(),
-    sqft: z.number().min(1, "Square footage must be positive"),
+    sqft: z.number().min(1, "Square footage must be positive"), // Renamed from size to match backend
     beds: z.number().min(0),
     baths: z.number().min(0),
     yearBuilt: z.number().min(1800).max(new Date().getFullYear() + 5).optional(),
     features: z.array(z.string()).optional(),
 
     // Step 3: Media
-    images: z.array(z.string()).min(1, "At least one image is required"),
+    images: z.any().optional(), // validated manually via state
     floorPlanUrl: z.string().optional(),
     virtualTourUrl: z.string().optional(),
 
@@ -61,11 +65,8 @@ const listingSchema = z.object({
     currency: z.string().default("USD"),
     price: z.number().min(1, "Price must be positive"),
     negotiable: z.boolean().default(true),
-    // Sale specific
-    taxAnnual: z.number().optional(),
-    hoaMonthly: z.number().optional(),
+    // Sale specific - Removed as per user request
     // Rent specific
-    securityDeposit: z.number().optional(),
     availableDate: z.string().optional(),
     leaseDuration: z.string().optional(),
 
@@ -73,6 +74,13 @@ const listingSchema = z.object({
         name: z.string(),
         amount: z.number()
     })).optional(),
+
+    // Availability
+    availabilities: z.array(z.object({
+        dayOfWeek: z.number(),
+        startTime: z.string(),
+        endTime: z.string()
+    })).optional()
 });
 
 type ListingFormValues = z.infer<typeof listingSchema>;
@@ -116,7 +124,9 @@ function PostListingContent() {
     const [isGeocoding, setIsGeocoding] = useState(false);
     const [searchError, setSearchError] = useState<string | null>(null);
     const router = useRouter();
+    const { isAuthenticated, isLoading } = useAuth();
 
+    // Hooks must be called before any early return
     const form = useForm<ListingFormValues>({
         resolver: zodResolver(listingSchema) as any,
         defaultValues: {
@@ -126,18 +136,101 @@ function PostListingContent() {
             baths: 1,
             currency: "USD",
             features: [],
-            price: 0,
+            price: undefined,
             negotiable: true,
-            // Sale defaults
-            taxAnnual: 0,
-            hoaMonthly: 0,
+            // Sale defaults - Removed
             // Rent defaults
-            securityDeposit: 0,
+            // Rent defaults - defaults removed
             leaseDuration: "12 Months",
         },
     });
 
     const { watch, setValue, register, formState: { errors }, trigger } = form;
+
+    // Redirect if not authenticated
+    useEffect(() => {
+        if (!isLoading && !isAuthenticated) {
+            // If user is already on the page and signs out, redirect to home
+            // If user enters directly via URL, redirect to auth with return url
+            // Since we can't easily distinguish "signing out" event here without more context,
+            // we'll assume if they are here unauthenticated, they should go to home
+            // EXCEPT if they came here intending to login.
+            // Simplified approach based on request: Sign out -> Home.
+            // Post property button -> Auth -> Post property.
+
+            // To handle "Sign out -> Home", we check if we were previously authenticated? No, hard to track.
+            // But if we are here and not authenticated, we should probably go to home?
+            // Wait, if I type /post and am not logged in, I want to be redirected to login.
+            // The request says: "sign out during a posting to getting kicked to the home page instead of the login".
+            // This means if I am on the page, and `isAuthenticated` flips from true to false, go to home.
+
+            // However, the other request: "click post property without login -> redirect to login -> (success) -> post property"
+            // This is handled by the Link in Navbar.
+
+            // So here:
+            // If I am here and unauth, it means I either:
+            // 1. Just arrived (and Navbar sent me to /auth, so I shouldn't be here) -> but providing I typed URL manually -> redirect to auth?
+            // 2. Was here and signed out -> redirect to home.
+
+            // BUT, if the Navbar link handles the redirect to /auth, then NO unauthenticated user should ever reach /post unless they type it manually.
+            // IF they type it manually, regular behavior is redirect to login.
+            // IF they sign out, they are on the page, auth state changes, effect runs -> redirect.
+
+            // Let's rely on the Navbar to handle the initial "intent".
+            // If we are here and not authenticated, we redirect to home.
+            // WHY? Because if the Navbar works, we go Navbar -> Auth -> Login -> Post (Auth'd).
+            // So the only time we are here unauth is if we sign out OR type url.
+            // If we type URL, redirecting to Home is a safe fallback (or Login).
+            // But User specifically asked "sign out -> home".
+
+            router.push("/");
+        }
+    }, [isLoading, isAuthenticated, router]);
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) return null; // Prevent flash of content
+
+
+    // Real-time validation for button state
+    const currentTransactionType = watch("transactionType");
+    const isStepValid = (() => {
+        if (step === 1) {
+            const values = watch();
+            return !!(
+                values.title?.trim() &&
+                values.description?.trim() &&
+                values.type &&
+                values.transactionType &&
+                values.address?.trim()
+            );
+        }
+        if (step === 2) {
+            // Address is complex, check if lat/lng are set (via geocoding) or address string exists
+            const yearValue = watch("yearBuilt");
+            const isYearValid = !yearValue || (yearValue >= 1800 && yearValue <= new Date().getFullYear() + 5);
+            return !!(watch("address") && watch("sqft") > 0 && watch("beds") >= 0 && watch("baths") >= 0 && isYearValid);
+        }
+        if (step === 3) {
+            return images.length > 0;
+        }
+        if (step === 4) {
+            const priceValid = watch("price") > 0;
+            if (!priceValid) return false;
+
+            if (currentTransactionType === "FOR_RENT") {
+                // Security deposit removed
+            }
+            return true;
+        }
+        return false;
+    })();
 
     const toggleFeature = (feature: string) => {
         const current = watch("features") || [];
@@ -315,22 +408,31 @@ function PostListingContent() {
             console.warn("Images failed to upload properly");
         }
 
+        const { sqft, beds, baths, transactionType, ...rest } = values;
+
         const listingData = {
-            ...values,
+            ...rest,
+            status: transactionType, // Map transactionType to status
+            sqft: sqft, // Backend now expects 'sqft'
+            bedrooms: beds, // Backend expects 'bedrooms'
+            bathrooms: baths, // Backend expects 'bathrooms'
+            country: values.country || "Unknown",
+            city: values.city || "Unknown",
             images: imageUrls,
         };
 
         try {
-            const res = await fetch("http://localhost:5000/listings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(listingData),
-            });
-            if (!res.ok) throw new Error("Failed to create listing");
-            const data = await res.json();
+            const { data } = await api.post("/listings", listingData);
             router.push(`/listings/${data.id}`);
-        } catch (error) {
+            toast.success("Listing published successfully!");
+        } catch (error: any) {
             console.error("Submission failed", error);
+            if (error.response?.data) {
+                console.error("Validation Errors:", error.response.data);
+                toast.error(`Error: ${JSON.stringify(error.response.data.message || "Validation failed")}`);
+            } else {
+                toast.error("Failed to publish listing. Please try again.");
+            }
         }
     };
 
@@ -338,7 +440,15 @@ function PostListingContent() {
         let fields: (keyof ListingFormValues)[] = [];
         if (step === 1) fields = ["title", "description", "transactionType", "type", "address", "country", "city"];
         if (step === 2) fields = ["sqft", "beds", "baths", "yearBuilt"];
-        // Step 3 media validation is manual mainly
+
+        if (step === 3) {
+            if (images.length === 0) {
+                toast.error("Please fill in all required fields", {
+                    description: "Make sure you haven't missed any important information."
+                });
+                return;
+            }
+        }
 
         const isValid = await trigger(fields);
         if (isValid) {
@@ -346,8 +456,7 @@ function PostListingContent() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
             toast.error("Please fill in all required fields", {
-                description: "Make sure you haven't missed any important information.",
-                position: "bottom-right"
+                description: "Make sure you haven't missed any important information."
             });
         }
     };
@@ -518,11 +627,15 @@ function PostListingContent() {
                                                     type="number"
                                                     placeholder="0"
                                                     {...register("sqft", { valueAsNumber: true })}
+                                                    onWheel={(e) => e.currentTarget.blur()}
+                                                    min={0}
+                                                    onKeyDown={(e) => ["-", "e", "E"].includes(e.key) && e.preventDefault()}
                                                     className={cn(
                                                         "block w-full px-4 py-4 rounded-xl border-slate-200 bg-white text-slate-900 text-xl font-medium focus:ring-primary/10 transition-all shadow-sm group-hover:border-primary/30 h-16",
                                                         errors.sqft ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:border-primary"
                                                     )}
                                                 />
+                                                {errors.sqft && <p className="text-red-500 text-xs font-semibold mt-1 pl-1">{errors.sqft.message}</p>}
                                             </div>
                                         </div>
 
@@ -533,11 +646,15 @@ function PostListingContent() {
                                                 <Input
                                                     type="number"
                                                     {...register("beds", { valueAsNumber: true })}
+                                                    onWheel={(e) => e.currentTarget.blur()}
+                                                    min={0}
+                                                    onKeyDown={(e) => ["-", "e", "E"].includes(e.key) && e.preventDefault()}
                                                     className={cn(
                                                         "block w-full px-4 py-4 rounded-xl border-slate-200 bg-white text-slate-900 text-xl font-medium focus:ring-primary/10 transition-all shadow-sm group-hover:border-primary/30 h-16",
                                                         errors.beds ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:border-primary"
                                                     )}
                                                 />
+                                                {errors.beds && <p className="text-red-500 text-xs font-semibold mt-1 pl-1">{errors.beds.message}</p>}
                                             </div>
                                         </div>
 
@@ -549,11 +666,15 @@ function PostListingContent() {
                                                     type="number"
                                                     step="0.5"
                                                     {...register("baths", { valueAsNumber: true })}
+                                                    onWheel={(e) => e.currentTarget.blur()}
+                                                    min={0}
+                                                    onKeyDown={(e) => ["-", "e", "E"].includes(e.key) && e.preventDefault()}
                                                     className={cn(
                                                         "block w-full px-4 py-4 rounded-xl border-slate-200 bg-white text-slate-900 text-xl font-medium focus:ring-primary/10 transition-all shadow-sm group-hover:border-primary/30 h-16",
                                                         errors.baths ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:border-primary"
                                                     )}
                                                 />
+                                                {errors.baths && <p className="text-red-500 text-xs font-semibold mt-1 pl-1">{errors.baths.message}</p>}
                                             </div>
                                         </div>
 
@@ -565,11 +686,15 @@ function PostListingContent() {
                                                     type="number"
                                                     placeholder="YYYY"
                                                     {...register("yearBuilt", { valueAsNumber: true })}
+                                                    onWheel={(e) => e.currentTarget.blur()}
+                                                    min={1800}
+                                                    onKeyDown={(e) => ["-", "e", "E"].includes(e.key) && e.preventDefault()}
                                                     className={cn(
                                                         "block w-full px-4 py-4 rounded-xl border-slate-200 bg-white text-slate-900 text-xl font-medium focus:ring-primary/10 transition-all shadow-sm group-hover:border-primary/30 h-16",
                                                         errors.yearBuilt ? "border-red-500 focus:ring-red-500/10 focus:border-red-500" : "border-slate-200 focus:border-primary"
                                                     )}
                                                 />
+                                                {errors.yearBuilt && <p className="text-red-500 text-xs font-semibold mt-1 pl-1">{errors.yearBuilt.message}</p>}
                                             </div>
                                         </div>
                                     </div>
@@ -865,8 +990,16 @@ function PostListingContent() {
                                                 <input
                                                     type="number"
                                                     {...register("price", { valueAsNumber: true })}
-                                                    placeholder="0"
-                                                    className="w-full h-14 pl-10 pr-4 rounded-xl border-slate-200 bg-white text-2xl font-black text-slate-900 shadow-sm transition-all focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none placeholder:text-slate-200"
+                                                    onWheel={(e) => e.currentTarget.blur()}
+                                                    min={0}
+                                                    onKeyDown={(e) => ["-", "e", "E"].includes(e.key) && e.preventDefault()}
+                                                    placeholder="Enter amount..."
+                                                    className={cn(
+                                                        "w-full h-14 pl-10 pr-4 rounded-xl border bg-white text-xl font-bold text-slate-900 shadow-sm transition-all outline-none placeholder:text-slate-300 placeholder:font-medium",
+                                                        errors.price
+                                                            ? "border-red-500 focus:ring-red-500/10 focus:border-red-500"
+                                                            : "border-slate-200 focus:border-primary focus:ring-primary/10"
+                                                    )}
                                                 />
                                                 {form.watch("transactionType") === "FOR_RENT" && (
                                                     <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
@@ -882,20 +1015,6 @@ function PostListingContent() {
                                     {form.watch("transactionType") === "FOR_RENT" && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
                                             <div className="space-y-2">
-                                                <Label className="text-slate-500 font-bold uppercase text-[11px] tracking-widest pl-1">Security Deposit</Label>
-                                                <div className="relative">
-                                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                                        <span className="text-slate-400 font-bold">$</span>
-                                                    </div>
-                                                    <input
-                                                        type="number"
-                                                        {...register("securityDeposit", { valueAsNumber: true })}
-                                                        placeholder="0"
-                                                        className="w-full h-12 pl-8 rounded-xl border-slate-200 bg-slate-50 font-bold text-slate-900 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="space-y-2">
                                                 <Label className="text-slate-500 font-bold uppercase text-[11px] tracking-widest pl-1">Lease Duration</Label>
                                                 <select {...register("leaseDuration")} className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 px-4 font-bold text-slate-900 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
                                                     <option value="6 Months">6 Months</option>
@@ -907,46 +1026,82 @@ function PostListingContent() {
                                         </div>
                                     )}
 
-                                    {/* Sale Specific Fields */}
-                                    {form.watch("transactionType") === "FOR_SALE" && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
-                                            <div className="space-y-2">
-                                                <Label className="text-slate-500 font-bold uppercase text-[11px] tracking-widest pl-1">Annual Property Tax</Label>
-                                                <div className="relative">
-                                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                                        <span className="text-slate-400 font-bold">$</span>
+
+                                </section>
+
+                                {/* Availability Section */}
+                                <section className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                                    <div className="border-b border-slate-100 pb-6">
+                                        <h2 className="text-xl font-black text-slate-900 font-display tracking-tight flex items-center gap-2">
+                                            <span className="material-icons-outlined text-primary">schedule</span>
+                                            Viewing Availability
+                                        </h2>
+                                        <p className="text-sm text-slate-500 mt-1 font-medium">When can potential buyers/tenants view the property?</p>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, index) => {
+                                            const availabilities = watch("availabilities") || [];
+                                            const dayAvailability = availabilities.find(a => a.dayOfWeek === index);
+                                            const isEnabled = !!dayAvailability;
+
+                                            return (
+                                                <div key={day} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors bg-slate-50/50">
+                                                    <div className="flex items-center gap-4">
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isEnabled}
+                                                                onChange={(e) => {
+                                                                    const current = watch("availabilities") || [];
+                                                                    if (e.target.checked) {
+                                                                        setValue("availabilities", [...current, { dayOfWeek: index, startTime: "09:00", endTime: "17:00" }]);
+                                                                    } else {
+                                                                        setValue("availabilities", current.filter(a => a.dayOfWeek !== index));
+                                                                    }
+                                                                }}
+                                                                className="sr-only peer"
+                                                            />
+                                                            <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                                                        </label>
+                                                        <span className={cn("font-bold text-sm w-24", isEnabled ? "text-slate-900" : "text-slate-400")}>{day}</span>
                                                     </div>
-                                                    <input
-                                                        type="number"
-                                                        {...register("taxAnnual", { valueAsNumber: true })}
-                                                        placeholder="0"
-                                                        className="w-full h-12 pl-8 rounded-xl border-slate-200 bg-slate-50 font-bold text-slate-900 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
-                                                    />
+
+                                                    {isEnabled && (
+                                                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-200">
+                                                            <input
+                                                                type="time"
+                                                                value={dayAvailability.startTime}
+                                                                onChange={(e) => {
+                                                                    const current = watch("availabilities") || [];
+                                                                    const updated = current.map(a => a.dayOfWeek === index ? { ...a, startTime: e.target.value } : a);
+                                                                    setValue("availabilities", updated);
+                                                                }}
+                                                                className="h-9 rounded-lg border-slate-200 bg-white text-xs font-bold text-slate-700 focus:border-primary focus:ring-primary/10"
+                                                            />
+                                                            <span className="text-slate-400 font-bold">-</span>
+                                                            <input
+                                                                type="time"
+                                                                value={dayAvailability.endTime}
+                                                                onChange={(e) => {
+                                                                    const current = watch("availabilities") || [];
+                                                                    const updated = current.map(a => a.dayOfWeek === index ? { ...a, endTime: e.target.value } : a);
+                                                                    setValue("availabilities", updated);
+                                                                }}
+                                                                className="h-9 rounded-lg border-slate-200 bg-white text-xs font-bold text-slate-700 focus:border-primary focus:ring-primary/10"
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-slate-500 font-bold uppercase text-[11px] tracking-widest pl-1">Monthly HOA Fee</Label>
-                                                <div className="relative">
-                                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                                        <span className="text-slate-400 font-bold">$</span>
-                                                    </div>
-                                                    <input
-                                                        type="number"
-                                                        {...register("hoaMonthly", { valueAsNumber: true })}
-                                                        placeholder="0"
-                                                        className="w-full h-12 pl-8 rounded-xl border-slate-200 bg-slate-50 font-bold text-slate-900 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
+                                            );
+                                        })}
+                                    </div>
                                 </section>
 
                                 {/* Listing Summary */}
                                 <section className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
                                     <div className="px-8 py-5 border-b border-slate-200 flex justify-between items-center bg-white/50">
                                         <h3 className="font-black text-slate-900 font-display tracking-tight text-lg">Listing Summary</h3>
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-200/50 px-2 py-1 rounded">Verify Info</span>
                                     </div>
                                     <div className="divide-y divide-slate-200">
                                         {/* Basic Info */}
@@ -1141,7 +1296,8 @@ function PostListingContent() {
                                         image: images[0]?.preview,
                                         transactionType: watch("transactionType"),
                                         latitude: watch("latitude"),
-                                        longitude: watch("longitude")
+                                        longitude: watch("longitude"),
+                                        leaseDuration: watch("leaseDuration")
                                     }}
                                 />
                                 <div className="mt-6 p-4 rounded-xl bg-slate-100 border border-slate-200 flex items-center gap-3 text-slate-500">
@@ -1178,16 +1334,33 @@ function PostListingContent() {
                             <Button
                                 type="button"
                                 onClick={nextStep}
-                                className="bg-primary text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-2"
+                                disabled={!isStepValid}
+                                className={cn(
+                                    "text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg transition-all flex items-center gap-2",
+                                    !isStepValid
+                                        ? "bg-slate-300 shadow-none cursor-not-allowed opacity-70"
+                                        : "bg-primary shadow-primary/20 hover:bg-primary/90 cursor-pointer"
+                                )}
                             >
                                 Continue to {STEPS[step]?.label || "Next"} <ChevronRight className="w-4 h-4" />
                             </Button>
                         ) : (
                             <Button
                                 type="button"
-                                onClick={form.handleSubmit(onSubmit as any)}
-                                disabled={isUploading || images.length === 0}
-                                className="bg-green-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-green-600/20 hover:bg-green-700 transition-all cursor-pointer flex items-center gap-2"
+                                onClick={form.handleSubmit(onSubmit as any, (errors) => {
+                                    const missingFields = Object.keys(errors).join(", ");
+                                    toast.error("Please fill in all required fields", {
+                                        description: `Missing or invalid: ${missingFields}`
+                                    });
+                                    console.error("Form validation errors:", errors);
+                                })}
+                                disabled={isUploading || !isStepValid}
+                                className={cn(
+                                    "text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-lg transition-all flex items-center gap-2",
+                                    (isUploading || !isStepValid)
+                                        ? "bg-slate-300 shadow-none cursor-not-allowed opacity-70"
+                                        : "bg-green-600 shadow-green-600/20 hover:bg-green-700 cursor-pointer"
+                                )}
                             >
                                 {isUploading ? "Publishing..." : "Finish & Publish"}
                                 <Check className="w-4 h-4" />

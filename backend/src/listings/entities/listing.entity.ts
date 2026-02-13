@@ -3,9 +3,7 @@ import { User } from '../../users/entities/user.entity';
 export enum PropertyType {
     APARTMENT = 'APARTMENT',
     HOUSE = 'HOUSE',
-    STUDIO = 'STUDIO',
-    COMMERCIAL = 'COMMERCIAL',
-    LAND = 'LAND',
+    OFFICE = 'OFFICE',
 }
 
 export enum ListingStatus {
@@ -19,7 +17,8 @@ export class Listing {
     description: string;
     status: ListingStatus;
     price: number;
-    size: number;
+    negotiable: boolean;
+    sqft: number;
     address: string;
     latitude?: number;
     longitude?: number;

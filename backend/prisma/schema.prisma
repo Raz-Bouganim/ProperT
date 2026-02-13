@@ -62,7 +62,8 @@ model Listing {
   description String
   status      ListingStatus @default(FOR_SALE)
   price       Decimal  @db.Decimal(12, 2)
-  size        Float
+  sqft        Float
+  negotiable  Boolean  @default(true)
   bedrooms    Int      @default(0)
   bathrooms   Int      @default(0)
   
@@ -93,6 +94,8 @@ model Listing {
   taxAnnual   Decimal? @db.Decimal(10, 2)
   hoaMonthly  Decimal? @db.Decimal(10, 2)
   currency    String   @default("USD")
+  availableDate String?
+  leaseDuration String?
   floorPlanUrl String?
   customFees  Json?    // Array of { name: string, amount: number }
 

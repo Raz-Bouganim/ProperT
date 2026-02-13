@@ -13,6 +13,7 @@ export class ListingsService {
     const data: any = {
       ...rest,
       price: price.toString(),
+      availabilities: rest.availabilities ? { create: rest.availabilities } : undefined,
       taxAnnual: taxAnnual?.toString(),
       hoaMonthly: hoaMonthly?.toString(),
     };

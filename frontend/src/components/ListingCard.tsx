@@ -20,6 +20,8 @@ export interface ListingCardProps {
     status?: string;
     onMouseEnter?: () => void;
     onMouseLeave?: () => void;
+    preview?: boolean;
+    leaseDuration?: string;
 }
 
 export function ListingCard({
@@ -37,6 +39,8 @@ export function ListingCard({
     status = "For Sale",
     onMouseEnter,
     onMouseLeave,
+    preview = false,
+    leaseDuration,
 }: ListingCardProps) {
     if (isLoading) {
         return (
@@ -56,12 +60,16 @@ export function ListingCard({
         );
     }
 
+    const isRent = status?.toLowerCase().includes("rent") || status === "FOR_RENT";
+    const Wrapper = (preview ? 'div' : Link) as any;
+    const wrapperProps = preview ? {} : { href: `/listings/${id}` };
+
     return (
-        <Link
-            href={`/listings/${id}`}
+        <Wrapper
+            {...wrapperProps}
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
-            className="group bg-transparent border border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300"
+            className="group block bg-transparent border border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 h-full bg-white"
         >
             <div className="relative aspect-[4/3] overflow-hidden">
                 <Image
@@ -77,9 +85,14 @@ export function ListingCard({
                 <button
                     onClick={(e) => {
                         e.preventDefault();
-                        // Favorite logic
+                        if (!preview) {
+                            // Favorite logic
+                        }
                     }}
-                    className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-red-500 transition-all shadow-sm z-10 cursor-pointer"
+                    className={cn(
+                        "absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-red-500 transition-all shadow-sm z-10",
+                        preview ? "pointer-events-none opacity-80" : "cursor-pointer"
+                    )}
                 >
                     <Heart className="w-5 h-5" />
                 </button>
@@ -87,8 +100,14 @@ export function ListingCard({
 
             <div className="p-5">
                 <div className="flex items-baseline justify-between gap-2">
-                    <h3 className="text-2xl font-bold text-primary">${price.toLocaleString()}</h3>
-                    <span className="text-xs font-medium text-slate-400">Est. ${(price / 180).toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo</span>
+                    <div className="flex flex-col">
+                        <h3 className="text-2xl font-bold text-primary">
+                            ${price.toLocaleString()}{isRent ? "/mo" : ""}
+                        </h3>
+                        {isRent && leaseDuration && (
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{leaseDuration}</span>
+                        )}
+                    </div>
                 </div>
                 <h4 className="text-lg font-bold text-slate-900 mt-1 line-clamp-1">
                     {title}
@@ -116,6 +135,6 @@ export function ListingCard({
                     </div>
                 </div>
             </div>
-        </Link>
+        </Wrapper>
     );
 }
