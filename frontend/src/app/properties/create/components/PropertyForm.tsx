@@ -126,6 +126,7 @@ export function PropertyForm() {
                 country: values.country || "Unknown",
                 city: values.city || "Unknown",
                 images: imageUrls,
+                features: values.features || [],
             };
 
             const { data } = await api.post("/properties", listingData);

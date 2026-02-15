@@ -81,8 +81,8 @@ model Property {
   longitude   Float?
 
   // Media & Features
-  images      String[] // Postgres array
-  features    String[] // Postgres array
+  images      String[] @default([]) // Postgres array
+  features    String[] @default([]) // Postgres array
   videoUrl    String?
   virtualTourUrl String?
 
