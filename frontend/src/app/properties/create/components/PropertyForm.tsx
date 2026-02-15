@@ -149,8 +149,8 @@ export function PropertyForm() {
                 <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
                     <form onSubmit={handleSubmit(onSubmit as any)} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
 
-                        {/* Left Column: Form Content */}
-                        <div className="lg:col-span-7 space-y-10">
+                        {/* Left Column: Form Content - Independent Scroll */}
+                        <div className="lg:col-span-7 lg:pr-4 space-y-10">
                             {currentStep === 1 && <Step1BasicInfo />}
                             {currentStep === 2 && <Step2Details />}
                             {currentStep === 3 && (
@@ -170,13 +170,13 @@ export function PropertyForm() {
                             )}
                         </div>
 
-                        {/* Right Column */}
-                        <div className="lg:col-span-5 relative">
+                        {/* Right Column - Independent Scroll */}
+                        <div className="lg:col-span-5 lg:pl-4">
                             {currentStep === 1 ? (
                                 <LocationPicker images={images} />
                             ) : (
                                 /* Live Preview for Step 2+ */
-                                <div className="sticky top-24">
+                                <div>
                                     <LivePreview
                                         data={{
                                             title: formValues.title,

@@ -34,7 +34,7 @@ export function LocationPicker({ images = [] }: LocationPickerProps) {
     const address = watch("address");
 
     return (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl sticky top-24 space-y-5">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl space-y-5">
             <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 font-display tracking-tight">
                 <MapPin className="text-primary w-6 h-6" /> Location
             </h2>

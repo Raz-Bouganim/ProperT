@@ -54,7 +54,7 @@ export function LivePreview({ data, className }: LivePreviewProps) {
     const priceDisplay = transactionType === "FOR_RENT" ? `$${formattedPrice}/mo` : `$${formattedPrice}`;
 
     return (
-        <div className={cn("space-y-4 sticky top-32", className)}>
+        <div className={cn("space-y-4", className)}>
             {/* Header */}
             <div className="flex items-center gap-2 text-slate-900 px-1">
                 <span className="material-icons-outlined text-primary text-lg">visibility</span>
