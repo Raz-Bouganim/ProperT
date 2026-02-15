@@ -67,8 +67,8 @@ export const useAvailability = (
             return;
         }
 
-        // @ts-ignore - Validated by logic but Typescript might complain about mixed types in union
-        setValue("availabilities", [...currentSlots, newSlot]);
+        // Type-safe addition of availability slot
+        setValue("availabilities", [...currentSlots, newSlot] as typeof currentSlots);
         toast.success("Availability slot added");
     };
 
