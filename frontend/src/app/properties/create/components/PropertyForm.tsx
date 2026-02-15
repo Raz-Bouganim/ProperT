@@ -189,7 +189,8 @@ export function PropertyForm() {
                                             transactionType: formValues.transactionType,
                                             latitude: formValues.latitude ?? 0,
                                             longitude: formValues.longitude ?? 0,
-                                            leaseDuration: formValues.leaseDuration
+                                            leaseDuration: formValues.leaseDuration,
+                                            currency: formValues.currency || "USD"
                                         }}
                                     />
                                     <div className="mt-6 p-4 rounded-xl bg-slate-100 border border-slate-200 flex items-center gap-3 text-slate-500">

@@ -22,6 +22,7 @@ export interface PropertyCardProps {
     onMouseLeave?: () => void;
     preview?: boolean;
     leaseDuration?: string;
+    currency?: string;
 }
 
 export function PropertyCard({
@@ -41,7 +42,17 @@ export function PropertyCard({
     onMouseLeave,
     preview = false,
     leaseDuration,
+    currency = "USD",
 }: PropertyCardProps) {
+    const getCurrencySymbol = (currencyCode: string) => {
+        const symbols: Record<string, string> = {
+            USD: "$",
+            EUR: "€",
+            GBP: "£",
+            ILS: "₪"
+        };
+        return symbols[currencyCode] || "$";
+    };
     if (isLoading) {
         return (
             <div className="rounded-2xl bg-transparent overflow-hidden shadow-sm animate-pulse">
@@ -102,7 +113,7 @@ export function PropertyCard({
                 <div className="flex items-baseline justify-between gap-2">
                     <div className="flex flex-col">
                         <h3 className="text-2xl font-bold text-primary">
-                            ${price.toLocaleString()}{isRent ? "/mo" : ""}
+                            {getCurrencySymbol(currency)}{price.toLocaleString()}{isRent ? "/mo" : ""}
                         </h3>
                         {isRent && leaseDuration && (
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{leaseDuration}</span>

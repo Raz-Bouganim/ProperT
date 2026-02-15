@@ -5,12 +5,9 @@ import { AvailabilityScheduler } from "../partials/AvailabilityScheduler";
 import { Tag, MapPin, Bed, Bath, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-
-const PROPERTY_TYPES = [
-    { id: "APARTMENT", label: "Apartment" },
-    { id: "HOUSE", label: "House" },
-    { id: "OFFICE", label: "Office" },
-];
+import { PROPERTY_TYPES } from "../../constants/propertyTypes";
+import { StepContainer } from "../shared/StepContainer";
+import { SectionHeader } from "../shared/SectionHeader";
 
 interface Step4PricingProps {
     images: (File & { preview?: string })[];
@@ -20,6 +17,17 @@ interface Step4PricingProps {
 export function Step4Pricing({ images, onEditStep }: Step4PricingProps) {
     const { register, watch, formState: { errors } } = useFormContext<ListingFormValues>();
     const transactionType = watch("transactionType");
+    const currency = watch("currency") || "USD";
+
+    const getCurrencySymbol = (currencyCode: string) => {
+        const symbols: Record<string, string> = {
+            USD: "$",
+            EUR: "€",
+            GBP: "£",
+            ILS: "₪"
+        };
+        return symbols[currencyCode] || "$";
+    };
 
     return (
         <div className="space-y-10">
@@ -52,10 +60,14 @@ export function Step4Pricing({ images, onEditStep }: Step4PricingProps) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                         <Label className="text-slate-500 font-bold uppercase text-[11px] tracking-widest pl-1">Currency</Label>
-                        <select {...register("currency")} className="w-full h-14 rounded-xl border-slate-200 bg-slate-50 px-4 text-base font-bold shadow-sm transition-all focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none appearance-none">
+                        <select
+                            {...register("currency")}
+                            className="w-full h-14 rounded-xl border-slate-200 bg-slate-50 px-4 text-base font-bold shadow-sm transition-all focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none appearance-none cursor-pointer"
+                        >
                             <option value="USD">USD ($)</option>
                             <option value="EUR">EUR (€)</option>
                             <option value="GBP">GBP (£)</option>
+                            <option value="ILS">ILS (₪)</option>
                         </select>
                     </div>
                     <div className="md:col-span-2 space-y-2">
@@ -64,7 +76,7 @@ export function Step4Pricing({ images, onEditStep }: Step4PricingProps) {
                         </Label>
                         <div className="relative group">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <span className="text-slate-400 font-black text-lg">$</span>
+                                <span className="text-slate-400 font-black text-lg">{getCurrencySymbol(currency)}</span>
                             </div>
                             <input
                                 type="number"
@@ -141,7 +153,7 @@ export function Step4Pricing({ images, onEditStep }: Step4PricingProps) {
                                 </span>
                             </div>
                         </div>
-                        <button type="button" onClick={() => onEditStep(1)} className="text-sm font-bold text-primary opacity-0 group-hover:opacity-100 hover:underline transition-all whitespace-nowrap ml-4">Edit</button>
+                        <button type="button" onClick={() => onEditStep(1)} className="text-sm font-bold text-primary opacity-0 group-hover:opacity-100 hover:underline transition-all whitespace-nowrap ml-4 cursor-pointer">Edit</button>
                     </div>
 
                     {/* Property Details */}
@@ -163,7 +175,7 @@ export function Step4Pricing({ images, onEditStep }: Step4PricingProps) {
                                 </div>
                             )}
                         </div>
-                        <button type="button" onClick={() => onEditStep(2)} className="text-sm font-bold text-primary opacity-0 group-hover:opacity-100 hover:underline transition-all whitespace-nowrap ml-4">Edit</button>
+                        <button type="button" onClick={() => onEditStep(2)} className="text-sm font-bold text-primary opacity-0 group-hover:opacity-100 hover:underline transition-all whitespace-nowrap ml-4 cursor-pointer">Edit</button>
                     </div>
 
                     {/* Photos */}
@@ -188,7 +200,7 @@ export function Step4Pricing({ images, onEditStep }: Step4PricingProps) {
                                 )}
                             </div>
                         </div>
-                        <button type="button" onClick={() => onEditStep(3)} className="text-sm font-bold text-primary opacity-0 group-hover:opacity-100 hover:underline transition-all whitespace-nowrap ml-4">Edit</button>
+                        <button type="button" onClick={() => onEditStep(3)} className="text-sm font-bold text-primary opacity-0 group-hover:opacity-100 hover:underline transition-all whitespace-nowrap ml-4 cursor-pointer">Edit</button>
                     </div>
                 </div>
             </section>

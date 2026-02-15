@@ -8,7 +8,7 @@ export const useMediaUpload = () => {
     const [images, setImages] = useState<FileWithPreview[]>([]);
     const [isUploading, setIsUploading] = useState(false);
 
-    // Cleanup effect to prevent memory leaks
+    // Cleanup effect to prevent memory leaks (only on unmount)
     useEffect(() => {
         return () => {
             // Revoke all object URLs when component unmounts
@@ -16,7 +16,8 @@ export const useMediaUpload = () => {
                 revokeObjectURL(img.preview);
             });
         };
-    }, [images]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Only run on mount/unmount, not on images changes
 
     const processFiles = (files: File[]) => {
         const newImages = files.map(file => {

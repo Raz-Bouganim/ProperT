@@ -34,7 +34,7 @@ export const listingSchema = z.object({
     virtualTourUrl: z.string().optional(),
 
     // Step 4: Pricing
-    currency: z.string().default("USD"),
+    currency: z.enum(["USD", "EUR", "GBP", "ILS"]).default("USD"),
     price: z.number().min(1, "Price must be positive"),
     negotiable: z.boolean().default(true),
     availableDate: z.string().optional(),

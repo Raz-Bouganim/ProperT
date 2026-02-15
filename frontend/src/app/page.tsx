@@ -235,6 +235,8 @@ export default function Home() {
                   isFeatured
                   type={listing.type || "For Sale"}
                   status={listing.status}
+                  currency={listing.currency || "USD"}
+                  leaseDuration={listing.leaseDuration}
                 />
               ))
             ) : (

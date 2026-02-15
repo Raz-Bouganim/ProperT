@@ -100,7 +100,7 @@ export function Step3Media({ images, onImagesSelected, onImageRemove, onImageReo
                         <button
                             type="button"
                             onClick={onClearAll}
-                            className="text-sm text-primary font-medium hover:text-primary/80 flex items-center gap-1"
+                            className="text-sm text-primary font-medium hover:text-primary/80 flex items-center gap-1 cursor-pointer"
                         >
                             <span className="material-icons-outlined text-base">delete_sweep</span> Remove All
                         </button>
@@ -133,7 +133,7 @@ export function Step3Media({ images, onImagesSelected, onImageRemove, onImageReo
                             <button
                                 type="button"
                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onImageRemove(i); }}
-                                className="absolute top-2 right-2 z-20 p-1.5 bg-black/50 hover:bg-red-500 backdrop-blur-md rounded-lg text-white opacity-0 group-hover:opacity-100 transition-all duration-300 border border-white/20 flex items-center justify-center"
+                                className="absolute top-2 right-2 z-20 p-1.5 bg-black/50 hover:bg-red-500 backdrop-blur-md rounded-lg text-white opacity-0 group-hover:opacity-100 transition-all duration-300 border border-white/20 flex items-center justify-center cursor-pointer"
                             >
                                 <span className="material-icons-outlined text-sm">close</span>
                             </button>
@@ -207,7 +207,7 @@ export function Step3Media({ images, onImagesSelected, onImageRemove, onImageReo
                                 className="block w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg bg-white/50 text-sm focus:ring-primary focus:border-primary placeholder-slate-400"
                             />
                         </div>
-                        <button type="button" className="w-full py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:text-primary hover:border-primary/30 transition-colors">
+                        <button type="button" className="w-full py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer">
                             Verify Link
                         </button>
                     </div>

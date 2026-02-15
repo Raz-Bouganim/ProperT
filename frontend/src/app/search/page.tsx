@@ -178,6 +178,8 @@ function SearchPageContent() {
                                         sqft={property.size}
                                         status={property.status}
                                         image={property.images[0] || "/placeholder.svg"}
+                                        currency={property.currency || "USD"}
+                                        leaseDuration={property.leaseDuration}
                                         onMouseEnter={() => setHoveredPropertyId(property.id)}
                                         onMouseLeave={() => setHoveredPropertyId(null)}
                                     />
