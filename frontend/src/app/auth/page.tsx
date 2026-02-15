@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
@@ -8,17 +9,33 @@ import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 
 type AuthMode = 'login' | 'register';
 
 export default function AuthPage() {
-    const [mode, setMode] = useState<AuthMode>('login');
+    // Mode state initialized later
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const { login: saveAuth } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const redirectUrl = searchParams.get('redirect') || '/';
+    const initialMode = (searchParams.get('mode') as AuthMode) || 'login';
+
+    // Only 'login' or 'register' are valid modes
+    const [mode, setMode] = useState<AuthMode>(
+        ['login', 'register'].includes(initialMode) ? initialMode : 'login'
+    );
+
+    // Update mode state when URL param changes changes
+    useEffect(() => {
+        const modeParam = searchParams.get('mode');
+        if (modeParam === 'login' || modeParam === 'register') {
+            setMode(modeParam);
+        }
+    }, [searchParams]);
 
     const [formData, setFormData] = useState({
         email: '',
@@ -41,7 +58,8 @@ export default function AuthPage() {
 
             toast.success(mode === 'login' ? 'Welcome back!' : 'Account created successfully!');
             saveAuth(data.access_token, data.user);
-            router.push('/');
+            saveAuth(data.access_token, data.user);
+            router.push(redirectUrl);
         } catch (err: any) {
             const responseData = err.response?.data;
 

@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { ListingCard } from "@/components/ListingCard";
+import { PropertyCard } from "@/components/PropertyCard";
 import { FilterBar } from "@/components/search/FilterBar";
 import { Pagination } from "@/components/search/Pagination";
 import { Footer } from "@/components/layout/Footer";
 import dynamic from "next/dynamic";
 import { Loader2, MapPin, Grid, List, Map as MapIcon } from "lucide-react";
+import api from "@/lib/api";
 
 // Dynamically import Map to avoid SSR issues with Leaflet
 const Map = dynamic(() => import("@/components/Map"), {
@@ -22,10 +23,10 @@ const Map = dynamic(() => import("@/components/Map"), {
 function SearchPageContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const [listings, setListings] = useState<any[]>([]);
+    const [properties, setProperties] = useState<any[]>([]);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [hoveredListingId, setHoveredListingId] = useState<string | null>(null);
+    const [hoveredPropertyId, setHoveredPropertyId] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [showMap, setShowMap] = useState(false);
 
@@ -39,11 +40,11 @@ function SearchPageContent() {
     const propertyType = searchParams.get("type");
     const page = parseInt(searchParams.get("page") || "1");
 
-    const fetchListings = useCallback(async () => {
+    const fetchProperties = useCallback(async () => {
         setLoading(true);
         const limit = showMap ? 8 : 9;
         try {
-            let url = `http://localhost:5000/listings/search?lat=${lat}&lng=${lng}&radius=${radius}&page=${page}&limit=${limit}`;
+            let url = `/properties?lat=${lat}&lng=${lng}&radius=${radius}&page=${page}&limit=${limit}`;
             const status = searchParams.get("status");
             if (minPrice) url += `&minPrice=${minPrice}`;
             if (maxPrice) url += `&maxPrice=${maxPrice}`;
@@ -51,11 +52,9 @@ function SearchPageContent() {
             if (propertyType) url += `&propertyType=${propertyType}`;
             if (status) url += `&status=${status}`;
 
-            const res = await fetch(url);
-            if (!res.ok) throw new Error("Failed to fetch");
-            const data = await res.json();
-            setListings(data.listings);
-            setTotalCount(data.totalCount);
+            const res = await api.get(url);
+            setProperties(res.data.properties);
+            setTotalCount(res.data.totalCount);
         } catch (error) {
             console.error(error);
         } finally {
@@ -64,8 +63,8 @@ function SearchPageContent() {
     }, [lat, lng, radius, minPrice, maxPrice, beds, propertyType, searchParams.get("status"), page, showMap]);
 
     useEffect(() => {
-        fetchListings();
-    }, [fetchListings]);
+        fetchProperties();
+    }, [fetchProperties]);
 
     const handleFilterChange = (newFilters: any) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -157,30 +156,32 @@ function SearchPageContent() {
                 </div>
 
                 <div className="flex flex-col lg:flex-row gap-8">
-                    {/* Left: Listings Grid */}
+                    {/* Left: Properties Grid */}
                     <div className="flex-1">
                         {loading ? (
                             <div className={`grid gap-8 ${showMap ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}>
                                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                                    <ListingCard key={i} id="" title="" address="" price={0} beds={0} baths={0} sqft={0} image="" isLoading />
+                                    <PropertyCard key={i} id="" title="" address="" price={0} beds={0} baths={0} sqft={0} image="" isLoading />
                                 ))}
                             </div>
-                        ) : listings.length > 0 ? (
+                        ) : properties.length > 0 ? (
                             <div className={`grid gap-8 ${viewMode === "grid" ? (showMap ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3") : "grid-cols-1"}`}>
-                                {listings.map((listing) => (
-                                    <ListingCard
-                                        key={listing.id}
-                                        id={listing.id}
-                                        title={listing.title || "Untitled Property"}
-                                        address={listing.address}
-                                        price={Number(listing.price)}
-                                        beds={listing.bedrooms || 0}
-                                        baths={listing.bathrooms || 0}
-                                        sqft={listing.size}
-                                        status={listing.status}
-                                        image={listing.images[0] || "/placeholder.svg"}
-                                        onMouseEnter={() => setHoveredListingId(listing.id)}
-                                        onMouseLeave={() => setHoveredListingId(null)}
+                                {properties.map((property) => (
+                                    <PropertyCard
+                                        key={property.id}
+                                        id={property.id}
+                                        title={property.title || "Untitled Property"}
+                                        address={property.address}
+                                        price={Number(property.price)}
+                                        beds={property.bedrooms || 0}
+                                        baths={property.bathrooms || 0}
+                                        sqft={property.size}
+                                        status={property.status}
+                                        image={property.images[0] || "/placeholder.svg"}
+                                        currency={property.currency || "USD"}
+                                        leaseDuration={property.leaseDuration}
+                                        onMouseEnter={() => setHoveredPropertyId(property.id)}
+                                        onMouseLeave={() => setHoveredPropertyId(null)}
                                     />
                                 ))}
                             </div>
@@ -209,7 +210,7 @@ function SearchPageContent() {
                     {/* Right: Map (Sticky) - Conditional */}
                     {showMap && (
                         <div className="hidden lg:block w-[450px] h-[calc(100vh-200px)] sticky top-44 rounded-2xl overflow-hidden shadow-2xl border border-slate-200/50 dark:border-slate-800/50 z-10 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <Map listings={listings} center={[lat, lng]} zoom={13} hoveredListingId={hoveredListingId} />
+                            <Map listings={properties} center={[lat, lng]} zoom={13} hoveredListingId={hoveredPropertyId} />
                         </div>
                     )}
                 </div>

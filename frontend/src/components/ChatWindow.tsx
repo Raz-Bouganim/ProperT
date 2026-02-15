@@ -21,16 +21,16 @@ interface Message {
 }
 
 interface ChatWindowProps {
-    listingId: string;
+    propertyId: string;
     ownerId: string;
     isOpen: boolean;
     onClose: () => void;
-    listingTitle: string;
+    propertyTitle: string;
 }
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-export function ChatWindow({ listingId, ownerId, isOpen, onClose, listingTitle }: ChatWindowProps) {
+export function ChatWindow({ propertyId, ownerId, isOpen, onClose, propertyTitle }: ChatWindowProps) {
     const { user } = useAuth();
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState("");
@@ -45,7 +45,7 @@ export function ChatWindow({ listingId, ownerId, isOpen, onClose, listingTitle }
         // 1. Get or Create Conversation
         const initChat = async () => {
             try {
-                const res = await api.post("/chat/conversations", { listingId, ownerId });
+                const res = await api.post("/chat/conversations", { propertyId, ownerId });
                 setConversationId(res.data.id);
 
                 // Load history
@@ -67,7 +67,7 @@ export function ChatWindow({ listingId, ownerId, isOpen, onClose, listingTitle }
         return () => {
             newSocket.close();
         };
-    }, [isOpen, listingId, ownerId, user]);
+    }, [isOpen, propertyId, ownerId, user]);
 
     useEffect(() => {
         if (!socket || !conversationId) return;
@@ -115,7 +115,7 @@ export function ChatWindow({ listingId, ownerId, isOpen, onClose, listingTitle }
                         <User className="w-6 h-6" />
                     </div>
                     <div>
-                        <div className="font-bold leading-tight line-clamp-1">{listingTitle}</div>
+                        <div className="font-bold leading-tight line-clamp-1">{propertyTitle}</div>
                         <div className="text-[10px] opacity-80 uppercase tracking-widest font-bold">Real-time Chat</div>
                     </div>
                 </div>

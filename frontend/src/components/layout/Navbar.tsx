@@ -34,10 +34,12 @@ export function Navbar() {
                         Search
                     </Link>
                     {isAuthenticated && (
-                        <Link href="/chat" className="text-xs font-semibold text-slate-600 hover:text-primary transition-colors flex items-center gap-1.5">
-                            <MessageCircle size={16} />
-                            Chats
-                        </Link>
+                        <>
+                            <Link href="/chat" className="text-xs font-semibold text-slate-600 hover:text-primary transition-colors flex items-center gap-1.5">
+                                <MessageCircle size={16} />
+                                Chats
+                            </Link>
+                        </>
                     )}
                 </div>
 

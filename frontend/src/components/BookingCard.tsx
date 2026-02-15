@@ -12,7 +12,7 @@ interface BookingCardProps {
         startTime: string;
         endTime: string;
         status: string;
-        listing: {
+        property: {
             id: string;
             title: string;
             address: string;
@@ -45,8 +45,8 @@ export function BookingCard({ booking, role, onStatusChange }: BookingCardProps)
             {/* Image */}
             <div className="w-full md:w-48 aspect-video md:aspect-square relative rounded-xl overflow-hidden bg-muted flex-shrink-0">
                 <Image
-                    src={booking.listing.images[0] || "/placeholder-property.svg"}
-                    alt={booking.listing.title}
+                    src={booking.property.images[0] || "/placeholder-property.svg"}
+                    alt={booking.property.title}
                     fill
                     className="object-cover"
                 />
@@ -57,9 +57,9 @@ export function BookingCard({ booking, role, onStatusChange }: BookingCardProps)
                 <div>
                     <div className="flex justify-between items-start mb-2">
                         <div>
-                            <h3 className="font-bold text-lg line-clamp-1">{booking.listing.title}</h3>
+                            <h3 className="font-bold text-lg line-clamp-1">{booking.property.title}</h3>
                             <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <MapPin className="w-3 h-3" /> {booking.listing.address}
+                                <MapPin className="w-3 h-3" /> {booking.property.address}
                             </div>
                         </div>
                         <span className={clsx(

@@ -25,11 +25,10 @@ export class ChatController {
     @Post('conversations')
     async getOrCreateConversation(
         @Request() req: any,
-        @Body() body: { listingId: string, ownerId: string }
+        @Body() body: { propertyId: string, ownerId: string }
     ) {
-        // Participant IDs: [Current User, Listing Owner]
         return this.chatService.getOrCreateConversation(
-            body.listingId,
+            body.propertyId,
             [req.user.userId, body.ownerId]
         );
     }

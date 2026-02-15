@@ -32,7 +32,7 @@ export class ChatService {
                     orderBy: { createdAt: 'desc' },
                     take: 1,
                 },
-                listing: {
+                property: {
                     select: {
                         id: true,
                         title: true,
@@ -43,12 +43,10 @@ export class ChatService {
         });
     }
 
-    async getOrCreateConversation(listingId: string, participantIds: string[]) {
-        // Basic logic: find a conversation for this listing with these exact participants
-        // For simplicity, we'll just check if one exists for these participants
+    async getOrCreateConversation(propertyId: string, participantIds: string[]) {
         const existing = await this.prisma.conversation.findFirst({
             where: {
-                listingId,
+                propertyId,
                 participants: {
                     every: {
                         userId: { in: participantIds },
@@ -61,7 +59,7 @@ export class ChatService {
 
         return this.prisma.conversation.create({
             data: {
-                listingId,
+                propertyId,
                 participants: {
                     create: participantIds.map((id) => ({ userId: id })),
                 },
@@ -128,7 +126,7 @@ export class ChatService {
                         },
                     },
                 },
-                listing: {
+                property: {
                     select: {
                         id: true,
                         title: true,

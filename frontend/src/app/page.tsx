@@ -14,11 +14,13 @@ import {
   ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { ListingCard } from "@/components/ListingCard";
+import { PropertyCard } from "@/components/PropertyCard";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { Footer } from "@/components/layout/Footer";
 
 export default function Home() {
+  const { isAuthenticated } = useAuth();
   const [featuredListings, setFeaturedListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchLocation, setSearchLocation] = useState("");
@@ -28,7 +30,7 @@ export default function Home() {
   useEffect(() => {
     async function fetchFeatured() {
       try {
-        const res = await api.get("/listings");
+        const res = await api.get("/properties");
         // Just take the first 3 for featured to match the 3-column grid design
         setFeaturedListings(res.data.slice(0, 3));
       } catch (error) {
@@ -91,7 +93,7 @@ export default function Home() {
             >
               Start Searching
             </Button>
-            <Link href="/post">
+            <Link href={isAuthenticated ? "/properties/create" : "/auth?redirect=/properties/create"}>
               <Button
                 variant="outline"
                 className="bg-white/10 backdrop-blur-md border border-white/20 text-white h-14 px-8 rounded-xl text-lg font-bold hover:bg-white/20 transition-all cursor-pointer"
@@ -131,7 +133,7 @@ export default function Home() {
                     <option>All Types</option>
                     <option value="HOUSE">House</option>
                     <option value="APARTMENT">Apartment</option>
-                    <option value="Villa">Villa</option>
+                    <option value="OFFICE">Office</option>
                   </select>
                 </div>
               </div>
@@ -162,10 +164,10 @@ export default function Home() {
             </Button>
           </div>
         </div>
-      </section>
+      </section >
 
       {/* Value Proposition Section */}
-      <section className="py-20 px-6 max-w-7xl mx-auto">
+      < section className="py-20 px-6 max-w-7xl mx-auto" >
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-4 tracking-tight">Why ProperT?</h2>
           <p className="text-slate-500 max-w-2xl mx-auto text-lg leading-relaxed font-medium">
@@ -199,10 +201,10 @@ export default function Home() {
             </div>
           ))}
         </div>
-      </section>
+      </section >
 
       {/* Featured Properties Section */}
-      <section className="py-20 bg-slate-50/50 border-y border-slate-200">
+      < section className="py-20 bg-slate-50/50 border-y border-slate-200" >
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-end gap-10 mb-16">
             <div className="text-left">
@@ -217,10 +219,10 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {loading ? (
-              [1, 2, 3].map(i => <ListingCard key={i} id="" title="" address="" price={0} beds={0} baths={0} sqft={0} image="" isLoading />)
+              [1, 2, 3].map(i => <PropertyCard key={i} id="" title="" address="" price={0} beds={0} baths={0} sqft={0} image="" isLoading />)
             ) : featuredListings.length > 0 ? (
               featuredListings.map((listing, index) => (
-                <ListingCard
+                <PropertyCard
                   key={listing.id || index}
                   id={listing.id || ""}
                   title={listing.title || "Premium Listing"}
@@ -228,11 +230,13 @@ export default function Home() {
                   price={Number(listing.price) || 0}
                   beds={listing.bedrooms || 2}
                   baths={listing.bathrooms || 1}
-                  sqft={listing.size || 0}
+                  sqft={listing.sqft || 0}
                   image={listing.images?.[0] || fallbackImages[index % 3]}
                   isFeatured
                   type={listing.type || "For Sale"}
                   status={listing.status}
+                  currency={listing.currency || "USD"}
+                  leaseDuration={listing.leaseDuration}
                 />
               ))
             ) : (
@@ -241,7 +245,7 @@ export default function Home() {
                   <HomeIcon className="text-slate-300 w-8 h-8" />
                 </div>
                 <p className="text-slate-400 text-xl font-bold mb-8 tracking-tight">No properties listed yet.</p>
-                <Link href="/post">
+                <Link href={isAuthenticated ? "/properties/create" : "/auth?redirect=/properties/create"}>
                   <Button size="lg" className="rounded-xl h-14 px-10 text-lg font-black shadow-xl shadow-primary/20 cursor-pointer">
                     Be the first to list!
                   </Button>
@@ -250,9 +254,9 @@ export default function Home() {
             )}
           </div>
         </div>
-      </section>
+      </section >
 
       <Footer />
-    </div>
+    </div >
   );
 }

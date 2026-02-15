@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, CreateBucketCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, CreateBucketCommand, HeadBucketCommand, PutBucketPolicyCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import { OnModuleInit } from '@nestjs/common';
@@ -32,9 +32,32 @@ export class MediaService implements OnModuleInit {
             try {
                 await this.s3Client.send(new CreateBucketCommand({ Bucket: bucketName }));
                 this.logger.log(`Bucket "${bucketName}" created successfully.`);
-            } catch (createError) {
+            } catch (createError: any) {
                 this.logger.error(`Failed to create bucket "${bucketName}": ${createError.message}`);
             }
+        }
+
+        // Apply Public Read Policy
+        try {
+            const policy = {
+                Version: "2012-10-17",
+                Statement: [
+                    {
+                        Sid: "PublicReadGetObject",
+                        Effect: "Allow",
+                        Principal: "*",
+                        Action: ["s3:GetObject"],
+                        Resource: [`arn:aws:s3:::${bucketName}/*`],
+                    },
+                ],
+            };
+            await this.s3Client.send(new PutBucketPolicyCommand({
+                Bucket: bucketName,
+                Policy: JSON.stringify(policy),
+            }));
+            this.logger.log(`Public read policy applied to bucket "${bucketName}".`);
+        } catch (policyError: any) {
+            this.logger.error(`Failed to set bucket policy: ${policyError.message}`);
         }
     }
 

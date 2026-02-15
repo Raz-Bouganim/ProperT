@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { BookingCard } from "@/components/BookingCard";
-import { ListingCard } from "@/components/ListingCard";
+import { PropertyCard } from "@/components/PropertyCard";
 import { Loader2, Plus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +14,7 @@ interface Booking {
     startTime: string;
     endTime: string;
     status: string;
-    listing: {
+    property: {
         id: string;
         title: string;
         address: string;
@@ -53,15 +53,15 @@ export default function DashboardPage() {
             try {
                 if (user.role === 'OWNER') {
                     // Fetch Listings
-                    const listingsRes = await api.get('/listings/my-listings');
+                    const listingsRes = await api.get('/properties/mine');
                     setListings(listingsRes.data);
 
                     // Fetch Incoming Bookings
-                    const bookingsRes = await api.get(`/bookings/my-bookings?userId=${user.id}&role=OWNER`);
+                    const bookingsRes = await api.get(`/bookings/mine?role=OWNER`);
                     setBookings(bookingsRes.data);
                 } else {
                     // Fetch My Bookings (Seeker)
-                    const bookingsRes = await api.get(`/bookings/my-bookings?userId=${user.id}&role=SEEKER`);
+                    const bookingsRes = await api.get(`/bookings/mine?role=SEEKER`);
                     setBookings(bookingsRes.data);
                 }
             } catch (error) {
@@ -76,7 +76,7 @@ export default function DashboardPage() {
 
     const handleStatusUpdate = async (bookingId: string, newStatus: string) => {
         try {
-            await api.patch(`/bookings/${bookingId}/status`, { status: newStatus, userId: user?.id });
+            await api.patch(`/bookings/${bookingId}`, { status: newStatus, userId: user?.id });
             // Optimistic update
             setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
         } catch (error) {
@@ -120,7 +120,7 @@ export default function DashboardPage() {
                     </p>
                 </div>
                 {user.role === 'OWNER' && (
-                    <Link href="/post">
+                    <Link href="/properties/create">
                         <Button className="gap-2 rounded-full shadow-lg shadow-primary/20">
                             <Plus className="w-4 h-4" /> Add New Property
                         </Button>
@@ -180,13 +180,13 @@ export default function DashboardPage() {
                             {listings.length === 0 ? (
                                 <div className="col-span-full text-center py-12 border rounded-2xl bg-muted/20">
                                     <p className="text-muted-foreground mb-4">You haven't listed any properties yet.</p>
-                                    <Link href="/post">
+                                    <Link href="/properties/create">
                                         <Button variant="outline">Create your first listing</Button>
                                     </Link>
                                 </div>
                             ) : (
                                 listings.map(listing => (
-                                    <ListingCard
+                                    <PropertyCard
                                         key={listing.id}
                                         id={listing.id}
                                         title={listing.title}

@@ -22,7 +22,7 @@ interface Conversation {
         content: string;
         createdAt: string;
     }[];
-    listing?: {
+    property?: {
         title: string;
     };
 }
@@ -110,7 +110,7 @@ export default function ChatListPage() {
                                         )}
                                     </div>
                                     <div className="text-[10px] text-primary font-black uppercase tracking-widest mb-1 opacity-70">
-                                        {conv.listing?.title || 'General Inquiry'}
+                                        {conv.property?.title || 'General Inquiry'}
                                     </div>
                                     <p className="text-sm text-muted-foreground truncate leading-snug">
                                         {lastMessage?.content || 'No messages yet'}
