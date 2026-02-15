@@ -1,6 +1,6 @@
 import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsArray, ValidateNested, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PropertyType, ListingStatus } from '@prisma/client';
+import { PropertyType, PropertyStatus } from '@prisma/client';
 
 export class CreateAvailabilityDto {
     @IsNumber()
@@ -16,10 +16,9 @@ export class CreateAvailabilityDto {
 
     @IsString()
     endTime: string;
-
 }
 
-export class CreateListingDto {
+export class CreatePropertyDto {
     @IsString()
     @IsNotEmpty()
     title: string;
@@ -72,9 +71,9 @@ export class CreateListingDto {
     @IsNotEmpty()
     type: PropertyType;
 
-    @IsEnum(ListingStatus)
+    @IsEnum(PropertyStatus)
     @IsOptional()
-    status?: ListingStatus;
+    status?: PropertyStatus;
 
     @IsNumber()
     @IsNotEmpty()

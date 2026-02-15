@@ -10,12 +10,12 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
 interface BookingWizardProps {
-    listingId: string;
+    propertyId: string;
     isOpen: boolean;
     onClose: () => void;
 }
 
-export function BookingWizard({ listingId, isOpen, onClose }: BookingWizardProps) {
+export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProps) {
     const [step, setStep] = useState(1);
     const [availabilityRules, setAvailabilityRules] = useState<{ dayOfWeek: number }[]>([]);
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -31,11 +31,11 @@ export function BookingWizard({ listingId, isOpen, onClose }: BookingWizardProps
         if (isOpen) {
             fetchAvailability();
         }
-    }, [isOpen, listingId]);
+    }, [isOpen, propertyId]);
 
     const fetchAvailability = async () => {
         try {
-            const res = await api.get(`/listings/${listingId}/availability`);
+            const res = await api.get(`/properties/${propertyId}/availability`);
             setAvailabilityRules(res.data);
         } catch (error) {
             console.error(error);
@@ -55,7 +55,7 @@ export function BookingWizard({ listingId, isOpen, onClose }: BookingWizardProps
         setSelectedSlot(null); // Reset slot when date changes
         try {
             const dateStr = format(date, "yyyy-MM-dd");
-            const res = await api.get(`/listings/${listingId}/availability/slots?date=${dateStr}`);
+            const res = await api.get(`/properties/${propertyId}/availability/slots?date=${dateStr}`);
             setSlots(res.data);
         } catch (error) {
             console.error(error);
@@ -83,7 +83,7 @@ export function BookingWizard({ listingId, isOpen, onClose }: BookingWizardProps
             }
 
             await api.post("/bookings", {
-                listingId,
+                propertyId,
                 seekerId: user.id,
                 startTime: startTime.toISOString(),
                 endTime: endTime.toISOString(),

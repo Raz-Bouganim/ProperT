@@ -5,14 +5,14 @@ import { PrismaService } from '../prisma/prisma.service';
 export class AvailabilityService {
     constructor(private prisma: PrismaService) { }
 
-    async setAvailability(listingId: string, schedule: { dayOfWeek: number; startTime: string; endTime: string }[]) {
+    async setAvailability(propertyId: string, schedule: { dayOfWeek: number; startTime: string; endTime: string }[]) {
         // Transaction: clear old schedule, insert new
         return this.prisma.$transaction(async (tx) => {
-            await tx.availability.deleteMany({ where: { listingId } });
+            await tx.availability.deleteMany({ where: { propertyId } });
             if (schedule.length > 0) {
                 await tx.availability.createMany({
                     data: schedule.map((s) => ({
-                        listingId,
+                        propertyId,
                         dayOfWeek: s.dayOfWeek,
                         startTime: s.startTime,
                         endTime: s.endTime,
@@ -22,20 +22,20 @@ export class AvailabilityService {
         });
     }
 
-    async getAvailability(listingId: string) {
+    async getAvailability(propertyId: string) {
         return this.prisma.availability.findMany({
-            where: { listingId },
+            where: { propertyId },
             orderBy: { dayOfWeek: 'asc' },
         });
     }
 
     // The "Smart" part: calculate discrete slots - booked slots
-    async getOpenSlots(listingId: string, date: Date) {
+    async getOpenSlots(propertyId: string, date: Date) {
         const dayOfWeek = date.getDay();
 
         // 1. Get availability for this day
         const availability = await this.prisma.availability.findFirst({
-            where: { listingId, dayOfWeek },
+            where: { propertyId, dayOfWeek },
         });
 
         if (!availability) return [];
@@ -48,7 +48,7 @@ export class AvailabilityService {
 
         const bookings = await this.prisma.booking.findMany({
             where: {
-                listingId,
+                propertyId,
                 startTime: { gte: startOfDay },
                 endTime: { lte: endOfDay },
                 status: { in: ['PENDING', 'CONFIRMED'] },

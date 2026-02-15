@@ -7,7 +7,7 @@ export class BookingsService {
     constructor(private prisma: PrismaService) { }
 
     async create(createBookingDto: {
-        listingId: string;
+        propertyId: string;
         seekerId: string;
         startTime: Date;
         endTime: Date;
@@ -18,10 +18,10 @@ export class BookingsService {
             throw new BadRequestException('End time must be after start time');
         }
 
-        // Check if user already has a booking for this listing
+        // Check if user already has a booking for this property
         const existingUserBooking = await this.prisma.booking.findFirst({
             where: {
-                listingId: createBookingDto.listingId,
+                propertyId: createBookingDto.propertyId,
                 seekerId: createBookingDto.seekerId,
                 status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
             },
@@ -34,7 +34,7 @@ export class BookingsService {
         // Check for slot conflicts
         const conflict = await this.prisma.booking.findFirst({
             where: {
-                listingId: createBookingDto.listingId,
+                propertyId: createBookingDto.propertyId,
                 status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
                 OR: [
                     {
@@ -61,29 +61,28 @@ export class BookingsService {
         if (role === 'SEEKER') {
             return this.prisma.booking.findMany({
                 where: { seekerId: userId },
-                include: { listing: true },
+                include: { property: true },
                 orderBy: { startTime: 'desc' },
             });
         } else {
-            // Owner sees bookings for their listings
+            // Owner sees bookings for their properties
             return this.prisma.booking.findMany({
-                where: { listing: { ownerId: userId } },
-                include: { listing: true, seeker: { select: { firstName: true, lastName: true, email: true } } },
+                where: { property: { ownerId: userId } },
+                include: { property: true, seeker: { select: { firstName: true, lastName: true, email: true } } },
                 orderBy: { startTime: 'desc' },
             });
         }
     }
 
     async updateStatus(id: string, status: BookingStatus, userId: string) {
-        // Verify ownership
         const booking = await this.prisma.booking.findUnique({
             where: { id },
-            include: { listing: true },
+            include: { property: true },
         });
 
         if (!booking) throw new NotFoundException('Booking not found');
 
-        if (booking.listing.ownerId !== userId) {
+        if (booking.property.ownerId !== userId) {
             throw new BadRequestException('Only the owner can update status');
         }
 

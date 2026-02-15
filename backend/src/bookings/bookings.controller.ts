@@ -19,12 +19,12 @@ export class BookingsController {
         return this.bookingsService.create(data);
     }
 
-    @Get('my-bookings')
+    @Get('mine')
     findAll(@Req() req: any, @Query('role') role: 'SEEKER' | 'OWNER') {
         return this.bookingsService.findAllByUser(req.user.userId, role);
     }
 
-    @Patch(':id/status')
+    @Patch(':id')
     updateStatus(
         @Param('id') id: string,
         @Body('status') status: BookingStatus,

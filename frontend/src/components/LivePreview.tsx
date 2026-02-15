@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
-import { ListingCard } from "./ListingCard";
+import { PropertyCard } from "./PropertyCard";
 
 // Dynamically import Map to avoid SSR issues
 const Map = dynamic(() => import("@/components/Map"), {
@@ -60,7 +60,7 @@ export function LivePreview({ data, className }: LivePreviewProps) {
             </div>
 
             {/* Main Card */}
-            <ListingCard
+            <PropertyCard
                 id="preview"
                 title={title}
                 price={price}

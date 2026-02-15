@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Bed, Bath, Square, Heart, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export interface ListingCardProps {
+export interface PropertyCardProps {
     id: string;
     title: string;
     address: string;
@@ -24,7 +24,7 @@ export interface ListingCardProps {
     leaseDuration?: string;
 }
 
-export function ListingCard({
+export function PropertyCard({
     id,
     title,
     address,
@@ -41,7 +41,7 @@ export function ListingCard({
     onMouseLeave,
     preview = false,
     leaseDuration,
-}: ListingCardProps) {
+}: PropertyCardProps) {
     if (isLoading) {
         return (
             <div className="rounded-2xl bg-transparent overflow-hidden shadow-sm animate-pulse">
@@ -62,7 +62,7 @@ export function ListingCard({
 
     const isRent = status?.toLowerCase().includes("rent") || status === "FOR_RENT";
     const Wrapper = (preview ? 'div' : Link) as any;
-    const wrapperProps = preview ? {} : { href: `/listings/${id}` };
+    const wrapperProps = preview ? {} : { href: `/properties/${id}` };
 
     return (
         <Wrapper

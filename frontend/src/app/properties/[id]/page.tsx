@@ -11,26 +11,26 @@ import { ChatWindow } from "@/components/ChatWindow";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
-export default function ListingDetail({ params }: { params: Promise<{ id: string }> }) {
+export default function PropertyDetail({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const [isBookingOpen, setIsBookingOpen] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const { user } = useAuth();
-    const [listing, setListing] = useState<any>(null);
+    const [property, setProperty] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchListing = async () => {
+        const fetchProperty = async () => {
             try {
-                const res = await api.get(`/listings/${id}`);
-                setListing(res.data);
+                const res = await api.get(`/properties/${id}`);
+                setProperty(res.data);
             } catch (error) {
-                console.error("Failed to fetch listing:", error);
+                console.error("Failed to fetch property:", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchListing();
+        fetchProperty();
     }, [id]);
 
     if (loading) {
@@ -44,11 +44,11 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
         );
     }
 
-    if (!listing) {
+    if (!property) {
         return (
             <div className="min-h-screen flex items-center justify-center p-4 text-center">
                 <div>
-                    <h2 className="text-2xl font-bold mb-2">Listing not found</h2>
+                    <h2 className="text-2xl font-bold mb-2">Property not found</h2>
                     <p className="text-muted-foreground mb-6">The property you're looking for doesn't exist or has been removed.</p>
                     <Link href="/search">
                         <Button variant="outline">Back to Search</Button>
@@ -58,18 +58,18 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
         );
     }
 
-    const displayListing = {
-        ...listing,
-        images: (listing.images && listing.images.length > 0) ? listing.images : ["/placeholder-property.svg"],
+    const displayProperty = {
+        ...property,
+        images: (property.images && property.images.length > 0) ? property.images : ["/placeholder-property.svg"],
         owner: {
-            name: listing.owner?.firstName ? `${listing.owner.firstName} ${listing.owner.lastName}` : "Property Owner",
-            avatar: listing.owner?.avatar || `https://ui-avatars.com/api/?name=${listing.owner?.firstName || 'O'}&background=random`,
-            joined: listing.owner?.createdAt ? new Date(listing.owner.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Recently",
+            name: property.owner?.firstName ? `${property.owner.firstName} ${property.owner.lastName}` : "Property Owner",
+            avatar: property.owner?.avatar || `https://ui-avatars.com/api/?name=${property.owner?.firstName || 'O'}&background=random`,
+            joined: property.owner?.createdAt ? new Date(property.owner.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Recently",
         },
-        features: listing.features || []
+        features: property.features || []
     };
 
-    const getImg = (index: number) => displayListing.images[index] || displayListing.images[0] || "/placeholder-property.svg";
+    const getImg = (index: number) => displayProperty.images[index] || displayProperty.images[0] || "/placeholder-property.svg";
 
     return (
         <div className="min-h-screen bg-background pb-20">
@@ -92,11 +92,11 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
 
             <main className="max-w-7xl mx-auto px-4 py-8">
                 <header className="mb-8">
-                    <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-4">{listing.title}</h1>
+                    <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-4">{property.title}</h1>
                     <div className="flex flex-wrap items-center gap-4 text-muted-foreground font-medium">
                         <div className="flex items-center gap-1.5">
                             <MapPin className="w-4 h-4" />
-                            <span>{listing.address}</span>
+                            <span>{property.address}</span>
                         </div>
                     </div>
                 </header>
@@ -129,37 +129,37 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                         <div className="flex items-center gap-8 py-6 border-b border-t mb-8 overflow-x-auto no-scrollbar">
                             <div className="flex flex-col items-center gap-1 min-w-[80px]">
                                 <Bed className="w-6 h-6 text-primary" />
-                                <span className="font-bold text-lg">{listing.beds}</span>
+                                <span className="font-bold text-lg">{property.beds}</span>
                                 <span className="text-xs text-muted-foreground uppercase tracking-widest">Beds</span>
                             </div>
                             <div className="flex flex-col items-center gap-1 min-w-[80px]">
                                 <Bath className="w-6 h-6 text-primary" />
-                                <span className="font-bold text-lg">{listing.baths}</span>
+                                <span className="font-bold text-lg">{property.baths}</span>
                                 <span className="text-xs text-muted-foreground uppercase tracking-widest">Baths</span>
                             </div>
                             <div className="flex flex-col items-center gap-1 min-w-[80px]">
                                 <Square className="w-6 h-6 text-primary" />
-                                <span className="font-bold text-lg">{listing.sqft}</span>
+                                <span className="font-bold text-lg">{property.sqft}</span>
                                 <span className="text-xs text-muted-foreground uppercase tracking-widest">Sqft</span>
                             </div>
                             <div className="flex flex-col items-center gap-1 min-w-[80px]">
                                 <ShieldCheck className="w-6 h-6 text-green-500" />
                                 <span className="font-bold text-sm">Verified</span>
-                                <span className="text-xs text-muted-foreground uppercase tracking-widest">Listing</span>
+                                <span className="text-xs text-muted-foreground uppercase tracking-widest">Property</span>
                             </div>
                         </div>
 
                         <section className="mb-12">
                             <h2 className="text-2xl font-bold mb-4">About this home</h2>
                             <p className="text-lg text-muted-foreground leading-relaxed whitespace-pre-line">
-                                {listing.description}
+                                {property.description}
                             </p>
                         </section>
 
                         <section className="mb-12">
                             <h2 className="text-2xl font-bold mb-6">Amenities</h2>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8">
-                                {listing.features?.map((feature: string) => (
+                                {property.features?.map((feature: string) => (
                                     <div key={feature} className="flex items-center gap-3 text-muted-foreground">
                                         <div className="w-2 h-2 rounded-full bg-primary" />
                                         <span className="font-medium">{feature}</span>
@@ -176,7 +176,7 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                                 </div>
                             </div>
                             <p className="mt-4 text-muted-foreground flex items-center gap-2">
-                                <MapPin className="w-4 h-4 text-primary" /> {listing.address}
+                                <MapPin className="w-4 h-4 text-primary" /> {property.address}
                             </p>
                         </section>
                     </div>
@@ -186,7 +186,7 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
                         <div className="sticky top-24 p-8 rounded-3xl border shadow-xl bg-card">
                             <div className="flex items-baseline justify-between mb-8">
                                 <div>
-                                    <span className="text-3xl font-black">${listing.price.toLocaleString()}</span>
+                                    <span className="text-3xl font-black">${property.price.toLocaleString()}</span>
                                     <span className="text-muted-foreground font-medium ml-1">/ mo</span>
                                 </div>
                                 <div className="text-sm font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded">Available Now</div>
@@ -225,12 +225,12 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
 
                             <div className="mt-8 pt-8 border-t flex items-center gap-4">
                                 <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
-                                    <Image src={displayListing.owner.avatar} alt={displayListing.owner.name} fill sizes="48px" />
+                                    <Image src={displayProperty.owner.avatar} alt={displayProperty.owner.name} fill sizes="48px" />
                                 </div>
                                 <div>
                                     <div className="font-bold leading-tight uppercase tracking-widest text-[10px] text-muted-foreground">Managed by</div>
-                                    <div className="font-black text-lg">{displayListing.owner.name}</div>
-                                    <div className="text-xs text-muted-foreground">Joined {displayListing.owner.joined}</div>
+                                    <div className="font-black text-lg">{displayProperty.owner.name}</div>
+                                    <div className="text-xs text-muted-foreground">Joined {displayProperty.owner.joined}</div>
                                 </div>
                             </div>
 
@@ -243,15 +243,15 @@ export default function ListingDetail({ params }: { params: Promise<{ id: string
             </main>
 
             <BookingWizard
-                listingId={id}
+                propertyId={id}
                 isOpen={isBookingOpen}
                 onClose={() => setIsBookingOpen(false)}
             />
 
             <ChatWindow
-                listingId={id}
-                ownerId={listing.ownerId}
-                listingTitle={listing.title}
+                propertyId={id}
+                ownerId={property.ownerId}
+                propertyTitle={property.title}
                 isOpen={isChatOpen}
                 onClose={() => setIsChatOpen(false)}
             />

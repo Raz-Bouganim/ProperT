@@ -8,7 +8,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
 import { UsersModule } from './users/users.module';
-import { ListingsModule } from './listings/listings.module';
+import { PropertiesModule } from './properties/properties.module';
 import { MediaModule } from './media/media.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { BookingsModule } from './bookings/bookings.module';
@@ -43,7 +43,7 @@ import { GeoModule } from './geo/geo.module';
     AuthModule,
     ChatModule,
     UsersModule,
-    ListingsModule,
+    PropertiesModule,
     MediaModule,
     BookingsModule,
     AvailabilityModule,

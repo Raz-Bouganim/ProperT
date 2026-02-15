@@ -14,7 +14,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { ListingCard } from "@/components/ListingCard";
+import { PropertyCard } from "@/components/PropertyCard";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Footer } from "@/components/layout/Footer";
@@ -30,7 +30,7 @@ export default function Home() {
   useEffect(() => {
     async function fetchFeatured() {
       try {
-        const res = await api.get("/listings");
+        const res = await api.get("/properties");
         // Just take the first 3 for featured to match the 3-column grid design
         setFeaturedListings(res.data.slice(0, 3));
       } catch (error) {
@@ -219,10 +219,10 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {loading ? (
-              [1, 2, 3].map(i => <ListingCard key={i} id="" title="" address="" price={0} beds={0} baths={0} sqft={0} image="" isLoading />)
+              [1, 2, 3].map(i => <PropertyCard key={i} id="" title="" address="" price={0} beds={0} baths={0} sqft={0} image="" isLoading />)
             ) : featuredListings.length > 0 ? (
               featuredListings.map((listing, index) => (
-                <ListingCard
+                <PropertyCard
                   key={listing.id || index}
                   id={listing.id || ""}
                   title={listing.title || "Premium Listing"}

@@ -6,16 +6,16 @@ export enum PropertyType {
     OFFICE = 'OFFICE',
 }
 
-export enum ListingStatus {
+export enum PropertyStatus {
     FOR_SALE = 'FOR_SALE',
     FOR_RENT = 'FOR_RENT',
 }
 
-export class Listing {
+export class Property {
     id: string;
     title: string;
     description: string;
-    status: ListingStatus;
+    status: PropertyStatus;
     price: number;
     negotiable: boolean;
     sqft: number;

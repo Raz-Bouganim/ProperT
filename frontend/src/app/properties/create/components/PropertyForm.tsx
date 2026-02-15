@@ -128,9 +128,9 @@ export function PropertyForm() {
                 images: imageUrls,
             };
 
-            const { data } = await api.post("/listings", listingData);
-            router.push(`/listings/${data.id}`);
-            toast.success("Listing published successfully!");
+            const { data } = await api.post("/properties", listingData);
+            router.push(`/properties/${data.id}`);
+            toast.success("Property published successfully!");
         } catch (error: any) {
             console.error("Submission failed", error);
             if (error.response?.data) {
