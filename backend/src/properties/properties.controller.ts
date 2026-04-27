@@ -72,13 +72,15 @@ export class PropertiesController {
     return this.propertiesService.findOne(id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePropertyDto: UpdatePropertyDto) {
-    return this.propertiesService.update(id, updatePropertyDto);
+  update(@Request() req: any, @Param('id') id: string, @Body() updatePropertyDto: UpdatePropertyDto) {
+    return this.propertiesService.update(req.user.userId, id, updatePropertyDto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.propertiesService.remove(id);
+  remove(@Request() req: any, @Param('id') id: string) {
+    return this.propertiesService.remove(req.user.userId, id);
   }
 }

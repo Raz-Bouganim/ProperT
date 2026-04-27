@@ -36,7 +36,8 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document);
 
   const configService = app.get(ConfigService);
-  const port = configService.get('PORT') || 5000;
+  // Default 4000: macOS often uses 5000 for AirPlay Receiver (AirTunes), which breaks local API calls.
+  const port = configService.get('PORT') || 4000;
   await app.listen(port);
   console.log(`Backend is running on: http://localhost:${port}`);
   console.log(`Swagger docs available at: http://localhost:${port}/api`);

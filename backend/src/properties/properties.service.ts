@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,7 +19,10 @@ export class PropertiesService {
     const data: any = {
       ...rest,
       price: price.toString(),
-      availabilities: availabilities ? { create: availabilities } : undefined,
+      availabilities:
+        availabilities && availabilities.length > 0
+          ? { create: availabilities }
+          : undefined,
       taxAnnual: taxAnnual?.toString(),
       hoaMonthly: hoaMonthly?.toString(),
       owner: { connect: { id: ownerId } }
@@ -115,7 +118,21 @@ export class PropertiesService {
     });
   }
 
-  update(id: string, updatePropertyDto: UpdatePropertyDto) {
+  private async assertOwner(userId: string, propertyId: string) {
+    const property = await this.prisma.property.findUnique({
+      where: { id: propertyId },
+      select: { ownerId: true },
+    });
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+    if (property.ownerId !== userId) {
+      throw new ForbiddenException('You can only modify your own listings');
+    }
+  }
+
+  async update(userId: string, id: string, updatePropertyDto: UpdatePropertyDto) {
+    await this.assertOwner(userId, id);
     const { price, ...rest } = updatePropertyDto;
     const data: any = {
       ...rest,
@@ -127,7 +144,8 @@ export class PropertiesService {
     });
   }
 
-  remove(id: string) {
+  async remove(userId: string, id: string) {
+    await this.assertOwner(userId, id);
     return this.prisma.property.delete({ where: { id } });
   }
 }
