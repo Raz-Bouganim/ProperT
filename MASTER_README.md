@@ -62,7 +62,7 @@ There is **no root `package.json`**; install and run commands are per package.
 | **Object storage** | `@aws-sdk/client-s3`, presigner | MinIO/S3 for uploads |
 | **HTTP client** | `@nestjs/axios` | Geo (Nominatim) |
 | **Validation** | `class-validator`, global `ValidationPipe` (whitelist, transform) | DTOs |
-| **Config** | `@nestjs/config` + **Joi** schema in `app.module.ts` | Env validation |
+| **Config** | `@nestjs/config` + **Joi** schema in `app.module.ts` | Env validation (`DATABASE_URL`, `JWT_SECRET`, optional S3/FRONTEND_URL) |
 | **API docs** | `@nestjs/swagger` | Served at `/api` |
 
 **Runtime:** default port **4000** (`PORT` env override). **CORS** allows `FRONTEND_URL` or `http://localhost:3000`.
@@ -101,11 +101,12 @@ Geo queries use **raw SQL** with `ST_DWithin` / geography in `PropertiesService.
 - **Media:** presigned upload URLs; bucket creation/policy on module init (MinIO-oriented).
 - **Geo:** forward/reverse geocoding via **OpenStreetMap Nominatim** (respect User-Agent policy in production).
 - **Frontend:** home, search, property detail, multi-step create listing, dashboard, auth, chat list + thread.
+- **Secrets & env:** access JWTs signed with **`JWT_SECRET`** from env (`JwtModule.registerAsync`, `JwtStrategy`, Joi min length 16); template vars in **`.env.example`** (root) and **`backend/.env.example`**.
 
 ### WIP / partial / fragile
 
 - **Unit tests:** several Nest controller specs fail to compile/instantiate because providers are not mocked (`BookingsController`, etc.). Treat `npm test` as **not green** until tests are refactored with proper module mocks or e2e focus.
-- **JWT secret:** hardcoded `'secretKey'` in `auth.module.ts` and `jwt.strategy.ts` — **must** move to `ConfigService` / env before any real deployment.
+- **JWT refresh model:** `POST /auth/refresh` re-validates the **access** JWT and re-issues tokens (no separate refresh signing secret or rotation yet). For production-grade sessions, consider opaque refresh tokens and/or a distinct `JWT_REFRESH_SECRET` when you extend `AuthService`.
 - **`GET /properties?owner=me`:** relies on `req.user`, but the route is **not** guarded with `JwtAuthGuard`, so `owner=me` without a valid JWT will not filter as intended. Prefer **`GET /properties/mine`** for authenticated “my listings.”
 - **Naming collision:** two different components export `ChatWindow`:
   - `components/ChatWindow.tsx` — modal chat from a **property** page (propertyId, ownerId, …).
@@ -115,11 +116,11 @@ Geo queries use **raw SQL** with `ST_DWithin` / geography in `PropertiesService.
 
 ### Next steps / backlog (suggested)
 
-1. **Secrets & env:** `JWT_SECRET`, refresh secret rotation, `.env.example` at repo root documenting `DATABASE_URL`, `FRONTEND_URL`, S3/MinIO vars, `PORT`.
-2. **Tests:** repair unit tests or replace critical paths with e2e (`test/app.e2e-spec.ts`).
-3. **Redis:** either wire a real use case (queues, session store) or document/remove from compose for minimal local setups.
-4. **Payments / contracts:** not present—out of scope today; schema is listing-centric.
-5. **Production hardening:** rate limits on auth and geo; helmet/CORS review for deployed origins; audit logging for mutations.
+1. **Tests:** repair unit tests or replace critical paths with e2e (`test/app.e2e-spec.ts`).
+2. **Redis:** either wire a real use case (queues, session store) or document/remove from compose for minimal local setups.
+3. **Payments / contracts:** not present—out of scope today; schema is listing-centric.
+4. **Production hardening:** rate limits on auth and geo; helmet/CORS review for deployed origins; audit logging for mutations.
+5. **Auth sessions (optional):** opaque refresh tokens, separate signing secret (`JWT_REFRESH_SECRET`), and rotation—today `POST /auth/refresh` only re-issues after validating the **access** JWT.
 6. **Optional:** root `package.json` with `concurrently` scripts for `dev` (frontend + backend) for DX.
 
 ---
@@ -129,6 +130,7 @@ Geo queries use **raw SQL** with `ST_DWithin` / geography in `PropertiesService.
 ```
 ProperT/
 ├── MASTER_README.md          ← This file
+├── .env.example              ← Template for backend + frontend env (no secrets committed)
 ├── docker-compose.yml        ← Local Postgres, Redis, MinIO
 ├── backend/
 │   ├── prisma/
@@ -259,10 +261,11 @@ cd /path/to/ProperT
 docker compose up -d
 ```
 
-Default DB is reachable at **`localhost:5433`** (see compose file). Create `backend/.env` with at least:
+Default DB is reachable at **`localhost:5433`** (see compose file). Copy **`.env.example`** (repo root) or **`backend/.env.example`** into `backend/.env` and set at least:
 
 ```env
 DATABASE_URL="postgresql://admin:admin123@localhost:5433/propert?schema=public"
+JWT_SECRET="use-a-long-random-string-at-least-16-chars"
 FRONTEND_URL="http://localhost:3000"
 PORT=4000
 
@@ -273,6 +276,8 @@ S3_ENDPOINT=http://localhost:9000
 S3_BUCKET_NAME=propert-uploads
 AWS_REGION=us-east-1
 ```
+
+`JWT_SECRET` is **validated at startup** (minimum length 16). The API will not boot without it.
 
 Apply migrations and generate the Prisma client:
 
@@ -339,3 +344,4 @@ cd backend && npm run test:e2e
 |------|---------|
 | 2026-04-27 | Initial master README: stack versions, architecture, cleanup notes (removed unused Bull bootstrap, PowerShell port-kill scripts, unsafe Prisma URL logging; secured listing PATCH/DELETE; fixed auth Suspense for production build). |
 | 2026-04-27 | Added **Agent prompt skeleton** under §5 (ROLE / Task / דגשים) for copy-paste agent prompts. |
+| 2026-04-27 | **Secrets & env:** `JWT_SECRET` from env + Joi; root `.env.example`; `backend/.env.example` + e2e `load-e2e-env` default for missing `JWT_SECRET` only. |

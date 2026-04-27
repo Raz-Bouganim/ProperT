@@ -19,11 +19,14 @@ import { GeoModule } from './geo/geo.module';
       isGlobal: true,
       validationSchema: Joi.object({
         DATABASE_URL: Joi.string().required(),
+        JWT_SECRET: Joi.string().min(16).required(),
+        FRONTEND_URL: Joi.string().uri().optional(),
         // MinIO
         S3_ENDPOINT: Joi.string().optional(),
         AWS_ACCESS_KEY_ID: Joi.string().optional(),
         AWS_SECRET_ACCESS_KEY: Joi.string().optional(),
         S3_BUCKET_NAME: Joi.string().optional(),
+        AWS_REGION: Joi.string().optional(),
       }),
     }),
     PrismaModule,
