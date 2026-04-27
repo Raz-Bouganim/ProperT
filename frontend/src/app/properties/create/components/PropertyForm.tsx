@@ -134,9 +134,20 @@ export function PropertyForm() {
             toast.success("Property published successfully!");
         } catch (error: any) {
             console.error("Submission failed", error);
-            if (error.response?.data) {
-                console.error("Validation Errors:", error.response.data);
-                toast.error(`Error: ${JSON.stringify(error.response.data.message || "Validation failed")}`);
+            const res = error.response;
+            const data = res?.data;
+            if (data && typeof data === "object" && Object.keys(data).length > 0) {
+                const label = res.status === 400 ? "Validation / request errors:" : "API error response:";
+                console.error(label, data);
+                const msg =
+                    typeof data.message === "string"
+                        ? data.message
+                        : Array.isArray(data.message)
+                          ? data.message.join(", ")
+                          : res.status === 500
+                            ? "Server error while saving the listing. If it persists, contact support."
+                            : "Request failed";
+                toast.error(msg);
             } else {
                 toast.error("Failed to publish listing. Please try again.");
             }

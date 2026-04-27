@@ -37,4 +37,4 @@ A modern, high-performance real estate platform built with **NestJS**, **Next.js
     npm run dev
     ```
 
-> **Note:** We have added automatic port cleanup scripts. Running `npm run dev` or `npm run start:dev` will automatically kill any lingering processes on ports 3000/5000.
+> **Note (macOS):** The API defaults to **port 4000** because **5000** is often taken by **AirPlay Receiver**; requests there get `403` / “Network Error” instead of hitting NestJS. Set `PORT` / `NEXT_PUBLIC_API_URL` if you use another port.

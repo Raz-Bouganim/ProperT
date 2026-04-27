@@ -28,7 +28,7 @@ interface ChatWindowProps {
     propertyTitle: string;
 }
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export function ChatWindow({ propertyId, ownerId, isOpen, onClose, propertyTitle }: ChatWindowProps) {
     const { user } = useAuth();

@@ -1,7 +1,6 @@
 'use client';
 
-
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
@@ -14,7 +13,7 @@ import { toast } from 'sonner';
 
 type AuthMode = 'login' | 'register';
 
-export default function AuthPage() {
+function AuthPageContent() {
     // Mode state initialized later
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -57,7 +56,6 @@ export default function AuthPage() {
             const { data } = await api.post(endpoint, body);
 
             toast.success(mode === 'login' ? 'Welcome back!' : 'Account created successfully!');
-            saveAuth(data.access_token, data.user);
             saveAuth(data.access_token, data.user);
             router.push(redirectUrl);
         } catch (err: any) {
@@ -288,5 +286,19 @@ export default function AuthPage() {
                 </div>
             </div>
         </div >
+    );
+}
+
+export default function AuthPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="flex min-h-screen items-center justify-center bg-[#f6f6f8]">
+                    <Loader2 className="h-10 w-10 animate-spin text-[#1754cf]" aria-label="Loading" />
+                </div>
+            }
+        >
+            <AuthPageContent />
+        </Suspense>
     );
 }

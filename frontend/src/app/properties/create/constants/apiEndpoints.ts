@@ -1,4 +1,4 @@
-const getApiUrl = () => process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const getApiUrl = () => process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export const API_ENDPOINTS = {
   presignedUrl: () => `${getApiUrl()}/media/presigned-url`,
