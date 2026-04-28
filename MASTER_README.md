@@ -50,6 +50,10 @@ There is **no root `package.json`**; install and run commands are per package.
 
 **API base URL:** `NEXT_PUBLIC_API_URL` (falls back to `http://localhost:4000`; avoid **5000** on macOS — AirPlay uses it).
 
+Optional frontend envs:
+
+- **`NEXT_PUBLIC_DEBUG_BOOKING_ERRORS=1`**: in non-production, logs structured booking failures to `console.debug` (helpful when the backend returns nested error payloads).
+
 ### Backend (`backend/`)
 
 | Technology | Version (from `package.json`) | Notes |
@@ -70,8 +74,8 @@ There is **no root `package.json`**; install and run commands are per package.
 ### Database & domain model (high level)
 
 - **User** — credentials, profile, role; owns **Property** rows.
-- **Property** (`@@map("Listing")`) — listing fields, geo coordinates, images array, features, pricing, etc.
-- **Availability** — recurring or date-specific slots per listing.
+- **Property** (`@@map("Listing")`) — listing fields, geo coordinates, images array, features, pricing, etc. **Bedrooms/Bathrooms** support **half steps** (stored as floats).
+- **Availability** — recurring (weekly `dayOfWeek`) **or date-specific** (`date`) windows per listing. The slots API expects a **date-only** query (`yyyy-MM-dd`) to avoid timezone drift.
 - **Booking** — seeker + listing + time range + **BookingStatus**.
 - **Conversation** / **UserConversation** / **Message** — chat threads, optionally tied to a listing.
 
@@ -239,6 +243,7 @@ Acceptance criteria:
 - **Prisma / DB:** The model is `Property` but the table is **`Listing`**; fields may use `@map` (e.g. `sqft` → `size`). After schema changes run **`npx prisma migrate dev`** (or `deploy`) and **`npx prisma generate`**. Never log secrets or full `DATABASE_URL`.
 - **Auth / listings:** Use `JwtAuthGuard` where appropriate; mutations on listings must enforce **owner** checks (see `PropertiesService.assertOwner` pattern).
 - **Next.js:** `useSearchParams` and similar require a **`<Suspense>`** boundary. Client data: `api` from `@/lib/api`.
+- **Availability:** rules may be weekly (`dayOfWeek`) or date-specific (`date`); slot queries should pass **date-only** `yyyy-MM-dd` (avoid timezone drift).
 - **Duplicates:** Two different `ChatWindow` components (`components/ChatWindow.tsx` vs `components/chat/ChatWindow.tsx`) — do not conflate them.
 - **Verification:** Run `npm run build` in `backend/` and `frontend/` before claiming done; extend or fix tests if you touch controllers/services.
 
@@ -373,3 +378,4 @@ cd backend && npm run test:e2e
 | 2026-04-27 | Initial master README: stack versions, architecture, cleanup notes (removed unused Bull bootstrap, PowerShell port-kill scripts, unsafe Prisma URL logging; secured listing PATCH/DELETE; fixed auth Suspense for production build). |
 | 2026-04-27 | Added **Agent prompt skeleton** under §5 (ROLE / Task / דגשים) for copy-paste agent prompts. |
 | 2026-04-27 | **Secrets & env:** `JWT_SECRET` from env + Joi; root `.env.example`; `backend/.env.example` + e2e `load-e2e-env` default for missing `JWT_SECRET` only. |
+| 2026-04-28 | Listings: allow **half bedrooms/bathrooms** (Prisma + migration), availability supports **weekly + specific-date** rules, and frontend property details UX improved (return-to links, map embed, lightbox gallery, booking calendar rule matching). |

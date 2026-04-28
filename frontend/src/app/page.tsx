@@ -225,6 +225,7 @@ export default function Home() {
                 <PropertyCard
                   key={listing.id || index}
                   id={listing.id || ""}
+                  detailsHref={`/properties/${listing.id || ""}?from=home&returnTo=${encodeURIComponent("/")}`}
                   title={listing.title || "Premium Listing"}
                   address={listing.address || "Location pending"}
                   price={Number(listing.price) || 0}

@@ -5,7 +5,10 @@ import { PrismaService } from '../prisma/prisma.service';
 export class AvailabilityService {
     constructor(private prisma: PrismaService) { }
 
-    async setAvailability(propertyId: string, schedule: { dayOfWeek: number; startTime: string; endTime: string }[]) {
+    async setAvailability(
+        propertyId: string,
+        schedule: { dayOfWeek?: number; date?: string; startTime: string; endTime: string }[],
+    ) {
         // Transaction: clear old schedule, insert new
         return this.prisma.$transaction(async (tx) => {
             await tx.availability.deleteMany({ where: { propertyId } });
@@ -13,7 +16,8 @@ export class AvailabilityService {
                 await tx.availability.createMany({
                     data: schedule.map((s) => ({
                         propertyId,
-                        dayOfWeek: s.dayOfWeek,
+                        dayOfWeek: s.dayOfWeek ?? null,
+                        date: s.date ? new Date(s.date) : null,
                         startTime: s.startTime,
                         endTime: s.endTime,
                     })),
@@ -33,19 +37,26 @@ export class AvailabilityService {
     async getOpenSlots(propertyId: string, date: Date) {
         const dayOfWeek = date.getDay();
 
-        // 1. Get availability for this day
-        const availability = await this.prisma.availability.findFirst({
-            where: { propertyId, dayOfWeek },
-        });
-
-        if (!availability) return [];
-
-        // 2. Get existing bookings for this day
         const startOfDay = new Date(date);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(date);
         endOfDay.setHours(23, 59, 59, 999);
 
+        // 1. Get availability for this day (specific-date and weekly rules)
+        const availabilities = await this.prisma.availability.findMany({
+            where: {
+                propertyId,
+                OR: [
+                    { dayOfWeek },
+                    { date: { gte: startOfDay, lte: endOfDay } },
+                ],
+            },
+            orderBy: [{ startTime: 'asc' }],
+        });
+
+        if (availabilities.length === 0) return [];
+
+        // 2. Get existing bookings for this day
         const bookings = await this.prisma.booking.findMany({
             where: {
                 propertyId,
@@ -56,36 +67,39 @@ export class AvailabilityService {
         });
 
         // 3. Generate slots (30 min intervals)
-        const slots: string[] = [];
-        const [startH, startM] = availability.startTime.split(':').map(Number);
-        const [endH, endM] = availability.endTime.split(':').map(Number);
+        const slotSet = new Set<string>();
 
-        const current = new Date(date);
-        current.setHours(startH, startM, 0, 0);
+        for (const availability of availabilities) {
+            const [startH, startM] = availability.startTime.split(':').map(Number);
+            const [endH, endM] = availability.endTime.split(':').map(Number);
 
-        const endLimit = new Date(date);
-        endLimit.setHours(endH, endM, 0, 0);
+            const current = new Date(date);
+            current.setHours(startH, startM, 0, 0);
 
-        while (current < endLimit) {
-            const slotStart = new Date(current);
-            const slotEnd = new Date(current.getTime() + 30 * 60000);
+            const endLimit = new Date(date);
+            endLimit.setHours(endH, endM, 0, 0);
 
-            if (slotEnd > endLimit) break;
+            while (current < endLimit) {
+                const slotStart = new Date(current);
+                const slotEnd = new Date(current.getTime() + 30 * 60000);
 
-            const isBooked = bookings.some(b => {
-                const bStart = new Date(b.startTime);
-                const bEnd = new Date(b.endTime);
-                return (slotStart < bEnd && slotEnd > bStart);
-            });
+                if (slotEnd > endLimit) break;
 
-            if (!isBooked) {
-                slots.push(this.formatTime(slotStart));
+                const isBooked = bookings.some((b) => {
+                    const bStart = new Date(b.startTime);
+                    const bEnd = new Date(b.endTime);
+                    return slotStart < bEnd && slotEnd > bStart;
+                });
+
+                if (!isBooked) {
+                    slotSet.add(this.formatTime(slotStart));
+                }
+
+                current.setTime(current.getTime() + 30 * 60000);
             }
-
-            current.setTime(current.getTime() + 30 * 60000);
         }
 
-        return slots;
+        return Array.from(slotSet).sort();
     }
 
     private parseTime(timeStr: string): Date {

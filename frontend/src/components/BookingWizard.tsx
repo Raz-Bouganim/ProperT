@@ -8,6 +8,7 @@ import { Button } from "./ui/Button";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import axios from "axios";
 
 interface BookingWizardProps {
     propertyId: string;
@@ -17,7 +18,7 @@ interface BookingWizardProps {
 
 export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProps) {
     const [step, setStep] = useState(1);
-    const [availabilityRules, setAvailabilityRules] = useState<{ dayOfWeek: number }[]>([]);
+    const [availabilityRules, setAvailabilityRules] = useState<{ dayOfWeek?: number | null; date?: string | null }[]>([]);
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
     const [slots, setSlots] = useState<string[]>([]);
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -49,6 +50,25 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
             fetchSlots(selectedDate);
         }
     }, [selectedDate]);
+
+    const isDateAvailable = (date: Date) => {
+        if (availabilityRules.length === 0) return true;
+
+        const day = date.getDay();
+        const dateStr = format(date, "yyyy-MM-dd");
+
+        return availabilityRules.some((r) => {
+            if (r?.date) {
+                // Compare in local date to avoid UTC day shifting (e.g. midnight local stored as previous-day UTC)
+                const ruleDateStr = format(new Date(r.date), "yyyy-MM-dd");
+                return ruleDateStr === dateStr;
+            }
+            if (r?.dayOfWeek === 0 || r?.dayOfWeek) {
+                return Number(r.dayOfWeek) === day;
+            }
+            return false;
+        });
+    };
 
     const fetchSlots = async (date: Date) => {
         setLoading(true);
@@ -103,8 +123,45 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
             }, 2000);
 
         } catch (error) {
-            console.error(error);
-            toast.error("Something went wrong. Please try again.");
+            const isAxios = axios.isAxiosError(error);
+            const response = isAxios ? error.response : (error as any)?.response;
+            const data = response?.data;
+
+            const shouldDebug =
+                process.env.NODE_ENV !== "production" &&
+                process.env.NEXT_PUBLIC_DEBUG_BOOKING_ERRORS === "1";
+
+            if (shouldDebug) {
+                // Use debug to avoid Next dev overlay noise.
+                console.debug("Booking request failed", {
+                    isAxios,
+                    status: response?.status,
+                    data,
+                    axios: isAxios ? error.toJSON() : undefined,
+                });
+            }
+
+            // Backend uses AllExceptionsFilter which nests exception payload under `data.message`.
+            const payload = data?.message ?? data;
+            const normalized =
+                typeof payload === "string"
+                    ? payload
+                    : typeof payload?.message === "string"
+                        ? payload.message
+                        : Array.isArray(payload)
+                            ? payload.filter((m: unknown) => typeof m === "string").join("\n")
+                            : Array.isArray(payload?.message)
+                                ? payload.message.filter((m: unknown) => typeof m === "string").join("\n")
+                                : typeof payload?.error === "string"
+                                    ? payload.error
+                                    : null;
+
+            toast.error(normalized || "Something went wrong. Please try again.");
+
+            if (normalized?.toLowerCase().includes("slot") && selectedDate) {
+                // If the slot was just taken, refresh the list.
+                fetchSlots(selectedDate);
+            }
         } finally {
             setSubmitting(false);
         }
@@ -113,7 +170,7 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -167,9 +224,7 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
                                         disabled={[
                                             { before: startOfToday() },
                                             (date: Date) => {
-                                                if (availabilityRules.length === 0) return false;
-                                                const day = date.getDay();
-                                                return !availabilityRules.some(r => r.dayOfWeek === day);
+                                                return !isDateAvailable(date);
                                             }
                                         ]}
                                         modifiersClassNames={{
@@ -184,7 +239,7 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
                                 </div>
 
                                 <Button
-                                    className="w-full h-14 text-lg rounded-2xl font-bold"
+                                    className="w-full h-14 text-lg rounded-2xl font-bold cursor-pointer"
                                     disabled={!selectedDate}
                                     onClick={() => setStep(2)}
                                 >
@@ -228,7 +283,7 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
                                             <button
                                                 key={slot}
                                                 onClick={() => setSelectedSlot(slot)}
-                                                className={`p-3 rounded-xl border-2 font-bold text-sm transition-all ${selectedSlot === slot
+                                                className={`p-3 rounded-xl border-2 font-bold text-sm transition-all cursor-pointer ${selectedSlot === slot
                                                     ? "border-primary bg-primary/5 text-primary scale-[0.98]"
                                                     : "border-transparent bg-muted/40 hover:bg-muted text-muted-foreground"
                                                     }`}
@@ -245,7 +300,7 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
                                 </div>
 
                                 <Button
-                                    className="w-full h-14 text-lg rounded-2xl font-bold"
+                                    className="w-full h-14 text-lg rounded-2xl font-bold cursor-pointer"
                                     disabled={!selectedSlot || submitting}
                                     onClick={handleBooking}
                                 >

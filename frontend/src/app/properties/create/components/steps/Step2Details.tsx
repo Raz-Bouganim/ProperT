@@ -24,6 +24,7 @@ export function Step2Details() {
                         label="Bedrooms"
                         name="beds"
                         min={0}
+                        step={0.5}
                     />
                     <NumericInputField
                         label="Bathrooms"

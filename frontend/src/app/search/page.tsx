@@ -96,6 +96,8 @@ function SearchPageContent() {
         router.push(`/search?${params.toString()}`);
     };
 
+    const returnTo = `/search?${searchParams.toString()}`;
+
     return (
         <div className="min-h-screen bg-slate-50/50">
             <FilterBar
@@ -170,6 +172,7 @@ function SearchPageContent() {
                                     <PropertyCard
                                         key={property.id}
                                         id={property.id}
+                                        detailsHref={`/properties/${property.id}?from=search&returnTo=${encodeURIComponent(returnTo)}`}
                                         title={property.title || "Untitled Property"}
                                         address={property.address}
                                         price={Number(property.price)}
