@@ -12,7 +12,7 @@ This file is the **canonical orientation** for the ProperT monorepo: product int
 - Rich **listing creation** (multi-step form: basics, details, media, pricing, availability)
 - **Bookings** (viewing / appointment windows) with status workflow
 - **Real-time chat** between users in the context of properties (Socket.IO)
-- **JWT-based authentication** with role-aware users (`SEEKER`, `OWNER`, `AGENT`, `ADMIN` in schema)
+- **JWT-based authentication** (ProperT-issued JWT) with role-aware users (`SEEKER`, `OWNER`, `AGENT`, `ADMIN` in schema)
 - **Media uploads** via S3-compatible storage (MinIO locally, AWS S3 in production patterns)
 
 **Primary users:** property seekers, owners/agents listing properties, and (by schema) admins.
@@ -57,7 +57,7 @@ There is **no root `package.json`**; install and run commands are per package.
 | **NestJS** | `^11.x` (`@nestjs/common` etc.) | Modular monolith |
 | **Prisma** | `^5.22.0` | ORM; DB table name `Listing` maps to model `Property` |
 | **PostgreSQL** | 16 (Docker image `postgis/postgis:16-3.4-alpine`) | **PostGIS** used for radius search |
-| **Auth** | `@nestjs/jwt`, `passport-jwt`, `passport-local`, `bcrypt` | Access + refresh patterns in `AuthModule` |
+| **Auth** | `@nestjs/jwt`, `passport-jwt`, `bcrypt` (+ optional **Auth0**) | ProperT-issued JWTs; optional Auth0-backed login + social providers |
 | **Realtime** | `@nestjs/platform-socket.io`, `socket.io` | Chat gateway |
 | **Object storage** | `@aws-sdk/client-s3`, presigner | MinIO/S3 for uploads |
 | **HTTP client** | `@nestjs/axios` | Geo (Nominatim) |
@@ -93,7 +93,7 @@ Geo queries use **raw SQL** with `ST_DWithin` / geography in `PropertiesService.
 
 ### Current state (implemented & working)
 
-- **Auth:** register/login, JWT, `/users/me`, refresh flow used by the frontend `AuthContext`.
+- **Auth:** register/login, ProperT JWT, `/users/me`, refresh flow used by the frontend `AuthContext`. Optional **Auth0** integration supports email/password (DB connection) and Google/Apple via `/authorize` + callback exchange.
 - **Properties:** CRUD patterns; public listing list/detail; geo radius search; **owner-scoped** create; `GET /properties/mine` for authenticated owner listings.
 - **Security fix (recent):** `PATCH` / `DELETE` on listings require **JWT** and **owner** match (see `PropertiesService.assertOwner`).
 - **Bookings & availability** modules exist with services and controllers.
@@ -139,7 +139,7 @@ ProperT/
 │   ├── src/
 │   │   ├── main.ts           ← Bootstrap, Swagger, CORS, helmet
 │   │   ├── app.module.ts     ← Feature modules, Joi env validation
-│   │   ├── auth/             ← Local + JWT strategies, guards
+│   │   ├── auth/             ← JWT guard + Auth0-backed login (optional)
 │   │   ├── users/
 │   │   ├── properties/       ← Listings API + geo search
 │   │   ├── bookings/
@@ -155,6 +155,7 @@ ProperT/
     │   │   ├── page.tsx      ← Home
     │   │   ├── search/
     │   │   ├── auth/
+    │   │   │   ├── callback/ ← Auth0 OAuth callback (code → API exchange)
     │   │   ├── dashboard/
     │   │   ├── chat/
     │   │   └── properties/   ← [id] detail, create wizard
@@ -278,6 +279,33 @@ AWS_REGION=us-east-1
 ```
 
 `JWT_SECRET` is **validated at startup** (minimum length 16). The API will not boot without it.
+
+#### Auth0 (optional)
+
+When `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `AUTH0_CLIENT_SECRET` are set in `backend/.env`, the backend uses Auth0 for:
+
+- **Manual login** (`POST /auth/login`): Auth0 DB connection via password-realm grant.
+- **Manual signup** (`POST /auth/register`): Auth0 `/dbconnections/signup`.
+- **Google/Apple**: frontend redirects to Auth0 `/authorize` (connection = `google-oauth2` or `apple`), then `frontend/src/app/auth/callback` exchanges the code via `POST /auth/oauth/exchange` to receive a ProperT JWT.
+
+Backend env (example):
+
+```env
+AUTH0_DOMAIN=your-tenant.auth0.com
+AUTH0_CLIENT_ID=your-client-id
+AUTH0_CLIENT_SECRET=your-client-secret
+# Optional
+AUTH0_AUDIENCE=
+AUTH0_DB_CONNECTION=Username-Password-Authentication
+```
+
+Frontend env (`frontend/.env.local`):
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:4000
+NEXT_PUBLIC_AUTH0_DOMAIN=your-tenant.auth0.com
+NEXT_PUBLIC_AUTH0_CLIENT_ID=your-client-id
+```
 
 Apply migrations and generate the Prisma client:
 

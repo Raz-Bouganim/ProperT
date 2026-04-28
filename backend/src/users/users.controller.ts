@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -15,8 +26,12 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  getMe(@Request() req: any) {
-    return this.usersService.findOne(req.user.userId);
+  async getMe(@Request() req: { user: { userId: string } }) {
+    const user = await this.usersService.findOnePublic(req.user.userId);
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return user;
   }
 
   @Get()
