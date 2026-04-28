@@ -14,6 +14,7 @@ export interface PropertyCardProps {
     baths: number;
     sqft: number;
     image: string;
+    detailsHref?: string;
     isLoading?: boolean;
     isFeatured?: boolean;
     type?: string;
@@ -34,6 +35,7 @@ export function PropertyCard({
     baths,
     sqft,
     image,
+    detailsHref,
     isLoading,
     isFeatured,
     type = "New Construction",
@@ -73,7 +75,7 @@ export function PropertyCard({
 
     const isRent = status?.toLowerCase().includes("rent") || status === "FOR_RENT";
     const Wrapper = (preview ? 'div' : Link) as any;
-    const wrapperProps = preview ? {} : { href: `/properties/${id}` };
+    const wrapperProps = preview ? {} : { href: (detailsHref ?? `/properties/${id}`) };
 
     return (
         <Wrapper

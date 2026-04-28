@@ -13,13 +13,23 @@ interface MapProps {
     className?: string;
     onLocationSelect?: (lat: number, lng: number) => void;
     isInteractive?: boolean;
+    /**
+     * Allows users to pan/zoom the map without enabling "pick a location" behavior.
+     * Defaults to `isInteractive` to preserve existing behavior.
+     */
+    isNavigable?: boolean;
+    /**
+     * Controls whether markers react to clicks (e.g. open the floating card).
+     * Defaults to true to preserve search/map behavior.
+     */
+    allowMarkerClick?: boolean;
 }
 
 function ZoomControls() {
     const map = useMap();
 
     return (
-        <div className="absolute top-6 right-6 flex flex-col gap-2 z-[400] isolate">
+        <div className="absolute top-6 right-6 flex flex-col gap-2 z-10 isolate">
             <button
                 type="button"
                 onClick={() => map.zoomIn()}
@@ -70,8 +80,30 @@ function InvalidateMapSize() {
     return null;
 }
 
-export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13, hoveredListingId, className, onLocationSelect, isInteractive }: MapProps) {
+export default function Map({
+    listings,
+    center = [40.7128, -74.0060],
+    zoom = 13,
+    hoveredListingId,
+    className,
+    onLocationSelect,
+    isInteractive,
+    isNavigable: isNavigableProp,
+    allowMarkerClick: allowMarkerClickProp,
+}: MapProps) {
     const [selectedListing, setSelectedListing] = useState<any>(null);
+    const isNavigable = isNavigableProp ?? !!isInteractive;
+    const allowMarkerClick = allowMarkerClickProp ?? true;
+
+    const getCurrencySymbol = (currencyCode?: string) => {
+        const symbols: Record<string, string> = {
+            USD: "$",
+            EUR: "€",
+            GBP: "£",
+            ILS: "₪",
+        };
+        return symbols[String(currencyCode ?? "").toUpperCase()] || "$";
+    };
 
     // Center map on first listing if available
     const mapCenter = useMemo(() => {
@@ -108,17 +140,17 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
     };
 
     return (
-        <div className={cn("relative h-full w-full rounded-2xl overflow-hidden group", className)}>
+        <div className={cn("relative z-0 isolate h-full w-full rounded-2xl overflow-hidden group", className)}>
             <MapContainer
                 center={mapCenter}
                 zoom={zoom}
                 style={{ height: "100%", width: "100%" }}
-                scrollWheelZoom={isInteractive}
-                dragging={isInteractive}
-                doubleClickZoom={isInteractive}
-                touchZoom={isInteractive}
-                boxZoom={isInteractive}
-                keyboard={isInteractive}
+                scrollWheelZoom={isNavigable}
+                dragging={isNavigable}
+                doubleClickZoom={isNavigable}
+                touchZoom={isNavigable}
+                boxZoom={isNavigable}
+                keyboard={isNavigable}
                 zoomControl={false}
             >
                 <ChangeView center={mapCenter} zoom={zoom} />
@@ -128,7 +160,7 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
                     url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
                 />
-                {isInteractive && <ZoomControls />}
+                {isNavigable && <ZoomControls />}
                 {listings.map((listing) => (
                     listing.latitude && listing.longitude ? (
                         <Marker
@@ -136,16 +168,21 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
                             position={[listing.latitude, listing.longitude]}
                             icon={createCustomIcon(hoveredListingId === listing.id || selectedListing?.id === listing.id)}
                             draggable={isInteractive && listing.id === "preview"}
-                            eventHandlers={{
-                                click: () => setSelectedListing(listing),
-                                dragend: (e) => {
-                                    if (isInteractive && onLocationSelect) {
-                                        const marker = e.target;
-                                        const position = marker.getLatLng();
-                                        onLocationSelect(position.lat, position.lng);
+                            interactive={allowMarkerClick || (isInteractive && listing.id === "preview")}
+                            eventHandlers={
+                                allowMarkerClick || (isInteractive && listing.id === "preview")
+                                    ? {
+                                        click: allowMarkerClick ? () => setSelectedListing(listing) : undefined,
+                                        dragend: (e) => {
+                                            if (isInteractive && onLocationSelect) {
+                                                const marker = e.target;
+                                                const position = marker.getLatLng();
+                                                onLocationSelect(position.lat, position.lng);
+                                            }
+                                        }
                                     }
-                                }
-                            }}
+                                    : undefined
+                            }
                         />
                     ) : null
                 ))}
@@ -153,7 +190,7 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
 
             {/* Floating Property Card */}
             {selectedListing && selectedListing.id !== "preview" && (
-                <div className="absolute bottom-6 left-6 right-6 md:right-auto md:w-80 bg-white p-4 rounded-xl shadow-2xl z-[1000] animate-in slide-in-from-bottom-4 duration-300 border border-slate-100">
+                <div className="absolute bottom-6 left-6 right-6 md:right-auto md:w-80 bg-white p-4 rounded-xl shadow-2xl z-20 animate-in slide-in-from-bottom-4 duration-300 border border-slate-100">
                     <div className="flex gap-4">
                         <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-slate-100">
                             <img
@@ -166,7 +203,7 @@ export default function Map({ listings, center = [40.7128, -74.0060], zoom = 13,
                             <h3 className="font-bold text-slate-900 truncate">{selectedListing.title}</h3>
                             <p className="text-slate-500 text-sm truncate">{selectedListing.address}</p>
                             <div className="flex items-center justify-between mt-2">
-                                <span className="font-bold text-primary">${Number(selectedListing.price).toLocaleString()}</span>
+                                <span className="font-bold text-primary">{getCurrencySymbol(selectedListing.currency)}{Number(selectedListing.price).toLocaleString()}</span>
                                 <button
                                     type="button"
                                     className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 transition-colors cursor-pointer"
