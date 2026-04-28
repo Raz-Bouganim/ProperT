@@ -56,6 +56,13 @@ export class UsersService {
       if (byEmail.auth0Sub && byEmail.auth0Sub !== p.sub) {
         throw new ConflictException('This email is linked to a different account.');
       }
+      // Prevent account takeover via unverified email coming from an Auth0 profile.
+      // Only link an existing ProperT account by email when Auth0 asserts the email is verified.
+      if (!byEmail.auth0Sub && p.email_verified !== true) {
+        throw new ConflictException(
+          'This email already exists. Please verify your email with the provider or sign in with your password.',
+        );
+      }
       return this.prisma.user.update({
         where: { id: byEmail.id },
         data: { auth0Sub: p.sub },
