@@ -27,6 +27,12 @@ import { GeoModule } from './geo/geo.module';
         AWS_SECRET_ACCESS_KEY: Joi.string().optional(),
         S3_BUCKET_NAME: Joi.string().optional(),
         AWS_REGION: Joi.string().optional(),
+        // Auth0 (optional — when all three are set, login/register use Auth0; otherwise legacy bcrypt)
+        AUTH0_DOMAIN: Joi.string().optional(),
+        AUTH0_CLIENT_ID: Joi.string().optional(),
+        AUTH0_CLIENT_SECRET: Joi.string().optional(),
+        AUTH0_AUDIENCE: Joi.string().optional(),
+        AUTH0_DB_CONNECTION: Joi.string().optional(),
       }),
     }),
     PrismaModule,

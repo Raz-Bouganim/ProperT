@@ -39,7 +39,10 @@ enum PropertyStatus {
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
-  password  String
+  /// Null when the account is provisioned via Auth0 (social or DB connection) only.
+  password  String?
+  /// Auth0 user id (`sub` from /userinfo), stable across logins.
+  auth0Sub  String?  @unique
 
   firstName String
   lastName  String

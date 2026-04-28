@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import api from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { startAuth0SocialLogin } from '@/lib/auth0';
 
 type AuthMode = 'login' | 'register';
 
@@ -94,6 +95,12 @@ function AuthPageContent() {
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSocial = (connection: 'google-oauth2' | 'apple') => {
+        if (!startAuth0SocialLogin(connection, redirectUrl)) {
+            toast.error('Social sign-in is not configured.');
+        }
     };
 
     return (
@@ -259,7 +266,11 @@ function AuthPageContent() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <button className="flex items-center justify-center gap-2 h-12 border border-[#dcdfe5] rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm text-[#111318] cursor-pointer">
+                        <button
+                            type="button"
+                            onClick={() => handleSocial('google-oauth2')}
+                            className="flex items-center justify-center gap-2 h-12 border border-[#dcdfe5] rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm text-[#111318] cursor-pointer"
+                        >
                             <svg className="h-5 w-5" viewBox="0 0 24 24">
                                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -268,7 +279,11 @@ function AuthPageContent() {
                             </svg>
                             Google
                         </button>
-                        <button className="flex items-center justify-center gap-2 h-12 border border-[#dcdfe5] rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm text-[#111318] cursor-pointer">
+                        <button
+                            type="button"
+                            onClick={() => handleSocial('apple')}
+                            className="flex items-center justify-center gap-2 h-12 border border-[#dcdfe5] rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm text-[#111318] cursor-pointer"
+                        >
                             <svg className="h-5 w-5 fill-current" viewBox="0 0 384 512">
                                 <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 21.8-88.5 21.8-11.4 0-51.1-20.8-83.6-20.1-42.9.6-82.7 25-104.7 63.3-44.9 77.7-11.5 191.8 32 254.8 21.3 30.7 46.7 65 80.3 63.7 32-1.3 44-20.6 82.5-20.6 38.4 0 49.3 20.6 82.5 19.9 34.1-1.4 56.4-30.8 77.5-61.7 24.3-35.4 34.3-69.8 34.7-71.5-1-.4-66.7-25.6-67-101.9zm-41.2-184c15.8-19.2 26.5-45.8 23.6-72.5-23 .9-50.8 15.3-67.2 34.5-14.8 17.2-27.7 44.4-24.2 70.4 25.7 2 52-13.2 67.8-32.4z" />
                             </svg>
