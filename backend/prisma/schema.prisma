@@ -72,10 +72,10 @@ model User {
 
   properties       Property[]
   bookings         Booking[]
-  sentMessages     Message[]
-  chats            UserConversation[]
-  seekerConversations Conversation[] @relation("ConversationSeeker")
-  ownerConversations  Conversation[] @relation("ConversationOwner")
+  sentMessages              Message[]
+  conversationParticipants  ConversationParticipant[]
+  seekerConversations       Conversation[] @relation("ConversationSeeker")
+  ownerConversations        Conversation[] @relation("ConversationOwner")
 }
 
 model Property {
@@ -202,49 +202,57 @@ model Booking {
 }
 
 model Conversation {
-  id         String    @id @default(uuid())
+  id         String @id @default(uuid())
 
   propertyId String   @map("property_id")
-  property   Property @relation(fields: [propertyId], references: [id])
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
 
-  seekerId   String   @map("seeker_id")
-  seeker     User     @relation("ConversationSeeker", fields: [seekerId], references: [id])
+  seekerId String @map("seeker_id")
+  seeker   User   @relation("ConversationSeeker", fields: [seekerId], references: [id])
 
-  ownerId    String   @map("owner_id")
-  owner      User     @relation("ConversationOwner", fields: [ownerId], references: [id])
+  ownerId String @map("owner_id")
+  owner   User   @relation("ConversationOwner", fields: [ownerId], references: [id])
 
-  participants UserConversation[]
+  /// Latest message time for inbox ordering (denormalized).
+  lastMessageAt      DateTime? @map("last_message_at")
+  /// Truncated snippet for conversation list (denormalized).
+  lastMessagePreview String?   @map("last_message_preview") @db.VarChar(512)
+
+  participants ConversationParticipant[]
   messages     Message[]
 
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([propertyId, seekerId, ownerId])
   @@index([propertyId])
-  @@map("Conversation")
+  @@map("conversations")
 }
 
-model UserConversation {
-  userId         String @map("user_id")
-  user           User   @relation(fields: [userId], references: [id])
+model ConversationParticipant {
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
 
   conversationId String       @map("conversation_id")
   conversation   Conversation @relation(fields: [conversationId], references: [id])
 
-  lastReadMessageId String?  @map("last_read_message_id")
-  lastReadMessage   Message? @relation("LastRead", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+  lastReadMessageId String?   @map("last_read_message_id")
+  lastReadMessage   Message?  @relation("LastRead", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
   lastReadAt        DateTime? @map("last_read_at")
+
+  /// Null = visible in main inbox; set to hide without deleting history.
+  archivedAt DateTime? @map("archived_at")
 
   @@id([userId, conversationId])
   @@index([conversationId])
-  @@map("UserConversation")
+  @@map("conversation_participants")
 }
 
 model Message {
-  id             String    @id @default(uuid())
-  content        String?
-  mediaUrl       String?   @db.VarChar(2048) @map("media_url")
-  mediaType      MediaType? @map("media_type")
+  id        String  @id @default(uuid())
+  content   String?
+  mediaUrl  String?   @db.VarChar(2048) @map("media_url")
+  mediaType MediaType? @map("media_type")
 
   conversationId String       @map("conversation_id")
   conversation   Conversation @relation(fields: [conversationId], references: [id])
@@ -252,10 +260,17 @@ model Message {
   senderId String @map("sender_id")
   sender   User   @relation(fields: [senderId], references: [id])
 
-  readPointers UserConversation[] @relation("LastRead")
+  editedAt DateTime? @map("edited_at")
+
+  replyToMessageId String?  @map("reply_to_message_id")
+  replyToMessage   Message? @relation("MessageReplyThread", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies          Message[] @relation("MessageReplyThread")
+
+  readPointers ConversationParticipant[] @relation("LastRead")
 
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([conversationId, createdAt])
-  @@map("Message")
+  @@index([replyToMessageId])
+  @@map("messages")
 }
