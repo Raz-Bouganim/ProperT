@@ -1,26 +1,22 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotImplementedException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { User } from '@prisma/client';
 import type { Auth0UserProfile } from '../auth/auth0.service';
+import { resolveAvatarUrl } from './user-avatar.util';
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) { }
 
-  async create(createUserDto: CreateUserDto) {
-    return this.prisma.user.create({
-      data: {
-        ...createUserDto,
-        email: createUserDto.email.toLowerCase(),
-      },
-    });
+  // Local-password registration is replaced by Auth0 in Phase 2.
+  async create(_createUserDto: CreateUserDto): Promise<User> {
+    throw new NotImplementedException('User creation must go through the Auth0 OAuth flow.');
   }
 
   toPublic(user: User) {
-    const { password: _password, ...rest } = user;
-    return rest;
+    return user;
   }
 
   async findOnePublic(id: string) {
@@ -40,6 +36,13 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
   }
 
+  private namesFromAuth0Profile(p: Auth0UserProfile): { firstName: string; lastName: string } {
+    const firstName = p.given_name || p.name?.split(/\s+/)[0] || 'User';
+    const lastName =
+      p.family_name || (p.name?.includes(' ') ? p.name.split(/\s+/).slice(1).join(' ') : '') || 'User';
+    return { firstName, lastName };
+  }
+
   async findOrCreateFromAuth0Profile(p: Auth0UserProfile) {
     if (!p.email) {
       throw new BadRequestException(
@@ -47,37 +50,29 @@ export class UsersService {
       );
     }
     const email = p.email.toLowerCase();
-    const bySub = await this.prisma.user.findUnique({ where: { auth0Sub: p.sub } });
+    const bySub = await this.prisma.user.findUnique({ where: { externalId: p.sub } });
     if (bySub) {
       return bySub;
     }
     const byEmail = await this.findByEmail(email);
     if (byEmail) {
-      if (byEmail.auth0Sub && byEmail.auth0Sub !== p.sub) {
-        throw new ConflictException('This email is linked to a different account.');
+      if (byEmail.externalId !== p.sub) {
+        return this.prisma.user.update({
+          where: { id: byEmail.id },
+          data: { externalId: p.sub },
+        });
       }
-      // Prevent account takeover via unverified email coming from an Auth0 profile.
-      // Only link an existing ProperT account by email when Auth0 asserts the email is verified.
-      if (!byEmail.auth0Sub && p.email_verified !== true) {
-        throw new ConflictException(
-          'This email already exists. Please verify your email with the provider or sign in with your password.',
-        );
-      }
-      return this.prisma.user.update({
-        where: { id: byEmail.id },
-        data: { auth0Sub: p.sub },
-      });
+      return byEmail;
     }
-    const firstName = p.given_name || p.name?.split(/\s+/)[0] || 'User';
-    const lastName =
-      p.family_name || (p.name?.includes(' ') ? p.name.split(/\s+/).slice(1).join(' ') : '') || 'User';
+    const { firstName, lastName } = this.namesFromAuth0Profile(p);
+    const avatar = resolveAvatarUrl(p.picture, firstName, lastName);
     return this.prisma.user.create({
       data: {
         email,
-        auth0Sub: p.sub,
+        externalId: p.sub,
         firstName,
         lastName,
-        password: null,
+        avatar,
       },
     });
   }

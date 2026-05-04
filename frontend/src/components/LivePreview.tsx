@@ -29,6 +29,7 @@ interface LivePreviewProps {
         longitude?: number;
         leaseDuration?: string;
         currency?: string;
+        propertyType?: string;
     };
     className?: string;
 }
@@ -46,7 +47,8 @@ export function LivePreview({ data, className }: LivePreviewProps) {
         latitude,
         longitude,
         leaseDuration,
-        currency = "USD"
+        currency = "USD",
+        propertyType,
     } = data;
 
     const formattedPrice = price ? price.toLocaleString() : "0";
@@ -76,6 +78,7 @@ export function LivePreview({ data, className }: LivePreviewProps) {
                 type="Preview"
                 leaseDuration={leaseDuration}
                 currency={currency}
+                hideBedBath={propertyType === "OFFICE"}
             />
 
             {/* Map Placeholder Card */}

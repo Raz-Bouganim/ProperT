@@ -23,6 +23,10 @@ export interface PropertyCardProps {
     onMouseLeave?: () => void;
     preview?: boolean;
     leaseDuration?: string;
+    /** Preferred over `leaseDuration` when provided by the API */
+    leaseDurationLabel?: string;
+    /** Hide bedroom / bathroom row (e.g. office listings). */
+    hideBedBath?: boolean;
     currency?: string;
 }
 
@@ -44,6 +48,8 @@ export function PropertyCard({
     onMouseLeave,
     preview = false,
     leaseDuration,
+    leaseDurationLabel,
+    hideBedBath = false,
     currency = "USD",
 }: PropertyCardProps) {
     const getCurrencySymbol = (currencyCode: string) => {
@@ -117,8 +123,10 @@ export function PropertyCard({
                         <h3 className="text-2xl font-bold text-primary">
                             {getCurrencySymbol(currency)}{price.toLocaleString()}{isRent ? "/mo" : ""}
                         </h3>
-                        {isRent && leaseDuration && (
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{leaseDuration}</span>
+                        {isRent && (leaseDurationLabel || leaseDuration) && (
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                {leaseDurationLabel ?? leaseDuration}
+                            </span>
                         )}
                     </div>
                 </div>
@@ -131,16 +139,20 @@ export function PropertyCard({
                 </p>
 
                 <div className="flex items-center gap-4 mt-5 pt-5 border-t border-slate-100">
-                    <div className="flex items-center gap-1.5">
-                        <Bed className="w-5 h-5 text-slate-400" />
-                        <span className="text-sm font-bold">{beds}</span>
-                        <span className="text-[10px] text-slate-500 uppercase font-medium">Beds</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <Bath className="w-5 h-5 text-slate-400" />
-                        <span className="text-sm font-bold">{baths}</span>
-                        <span className="text-[10px] text-slate-500 uppercase font-medium">Baths</span>
-                    </div>
+                    {!hideBedBath && (
+                        <>
+                            <div className="flex items-center gap-1.5">
+                                <Bed className="w-5 h-5 text-slate-400" />
+                                <span className="text-sm font-bold">{beds}</span>
+                                <span className="text-[10px] text-slate-500 uppercase font-medium">Beds</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <Bath className="w-5 h-5 text-slate-400" />
+                                <span className="text-sm font-bold">{baths}</span>
+                                <span className="text-[10px] text-slate-500 uppercase font-medium">Baths</span>
+                            </div>
+                        </>
+                    )}
                     <div className="flex items-center gap-1.5">
                         <Square className="w-4 h-4 text-slate-400" />
                         <span className="text-sm font-bold">{sqft.toLocaleString()}</span>

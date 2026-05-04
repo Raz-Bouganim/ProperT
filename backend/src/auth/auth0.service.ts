@@ -16,6 +16,8 @@ export type Auth0UserProfile = {
   given_name?: string;
   family_name?: string;
   name?: string;
+  /** Profile picture URL from `/userinfo` (when scope includes `profile`). */
+  picture?: string;
 };
 
 @Injectable()

@@ -29,7 +29,8 @@ export class ChatController {
     ) {
         return this.chatService.getOrCreateConversation(
             body.propertyId,
-            [req.user.userId, body.ownerId]
+            req.user.userId,
+            body.ownerId
         );
     }
 }

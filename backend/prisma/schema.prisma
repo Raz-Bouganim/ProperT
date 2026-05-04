@@ -7,18 +7,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Enums
-enum UserRole {
-  SEEKER
-  OWNER
-  AGENT
-  ADMIN
-}
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum PropertyType {
   APARTMENT
   HOUSE
   OFFICE
+}
+
+enum PropertyStatus {
+  DRAFT
+  FOR_SALE
+  FOR_RENT
+  SOLD
+  @@map("ListingStatus")
 }
 
 enum BookingStatus {
@@ -28,166 +30,224 @@ enum BookingStatus {
   CANCELLED
 }
 
-enum PropertyStatus {
-  FOR_SALE
-  FOR_RENT
-
-  @@map("ListingStatus")
+enum AmenityType {
+  SWIMMING_POOL
+  GYM
+  PARKING
+  ELEVATOR
+  BALCONY
+  AIR_CONDITIONING
+  GARDEN
+  FIREPLACE
+  PET_FRIENDLY
+  FURNISHED
+  WASHER_DRYER
+  DISHWASHER
 }
 
-// Models
+enum MediaType {
+  IMAGE
+  VIDEO
+  FILE
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  /// Null when the account is provisioned via Auth0 (social or DB connection) only.
-  password  String?
-  /// Auth0 user id (`sub` from /userinfo), stable across logins.
-  auth0Sub  String?  @unique
+  id               String    @id @default(uuid())
+  email            String    @unique @db.VarChar(254)
+  /// Auth0 subject claim (`sub`) — required
+  externalId       String    @unique @map("external_id")
 
-  firstName String
-  lastName  String
-  avatar    String?
+  firstName        String    @db.VarChar(100) @map("first_name")
+  lastName         String    @db.VarChar(100) @map("last_name")
+  /// Profile image URL (Auth0 `picture` or generated initials fallback). Required; not overwritten on later logins once set.
+  avatar           String    @db.VarChar(2048)
 
-  role      UserRole @default(SEEKER)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  // Relations
-  properties Property[]
-  bookings   Booking[]
-
-  sentMessages Message[]
-  chats        UserConversation[]
+  properties       Property[]
+  bookings         Booking[]
+  sentMessages     Message[]
+  chats            UserConversation[]
+  seekerConversations Conversation[] @relation("ConversationSeeker")
+  ownerConversations  Conversation[] @relation("ConversationOwner")
 }
 
 model Property {
-  id          String   @id @default(uuid())
-  title       String
+  id          String         @id @default(uuid())
+  /// URL-safe unique segment for public links (e.g. /properties/gorgeous-loft-brooklyn-a3f2c1)
+  slug        String         @unique @db.VarChar(200)
+  title       String         @db.VarChar(255)
   description String
-  status      PropertyStatus @default(FOR_SALE)
-  price       Decimal  @db.Decimal(12, 2)
-  sqft        Float    @map("size")
-  negotiable  Boolean  @default(true)
-  bedrooms    Float    @default(0)
-  bathrooms   Float    @default(0)
-
+  status      PropertyStatus @default(DRAFT)
+  /// When status is DRAFT: whether the user intends to publish as sale or rent (drives publish action).
+  draftTargetStatus PropertyStatus? @map("draft_target_status")
+  price       Decimal        @db.Decimal(12, 2)
+  sqft        Float
+  negotiable  Boolean        @default(true)
+  bedrooms    Float          @default(0)
+  bathrooms   Float          @default(0)
   type        PropertyType
 
-  // Address & Location
-  address     String
-  country     String   @default("Unknown")
-  city        String   @default("Unknown")
-  state       String?
-  zipCode     String?
-  street      String?
-  houseNumber String?
+  /// Structured address: city-line string plus city and country (no separate state or zip columns)
+  address     String         @db.VarChar(500)
+  city        String         @db.VarChar(100)
+  country     String         @db.VarChar(100)
+
   latitude    Float?
   longitude   Float?
 
-  // Media & Features
-  images      String[] @default([]) // Postgres array
-  features    String[] @default([]) // Postgres array
-  videoUrl    String?
-  virtualTourUrl String?
+  /// External embed (Matterport, etc.) — no self-hosted 360 video
+  virtualTourUrl String?   @db.VarChar(2048) @map("virtual_tour_url")
+  floorPlanUrl   String?   @db.VarChar(2048) @map("floor_plan_url")
 
-  // Metrics
-  views       Int      @default(0)
+  currency         String   @default("USD") @db.VarChar(3)
+  yearBuilt            Int?      @map("year_built")
+  views                Int       @default(0)
+  availableFrom        DateTime? @map("available_from")
+  leaseDurationMonths  Int?      @map("lease_duration_months")
 
-  // Additional Details
-  yearBuilt   Int?
-  taxAnnual   Decimal? @db.Decimal(10, 2)
-  hoaMonthly  Decimal? @db.Decimal(10, 2)
-  currency    String   @default("USD")
-  availableDate String?
-  leaseDuration String?
-  floorPlanUrl String?
-  customFees  Json?    // Array of { name: string, amount: number }
+  /// Client-reported time the user opened the list-property flow (ISO). Distinct from `createdAt` (row inserted at submit).
+  flowStartedAt DateTime? @map("flow_started_at")
 
-  // Relations
-  ownerId     String
+  ownerId     String   @map("owner_id")
   owner       User     @relation(fields: [ownerId], references: [id])
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
 
-  bookings    Booking[]
+  images        PropertyImage[]
+  features      PropertyFeature[]
+  bookings      Booking[]
   availabilities Availability[]
   conversations Conversation[]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 
   @@map("Listing")
   @@index([price])
   @@index([ownerId])
 }
 
-model Availability {
+model PropertyImage {
   id        String   @id @default(uuid())
+  url       String   @db.VarChar(2048)
+  key       String   @db.VarChar(1024)
+  altText   String   @db.VarChar(255) @map("alt_text")
+  isPrimary Boolean  @default(false) @map("is_primary")
+  sortOrder Int      @default(0) @map("sort_order")
 
-  dayOfWeek Int?      // 0-6 (Sun-Sat) - Optional if date is set
-  date      DateTime? // Specific date
-  startTime String   // "09:00"
-  endTime   String   // "17:00"
+  propertyId String   @map("property_id")
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
-  propertyId String   @map("listingId")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([propertyId, sortOrder])
+  @@index([propertyId, isPrimary])
+  @@map("PropertyImage")
+}
+
+model PropertyFeature {
+  propertyId String      @map("property_id")
+  property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  feature    AmenityType
+
+  @@id([propertyId, feature])
+  @@index([feature])
+  @@map("PropertyFeature")
+}
+
+model Availability {
+  id        String    @id @default(uuid())
+  dayOfWeek Int?      @map("day_of_week")
+  date      DateTime?
+  startTime String    @map("start_time")
+  endTime   String    @map("end_time")
+
+  propertyId String   @map("property_id")
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId])
+  @@map("Availability")
 }
 
 model Booking {
-  id        String   @id @default(uuid())
-
-  startTime DateTime
-  endTime   DateTime
+  id        String        @id @default(uuid())
+  startTime DateTime      @map("start_time")
+  endTime   DateTime      @map("end_time")
   status    BookingStatus @default(PENDING)
   notes     String?
 
-  propertyId String  @map("listingId")
-  property   Property @relation(fields: [propertyId], references: [id])
+  propertyId String   @map("property_id")
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
-  seekerId  String
-  seeker    User     @relation(fields: [seekerId], references: [id])
+  seekerId  String   @map("seeker_id")
+  seeker    User     @relation(fields: [seekerId], references: [id], onDelete: Restrict)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@index([propertyId])
-  @@index([seekerId])
+  @@index([propertyId, startTime])
+  @@index([seekerId, status])
+  @@map("Booking")
 }
 
-// Messaging System
-
 model Conversation {
-  id        String   @id @default(uuid())
+  id         String    @id @default(uuid())
 
-  propertyId String?  @map("listingId")
-  property   Property? @relation(fields: [propertyId], references: [id])
+  propertyId String   @map("property_id")
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  seekerId   String   @map("seeker_id")
+  seeker     User     @relation("ConversationSeeker", fields: [seekerId], references: [id])
+
+  ownerId    String   @map("owner_id")
+  owner      User     @relation("ConversationOwner", fields: [ownerId], references: [id])
 
   participants UserConversation[]
   messages     Message[]
 
-  updatedAt    DateTime @updatedAt
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([propertyId, seekerId, ownerId])
+  @@index([propertyId])
+  @@map("Conversation")
 }
 
 model UserConversation {
-  userId         String
-  user           User         @relation(fields: [userId], references: [id])
-  conversationId String
+  userId         String @map("user_id")
+  user           User   @relation(fields: [userId], references: [id])
+
+  conversationId String       @map("conversation_id")
   conversation   Conversation @relation(fields: [conversationId], references: [id])
 
+  lastReadMessageId String?  @map("last_read_message_id")
+  lastReadMessage   Message? @relation("LastRead", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+  lastReadAt        DateTime? @map("last_read_at")
+
   @@id([userId, conversationId])
+  @@index([conversationId])
+  @@map("UserConversation")
 }
 
 model Message {
-  id             String   @id @default(uuid())
-  content        String
-  read           Boolean  @default(false)
+  id             String    @id @default(uuid())
+  content        String?
+  mediaUrl       String?   @db.VarChar(2048) @map("media_url")
+  mediaType      MediaType? @map("media_type")
 
-  conversationId String
+  conversationId String       @map("conversation_id")
   conversation   Conversation @relation(fields: [conversationId], references: [id])
 
-  senderId       String
-  sender         User     @relation(fields: [senderId], references: [id])
+  senderId String @map("sender_id")
+  sender   User   @relation(fields: [senderId], references: [id])
 
-  createdAt      DateTime @default(now())
+  readPointers UserConversation[] @relation("LastRead")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@map("Message")
 }

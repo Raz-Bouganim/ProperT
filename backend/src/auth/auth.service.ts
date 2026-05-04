@@ -40,14 +40,8 @@ export class AuthService {
     return this.issueAppTokens(user);
   }
 
-  async validateUser(email: string, pass: string): Promise<User | null> {
-    const user = await this.usersService.findByEmail(email);
-    if (!user?.password) {
-      return null;
-    }
-    if (await bcrypt.compare(pass, user.password)) {
-      return user;
-    }
+  async validateUser(_email: string, _pass: string): Promise<User | null> {
+    // Local password auth removed — all auth goes through Auth0 (Phase 2 cleans this up fully).
     return null;
   }
 

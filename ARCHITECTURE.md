@@ -700,6 +700,12 @@ erDiagram
     CONVERSATION     ||--o{ MESSAGE           : "contains"
 ```
 
+### 6.4 — Migration strategy
+
+The transition to this architecture is executed via a **hard database reset** (`npx prisma migrate reset`). **No legacy data is migrated.** Existing users, properties, bookings, messages, and media metadata are discarded by design.
+
+Engineering delivers **`schema.prisma` matching §6.1**, a **single fresh initial migration** (including the §6.2 raw SQL for extensions, exclusion constraints, generated `location` and `search_vector` columns, and the remaining integrity rules), then resets the database so the live schema is that **one baseline**. Further schema changes ship as new migrations from that baseline—there are no multi-step data backfills, pre-flight row counts, or image row copying scripts tied to the MVP cutover.
+
 ---
 
 ## 7. Feature Flow Diagrams

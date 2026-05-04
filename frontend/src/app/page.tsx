@@ -225,19 +225,27 @@ export default function Home() {
                 <PropertyCard
                   key={listing.id || index}
                   id={listing.id || ""}
-                  detailsHref={`/properties/${listing.id || ""}?from=home&returnTo=${encodeURIComponent("/")}`}
+                  detailsHref={`/properties/${listing.slug || listing.id || ""}?from=home&returnTo=${encodeURIComponent("/")}`}
                   title={listing.title || "Premium Listing"}
                   address={listing.address || "Location pending"}
                   price={Number(listing.price) || 0}
                   beds={listing.bedrooms || 2}
                   baths={listing.bathrooms || 1}
-                  sqft={listing.sqft || 0}
-                  image={listing.images?.[0] || fallbackImages[index % 3]}
+                  sqft={listing.sqft ?? listing.size ?? 0}
+                  image={
+                    listing.coverImageUrl ||
+                    (typeof listing.images?.[0] === "object" && listing.images[0]?.url
+                      ? listing.images[0].url
+                      : listing.images?.[0]) ||
+                    fallbackImages[index % 3]
+                  }
                   isFeatured
                   type={listing.type || "For Sale"}
                   status={listing.status}
                   currency={listing.currency || "USD"}
                   leaseDuration={listing.leaseDuration}
+                  leaseDurationLabel={listing.leaseDurationLabel}
+                  hideBedBath={listing.type === "OFFICE"}
                 />
               ))
             ) : (

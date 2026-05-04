@@ -8,16 +8,16 @@
 
 ## How to use it
 
-1. Open **[Work queue](#work-queue)** and do the **first unchecked** item you can start (respect **Depends on**).
-2. When it is merged: change `[ ]` → `[x]`, bump **[Last reviewed](#last-reviewed)**.
-3. Need column names or behavior? Read **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — do not duplicate the spec here.
+1. Execute **[Work queue](#work-queue)** in **phase order** (Phase 1 → 2 → 3 → 4). Do not start a later phase until prior blockers are cleared.
+2. When a checkbox is merged to `main`: `[ ]` → `[x]`, bump **[Last reviewed](#last-reviewed)**.
+3. Column names, constraints, and API shapes: read **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — do not duplicate the spec here.
 
 ---
 
 ## Last reviewed
 
-- **Date:** 2026-04-29  
-- **Git (short):** `8c5d407`  
+- **Date:** 2026-05-04  
+- **Git (short):** `82e4fce`  
 
 ---
 
@@ -25,47 +25,57 @@
 
 | Area | Status |
 |------|--------|
-| Auth / JWT transport | In progress — Auth0 paths exist; Bearer + readable cookie vs ARCH HttpOnly |
-| Schema vs ARCH §6 | In progress — legacy `User`/`Property` shape; no exclusion / generated columns in migrations |
-| Bookings | Partial — app overlap check; no DB `btree_gist` / 409 |
-| Search | Partial — PostGIS radius; no single-query FTS + `q`, no Redis 60s cache |
-| Chat / WS | Partial — REST create; WS auth off; no Redis adapter; no `PATCH .../read` |
-| Media | Partial — presigned PUT; path `/media/presigned-url`; public bucket policy vs ARCH |
+| **Database / schema** | **Done** — single baseline migration `20260504000000_init`; schema locked to §6.1; §6.2 constraints applied |
+| Auth / JWT transport | In progress — move to Auth0-only + HttpOnly cookie (Phases 1–2) |
+| Bookings | Partial — app overlap check; DB exclusion + **409** in Phase 3 |
+| Search | Partial — radius only; single SQL + FTS + 60s Redis in Phase 3 |
+| Chat / WS | Partial — REST OK; cookie auth, no body `senderId`, `lastReadMessageId` in Phases 2–3 |
+| Media / listings UI | Partial — presign path/policy drift; Phase 4: `virtualTourUrl` input, forms, Canvas thumbnails |
 | Calendar / `.ics` | **N/A** — out of product scope ([`ARCHITECTURE.md`](ARCHITECTURE.md) §8, §10) |
-| Redis / `/health` / `/ready` | Not started in app — Redis only in `docker-compose.yml` |
+| Redis / `/health` / `/ready` | Partial in compose — wire for search cache, Socket.IO adapter, probes (Phase 3 + infra as needed) |
 
 ---
 
 ## Work queue
 
-Check **`[x]`** when the item is **done on `main`**. Order matters where **Depends on** is set.
+**Product decision:** The owner has authorized a **complete database wipe**. We **do not** preserve users, properties, or rows, and we **do not** author multi-step data migration scripts. The fastest path to the target model is **hard reset** after a clean Prisma baseline aligned with **`ARCHITECTURE.md` §6** (see also §6.4 — Migration strategy).
 
-- [ ] **1. Schema & Prisma toward ARCH §6.1–6.2** — `User.externalId` (vs `auth0Sub`), listings/images/features/messages as in spec, soft delete, enums (`DRAFT`/`SOLD`, etc.). Add raw SQL migrations for §6.2 (exclusion, generated `location` / `search_vector`, partial unique primary image, message XOR content/media, availability XOR). **Owner:** backend. **Depends on:** none (start here).
-- [ ] **2. Booking overlap in DB (ARCH D-4, NF-6)** — `btree_gist` + exclusion constraint; map violation → **409**; replace `any` body on `POST /bookings`. **Owner:** backend. **Depends on:** 1 (Booking table/columns match migration SQL).
-- [ ] **3. Auth0-only identity (ARCH F-5, D-1–D-2)** — Remove role enum from product path; no local passwords; JWT claims without roles. **Owner:** backend (+ data backfill). **Depends on:** 1 for column names.
-- [ ] **4. HttpOnly session cookie (ARCH §8, D-3)** — Issue JWT with `Set-Cookie`; validate from cookie on REST + Socket.IO; stop trusting body `senderId` on WS. **Owner:** backend + frontend.
-- [ ] **5. Redis + ops baseline (ARCH §9)** — `REDIS_URL`, `ioredis`, `@nestjs/throttler` + Redis store, `@socket.io/redis-adapter`, `GET /health` + `GET /ready` (DB + Redis). **Owner:** backend. **Depends on:** none for wiring (can parallel with 3–4 if teams split).
-- [ ] **6. Search: single SQL + cache (ARCH F-2, D-7–D-8)** — One query with geo + FTS + filters + pagination; Redis key = hash of params, TTL 60s; discovery excludes `DRAFT` / `SOLD` / `deleted_at` (ARCH §10). **Owner:** backend. **Depends on:** 1 (generated columns).
-- [ ] **7. Chat hardening (ARCH F-1, §7.2)** — WS JWT, `joinRoom` membership, `PATCH /chat/conversations/:id/read`, message media fields, cursor history. **Owner:** backend (+ frontend). **Depends on:** 1, 4, 5.
-- [ ] **8. Media module (ARCH D-6, §8)** — Align route with `POST /media/presign`, JWT on presign, presign size limits (D-6), private bucket + CDN story vs public read policy. **Owner:** backend / infra. **Depends on:** 4 (auth on route).
-- [ ] **9. Listings UX vs ARCH F-3–F-4** — Draft/publish, gallery + Canvas thumbnails, strip tax/HOA from MVP surfaces if schema lags. **Owner:** frontend + backend. **Depends on:** 1, 8.
-- [ ] **10. Hardening & scale** — Typed DTOs everywhere critical; owner projection on public property API; list pagination; atomic `views`; optional property-detail cache; structured logging; E2E for auth / search / booking / chat; CDN + CI/CD when ready. **Owner:** backend + frontend + infra. **Depends on:** prior items.
+Check **`[x]`** when the item is **done on `main`**.
+
+### Phase 1: The Hard Reset & Schema Lock (Priority 0)
+
+- [x] **Remove old migrations** — Delete every folder under `prisma/migrations` (keep the directory).
+- [x] **Lock `schema.prisma` to the target MVP** — Match **`ARCHITECTURE.md` §6.1**: Auth0-only `User` with required `externalId` (no `UserRole`, no local `password`); `Property` / `PropertyImage` / `PropertyFeature` / `Availability` / `Booking` / chat models as specified; required `address` / `city` / `country`; `virtualTourUrl`; soft delete and listing status enums (`DRAFT`, `SOLD`, etc.); no MVP-excluded financial/custom-fee fields where the spec omits them.
+- [x] **One initial migration** — `prisma/migrations/20260504000000_init/migration.sql` — single new migration directory.
+- [x] **Embed §6.2 SQL in that migration** — `CREATE EXTENSION IF NOT EXISTS btree_gist`; booking overlap **exclusion** constraint (using `tsrange` since Prisma maps `DateTime` to `TIMESTAMP` without timezone); PostGIS generated **`location`** on `"Listing"`; generated **`search_vector`** + GIN index; partial unique primary image; message content/media check; availability XOR; currency check.
+- [x] **Apply cleanly** — `npx prisma migrate reset --force` succeeded; Prisma Client generated; API boots against empty DB (`Nest application successfully started`).
+
+### Phase 2: Auth & Transport Security (Priority 1)
+
+- [ ] **ProperT JWT via `Set-Cookie`** — HttpOnly, Secure in production, SameSite appropriate for your domains; REST reads the session cookie (see **`ARCHITECTURE.md`** auth transport + §7.1).
+- [ ] **Remove legacy local auth** — Delete bcrypt paths, email/password registration/login, and any role-based JWT claims; **Auth0-only** exchange and user upsert by `sub` → `externalId`.
+- [ ] **Enforce Auth0-only flows** — No feature flags that re-enable local passwords; guards and DTOs assume external identity only.
+
+### Phase 3: Core Backend Features (Priority 2)
+
+- [ ] **Booking overlap at the database** — Rely on the exclusion constraint from Phase 1; map unique violation to **HTTP 409 Conflict**; remove redundant application-only racing logic where the DB is authoritative.
+- [ ] **Property search** — One parameterized SQL query: PostGIS radius + **`search_vector`** FTS + filters + pagination per **F-2 / D-7–D-8**; exclude `DRAFT`, `SOLD`, and soft-deleted rows from public discovery (**§10**).
+- [ ] **Search cache** — Redis key = stable hash of full query params, **TTL 60s**.
+- [ ] **Chat gateway** — Authenticate Socket.IO using the **same HttpOnly JWT** as REST; **derive sender from the socket session**, never from client-supplied `senderId` in the payload; verify `joinRoom` membership.
+- [ ] **`lastReadMessageId` / read receipts** — Implement **`PATCH /chat/conversations/:id/read`** (or equivalent per API contract) and persist on `UserConversation` per **F-1-5**.
+- [ ] **Realtime + ops (MVP)** — Redis adapter for Socket.IO where multi-instance; **`GET /health`** and **`GET /ready`** (DB + Redis) per **`ARCHITECTURE.md` §9**.
+
+### Phase 4: Frontend Alignment (Priority 3)
+
+- [ ] **Virtual tour** — Remove legacy multipart / large video upload UI; single **text input** for **`virtualTourUrl`** (e.g. Matterport embed URL) per **F-4** / §8.
+- [ ] **Listing forms** — Match the new schema: required **country** and **city**; remove surfaces for custom fees / tax / HOA if absent from the MVP model.
+- [ ] **Gallery** — Standard images only: presigned upload flow + **Canvas-generated thumbnails** before upload, aligned with **F-3–F-4** and **`PropertyImage`** (`sortOrder`, `isPrimary`).
 
 ---
 
-## Database migration order
+## Database: greenfield baseline (Phase 1 only)
 
-When applying **§6.2**-style changes, prefer this **dependency order** (Prisma `migration.sql` + raw blocks):
-
-1. **Booking integrity** — `btree_gist`; exclusion on `(property_id, tstzrange)` for active statuses; confirm FKs (`Booking` → `Property`, → `User`).
-2. **Authentication** — Every user has **`external_id`** (Auth0 `sub`) before NOT NULL; then drop legacy password if applicable.
-3. **Listing model** — Geography + `search_vector` generators, `virtual_tour_url`, soft delete, published timestamps (no listing tax/HOA per ARCH).
-4. **Property images** — `alt_text`, `created_at`, partial unique one primary per property.
-5. **Messaging** — Content/media check; `UserConversation` last-read columns; index `(conversation_id, created_at)`.
-6. **Availability** — XOR day vs date + valid `day_of_week`.
-
-**Pre-flight (before NOT NULL on `external_id`):**  
-`SELECT COUNT(*) FROM "User" WHERE external_id IS NULL` → must be **0**.
+There is **no** ordered “migrate production rows” checklist. After Phase 1, the database is defined entirely by **one** Prisma migration (Prisma DDL + §6.2 raw SQL). All environments that should match MVP run **`npx prisma migrate reset`** (or deploy that migration onto empty databases). Future schema work adds **new** migrations on top of this baseline—never revive deleted migration folders for the same environment.
 
 ---
 
@@ -90,9 +100,10 @@ Same as [`ARCHITECTURE.md`](ARCHITECTURE.md) §8 **Out of scope** and §10 (cale
 
 ## Risks (short)
 
-- **Race:** Booking overlap not serialized until item **2** is done.
-- **Security:** WS impersonation via `senderId`; chat GET routes may not verify membership; presign may be unauthenticated — treat until items **4**, **7**, **8**.
-- **Tests:** Few meaningful API tests; no E2E — add under item **10**.
+- **Until Phase 1 lands:** Code and DB still reflect the **legacy** model—treat any “align to ARCH” work as provisional until the baseline migration ships.
+- **Until Phase 3:** Booking races and weak search parity vs spec.
+- **Until Phases 2–3:** WS impersonation and missing read-receipt semantics if not gated in product.
+- **Tests:** Few meaningful API tests; no E2E — add as part of MVP hardening after core phases.
 
 ---
 

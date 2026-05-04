@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FormProvider } from "react-hook-form";
 import { useListingForm, ListingFormValues } from "../hooks/useListingForm";
 import { useMediaUpload } from "../hooks/useMediaUpload";
@@ -37,12 +37,23 @@ export function PropertyForm() {
         setImages
     } = useMediaUpload();
     const router = useRouter();
+    const flowStartedAtRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        const key = "propert_listing_flow_started_at";
+        let t = typeof window !== "undefined" ? sessionStorage.getItem(key) : null;
+        if (!t && typeof window !== "undefined") {
+            t = new Date().toISOString();
+            sessionStorage.setItem(key, t);
+        }
+        flowStartedAtRef.current = t;
+    }, []);
 
     useEffect(() => {
         window.scrollTo(0, 0);
     }, [currentStep]);
 
-    const { trigger, handleSubmit, watch } = form;
+    const { trigger, handleSubmit, watch, getValues } = form;
     const formValues = watch();
 
     // Real-time validation for button state (matching old behavior)
@@ -106,7 +117,82 @@ export function PropertyForm() {
         }
     };
 
+    const canSaveDraft =
+        currentStep === 4 &&
+        !!formValues.title?.trim() &&
+        Number(formValues.price) > 0 &&
+        Number(formValues.sqft) > 0;
+
+    const onSaveDraft = async () => {
+        const fields: (keyof ListingFormValues)[] = [
+            "title",
+            "description",
+            "transactionType",
+            "type",
+            "address",
+            "country",
+            "city",
+            "sqft",
+            "beds",
+            "baths",
+            "yearBuilt",
+            "price",
+            "currency",
+        ];
+        const ok = await trigger(fields as any);
+        if (!ok) {
+            toast.error("Please fix the highlighted fields before saving a draft.");
+            return;
+        }
+        try {
+            const values = getValues();
+            const imageUrls = images.length > 0 ? await uploadImages() : [];
+            const { sqft, beds, baths, transactionType, ...rest } = values;
+            const listingData = {
+                ...rest,
+                status: "DRAFT",
+                draftTargetStatus: transactionType,
+                sqft,
+                bedrooms: beds,
+                bathrooms: baths,
+                country: values.country || "Unknown",
+                city: values.city || "Unknown",
+                images: imageUrls,
+                features: values.features || [],
+                ...(flowStartedAtRef.current ? { flowStartedAt: flowStartedAtRef.current } : {}),
+            };
+
+            const { data } = await api.post("/properties", listingData);
+            try {
+                sessionStorage.removeItem("propert_listing_flow_started_at");
+            } catch {
+                /* ignore */
+            }
+            const hrefId = data.slug || data.id;
+            router.push(`/properties/${hrefId}`);
+            toast.success("Draft saved. Finish and publish anytime from your dashboard.");
+        } catch (error: any) {
+            console.error("Draft save failed", error);
+            const res = error.response;
+            const errData = res?.data;
+            const msg =
+                typeof errData?.message === "string"
+                    ? errData.message
+                    : Array.isArray(errData?.message)
+                      ? errData.message.join(", ")
+                      : "Could not save draft.";
+            toast.error(msg);
+        }
+    };
+
     const onSubmit = async (values: ListingFormValues) => {
+        if (values.transactionType === "FOR_RENT" && !values.availableDate?.trim()) {
+            toast.error("Rental listings need an available-from date.", {
+                description: "Pick a date in the Pricing step before publishing.",
+            });
+            return;
+        }
+
         if (images.length === 0) {
             toast.error("Upload at least one image");
             return;
@@ -127,10 +213,17 @@ export function PropertyForm() {
                 city: values.city || "Unknown",
                 images: imageUrls,
                 features: values.features || [],
+                ...(flowStartedAtRef.current ? { flowStartedAt: flowStartedAtRef.current } : {}),
             };
 
             const { data } = await api.post("/properties", listingData);
-            router.push(`/properties/${data.id}`);
+            try {
+                sessionStorage.removeItem("propert_listing_flow_started_at");
+            } catch {
+                /* ignore */
+            }
+            const hrefId = data.slug || data.id;
+            router.push(`/properties/${hrefId}`);
             toast.success("Property published successfully!");
         } catch (error: any) {
             console.error("Submission failed", error);
@@ -201,7 +294,8 @@ export function PropertyForm() {
                                             latitude: formValues.latitude ?? 0,
                                             longitude: formValues.longitude ?? 0,
                                             leaseDuration: formValues.leaseDuration,
-                                            currency: formValues.currency || "USD"
+                                            currency: formValues.currency || "USD",
+                                            propertyType: formValues.type,
                                         }}
                                     />
                                     <div className="mt-6 p-4 rounded-xl bg-slate-100 border border-slate-200 flex items-center gap-3 text-slate-500">
@@ -285,8 +379,8 @@ export function PropertyForm() {
                             })}
                         </div>
 
-                        {/* Next / Submit Button */}
-                        <div className="w-full md:w-auto flex justify-end">
+                        {/* Next / Submit / Draft */}
+                        <div className="w-full md:w-auto flex flex-col sm:flex-row justify-end gap-2">
                             {currentStep < 4 ? (
                                 <Button
                                     type="button"
@@ -302,33 +396,47 @@ export function PropertyForm() {
                                     Continue <ChevronRight className="w-4 h-4" />
                                 </Button>
                             ) : (
-                                <Button
-                                    type="button"
-                                    onClick={handleSubmit(onSubmit as any, (errors) => {
-                                        const missingFields = Object.keys(errors).join(", ");
-                                        toast.error("Please fill in all required fields", {
-                                            description: `Missing or invalid: ${missingFields}`
-                                        });
-                                        console.error("Form validation errors:", errors);
-                                    })}
-                                    disabled={isUploading || !isStepValid}
-                                    className={cn(
-                                        "w-full md:w-auto text-white text-sm font-bold px-6 py-2.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2",
-                                        (isUploading || !isStepValid)
-                                            ? "bg-slate-300 shadow-none cursor-not-allowed opacity-70"
-                                            : "bg-green-600 shadow-green-600/20 hover:bg-green-700 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-                                    )}
-                                >
-                                    {isUploading ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" /> Publishing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            Finish & Publish <Check className="w-4 h-4" />
-                                        </>
-                                    )}
-                                </Button>
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => void onSaveDraft()}
+                                        disabled={isUploading || !canSaveDraft}
+                                        className={cn(
+                                            "w-full sm:w-auto text-sm font-bold px-6 py-2.5 rounded-xl border-slate-300",
+                                            !canSaveDraft && "opacity-50 cursor-not-allowed",
+                                        )}
+                                    >
+                                        Save draft
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        onClick={handleSubmit(onSubmit as any, (errors) => {
+                                            const missingFields = Object.keys(errors).join(", ");
+                                            toast.error("Please fill in all required fields", {
+                                                description: `Missing or invalid: ${missingFields}`
+                                            });
+                                            console.error("Form validation errors:", errors);
+                                        })}
+                                        disabled={isUploading || !isStepValid}
+                                        className={cn(
+                                            "w-full sm:w-auto text-white text-sm font-bold px-6 py-2.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2",
+                                            (isUploading || !isStepValid)
+                                                ? "bg-slate-300 shadow-none cursor-not-allowed opacity-70"
+                                                : "bg-green-600 shadow-green-600/20 hover:bg-green-700 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                                        )}
+                                    >
+                                        {isUploading ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" /> Publishing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                Finish & Publish <Check className="w-4 h-4" />
+                                            </>
+                                        )}
+                                    </Button>
+                                </>
                             )}
                         </div>
                     </div>

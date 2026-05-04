@@ -9,6 +9,9 @@ export const AMENITIES = [
   { id: "air-conditioning", label: "Air Conditioning", icon: "ac_unit" },
   { id: "heating", label: "Central Heating", icon: "local_fire_department" },
   { id: "laundry", label: "Laundry Room", icon: "local_laundry_service" },
-  { id: "dishwasher", label: "Dishwasher", icon: "countertops" },
+  { id: "dishwasher", label: "Dishwasher", icon: "kitchen" },
   { id: "wifi", label: "WiFi Included", icon: "wifi" },
+  { id: "fireplace", label: "Fireplace", icon: "local_fireplace" },
+  { id: "pet-friendly", label: "Pet Friendly", icon: "pets" },
+  { id: "furnished", label: "Furnished", icon: "weekend" },
 ] as const;

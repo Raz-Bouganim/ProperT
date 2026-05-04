@@ -172,17 +172,25 @@ function SearchPageContent() {
                                     <PropertyCard
                                         key={property.id}
                                         id={property.id}
-                                        detailsHref={`/properties/${property.id}?from=search&returnTo=${encodeURIComponent(returnTo)}`}
+                                        detailsHref={`/properties/${property.slug || property.id}?from=search&returnTo=${encodeURIComponent(returnTo)}`}
                                         title={property.title || "Untitled Property"}
                                         address={property.address}
                                         price={Number(property.price)}
                                         beds={property.bedrooms || 0}
                                         baths={property.bathrooms || 0}
-                                        sqft={property.size}
+                                        sqft={property.sqft ?? property.size ?? 0}
                                         status={property.status}
-                                        image={property.images[0] || "/placeholder.svg"}
+                                        image={
+                                            property.coverImageUrl ||
+                                            (typeof property.images?.[0] === "object" && property.images[0]?.url
+                                                ? property.images[0].url
+                                                : property.images?.[0]) ||
+                                            "/placeholder.svg"
+                                        }
                                         currency={property.currency || "USD"}
                                         leaseDuration={property.leaseDuration}
+                                        leaseDurationLabel={property.leaseDurationLabel}
+                                        hideBedBath={property.type === "OFFICE"}
                                         onMouseEnter={() => setHoveredPropertyId(property.id)}
                                         onMouseLeave={() => setHoveredPropertyId(null)}
                                     />

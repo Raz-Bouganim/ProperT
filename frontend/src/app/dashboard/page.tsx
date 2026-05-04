@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import { BookingCard } from "@/components/BookingCard";
 import { PropertyCard } from "@/components/PropertyCard";
 import { Loader2, Plus } from "lucide-react";
+import { toast } from "sonner";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 
@@ -30,12 +31,19 @@ interface Booking {
 
 interface Listing {
     id: string;
+    slug?: string;
     title: string;
     address: string;
     price: number;
     size: number;
-    images: string[];
-    // TODO: Add created at to type if needed
+    sqft?: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    coverImageUrl?: string | null;
+    images: Array<string | { url: string }>;
+    status?: string;
+    draftTargetStatus?: string;
+    type?: string;
 }
 
 export default function DashboardPage() {
@@ -73,6 +81,26 @@ export default function DashboardPage() {
 
         fetchData();
     }, [user]);
+
+    const publishDraft = async (listing: Listing) => {
+        const nextStatus = listing.draftTargetStatus === "FOR_RENT"
+            ? "FOR_RENT"
+            : listing.draftTargetStatus === "FOR_SALE"
+              ? "FOR_SALE"
+              : "FOR_SALE";
+        try {
+            await api.patch(`/properties/${listing.id}`, { status: nextStatus });
+            toast.success("Listing published.");
+            const listingsRes = await api.get("/properties/mine");
+            setListings(listingsRes.data);
+        } catch (error: unknown) {
+            const msg =
+                error && typeof error === "object" && "response" in error
+                    ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+                    : undefined;
+            toast.error(typeof msg === "string" ? msg : "Could not publish. Add missing details (e.g. available-from for rentals) and try again.");
+        }
+    };
 
     const handleStatusUpdate = async (bookingId: string, newStatus: string) => {
         try {
@@ -185,19 +213,42 @@ export default function DashboardPage() {
                                     </Link>
                                 </div>
                             ) : (
-                                listings.map(listing => (
-                                    <PropertyCard
-                                        key={listing.id}
-                                        id={listing.id}
-                                        title={listing.title}
-                                        address={listing.address}
-                                        price={Number(listing.price)}
-                                        beds={0} // TODO: Add beds to listing typs
-                                        baths={0}
-                                        sqft={listing.size}
-                                        image={listing.images[0] || "/placeholder-property.svg"}
-                                    />
-                                ))
+                                listings.map((listing) => {
+                                    const firstImg = listing.images?.[0];
+                                    const cover =
+                                        listing.coverImageUrl ||
+                                        (typeof firstImg === "object" && firstImg && "url" in firstImg
+                                            ? firstImg.url
+                                            : firstImg) ||
+                                        "/placeholder-property.svg";
+                                    const isDraft = String(listing.status ?? "").toUpperCase() === "DRAFT";
+                                    return (
+                                        <div key={listing.id} className="flex flex-col gap-3">
+                                            <PropertyCard
+                                                id={listing.id}
+                                                detailsHref={`/properties/${listing.slug || listing.id}`}
+                                                title={listing.title}
+                                                address={listing.address}
+                                                price={Number(listing.price)}
+                                                beds={listing.bedrooms ?? 0}
+                                                baths={listing.bathrooms ?? 0}
+                                                sqft={listing.sqft ?? listing.size ?? 0}
+                                                image={cover}
+                                                status={listing.status}
+                                                hideBedBath={listing.type === "OFFICE"}
+                                            />
+                                            {isDraft && (
+                                                <Button
+                                                    type="button"
+                                                    className="w-full rounded-xl font-bold"
+                                                    onClick={() => void publishDraft(listing)}
+                                                >
+                                                    Publish listing
+                                                </Button>
+                                            )}
+                                        </div>
+                                    );
+                                })
                             )}
                         </div>
                     )}

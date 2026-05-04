@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsArray, ValidateNested, IsBoolean } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsArray, ValidateNested, IsBoolean, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PropertyType, PropertyStatus } from '@prisma/client';
 
@@ -75,6 +75,11 @@ export class CreatePropertyDto {
     @IsOptional()
     status?: PropertyStatus;
 
+    /** When saving as DRAFT: intended status at publish time (FOR_SALE or FOR_RENT). */
+    @IsEnum(PropertyStatus)
+    @IsOptional()
+    draftTargetStatus?: PropertyStatus;
+
     @IsNumber()
     @IsNotEmpty()
     bedrooms: number;
@@ -135,6 +140,11 @@ export class CreatePropertyDto {
     @IsString()
     @IsOptional()
     availableDate?: string;
+
+    /** ISO timestamp when the user opened the create-listing flow (client-generated). */
+    @IsOptional()
+    @IsDateString()
+    flowStartedAt?: string;
 
     @IsString()
     @IsOptional()

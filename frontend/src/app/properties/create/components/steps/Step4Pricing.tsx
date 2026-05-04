@@ -114,6 +114,19 @@ export function Step4Pricing({ images, onEditStep }: Step4PricingProps) {
                                 <option value="Flexible">Flexible / Short Term</option>
                             </select>
                         </div>
+                        <div className="space-y-2">
+                            <Label className="text-slate-500 font-bold uppercase text-[11px] tracking-widest pl-1">
+                                Available from <span className="text-red-600">*</span>
+                            </Label>
+                            <input
+                                type="date"
+                                {...register("availableDate")}
+                                className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 px-4 font-bold text-slate-900 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+                            />
+                            <p className="text-xs text-slate-400 font-medium pl-1">
+                                Required to publish a rental. You can leave it blank while saving a draft.
+                            </p>
+                        </div>
                     </div>
                 )}
             </section>

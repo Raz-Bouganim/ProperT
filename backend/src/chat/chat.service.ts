@@ -36,39 +36,32 @@ export class ChatService {
                     select: {
                         id: true,
                         title: true,
-                        images: true,
                     },
                 },
             },
         });
     }
 
-    async getOrCreateConversation(propertyId: string, participantIds: string[]) {
+    async getOrCreateConversation(propertyId: string, seekerId: string, ownerId: string) {
         const existing = await this.prisma.conversation.findFirst({
-            where: {
-                propertyId,
-                participants: {
-                    every: {
-                        userId: { in: participantIds },
-                    },
-                },
-            },
+            where: { propertyId, seekerId, ownerId },
         });
 
         if (existing) return existing;
 
         return this.prisma.conversation.create({
             data: {
-                propertyId,
+                property: { connect: { id: propertyId } },
+                seeker: { connect: { id: seekerId } },
+                owner: { connect: { id: ownerId } },
                 participants: {
-                    create: participantIds.map((id) => ({ userId: id })),
+                    create: [{ userId: seekerId }, { userId: ownerId }],
                 },
             },
         });
     }
 
     async saveMessage(conversationId: string, senderId: string, content: string) {
-        // Update conversation's updatedAt manually to ensure sorting works
         await this.prisma.conversation.update({
             where: { id: conversationId },
             data: { updatedAt: new Date() },
@@ -130,7 +123,6 @@ export class ChatService {
                     select: {
                         id: true,
                         title: true,
-                        images: true,
                     },
                 },
             },
