@@ -32,6 +32,8 @@ export const listingSchema = z.object({
 
     // Step 4: Pricing
     currency: z.enum(["USD", "EUR", "GBP", "ILS"]).default("USD"),
+    /** IANA zone; viewing rules and API slot labels are expressed in this zone (backend default UTC). */
+    timeZone: z.string().min(1, "Time zone is required").default("UTC"),
     price: z.number().min(1, "Price must be positive"),
     negotiable: z.boolean().default(true),
     availableDate: z.string().optional(),
@@ -65,6 +67,7 @@ export const useListingForm = () => {
             price: undefined,
             negotiable: true,
             leaseDuration: "12 Months",
+            timeZone: "UTC",
             images: [],
             availabilities: []
         },

@@ -8,6 +8,7 @@ import Image from "next/image";
 import { PROPERTY_TYPES } from "../../constants/propertyTypes";
 import { StepContainer } from "../shared/StepContainer";
 import { SectionHeader } from "../shared/SectionHeader";
+import { PROPERTY_IANA_TIMEZONES } from "../../constants/timeZones";
 
 interface Step4PricingProps {
     images: (File & { preview?: string })[];
@@ -139,6 +140,25 @@ export function Step4Pricing({ images, onEditStep }: Step4PricingProps) {
                         Viewing Availability
                     </h2>
                     <p className="text-sm text-slate-500 mt-1 font-medium">Add specific dates or recurring days when your property is available for viewing.</p>
+                </div>
+
+                <div className="space-y-2 max-w-xl">
+                    <Label className="text-slate-500 font-bold uppercase text-[11px] tracking-widest pl-1">
+                        Property time zone <span className="text-slate-400 font-semibold normal-case">(IANA)</span>
+                    </Label>
+                    <select
+                        {...register("timeZone")}
+                        className="w-full h-12 rounded-xl border-slate-200 bg-slate-50 px-4 font-bold text-slate-900 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+                    >
+                        {PROPERTY_IANA_TIMEZONES.map((z) => (
+                            <option key={z.value} value={z.value}>
+                                {z.label}
+                            </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-slate-400 font-medium pl-1">
+                        Weekly rules and time slot labels use this time zone. Default is UTC if unchanged.
+                    </p>
                 </div>
 
                 <AvailabilityScheduler />

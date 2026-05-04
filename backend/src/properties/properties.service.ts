@@ -69,6 +69,7 @@ function publishCheckDtoFromRecord(existing: Property, patch: UpdatePropertyDto)
     city: patch.city ?? existing.city,
     region: patch.region ?? existing.region ?? undefined,
     postalCode: patch.postalCode ?? existing.postalCode ?? undefined,
+    timeZone: patch.timeZone ?? existing.timeZone,
     type: (patch.type ?? existing.type) as PropertyType,
     status: (patch.status ?? existing.status) as PropertyStatus,
     bedrooms: patch.bedrooms !== undefined ? patch.bedrooms : (existing.bedrooms ?? undefined),
@@ -177,6 +178,7 @@ export class PropertiesService {
         floorPlanUrl: createPropertyDto.floorPlanUrl,
         currency: createPropertyDto.currency,
         yearBuilt: createPropertyDto.yearBuilt,
+        timeZone: createPropertyDto.timeZone?.trim() || undefined,
         availableFrom:
           willPublish
             ? (intent === PropertyStatus.FOR_SALE
@@ -390,6 +392,7 @@ export class PropertiesService {
       ...(updatePropertyDto.floorPlanUrl !== undefined && { floorPlanUrl: updatePropertyDto.floorPlanUrl }),
       ...(updatePropertyDto.currency !== undefined && { currency: updatePropertyDto.currency }),
       ...(updatePropertyDto.yearBuilt !== undefined && { yearBuilt: updatePropertyDto.yearBuilt }),
+      ...(updatePropertyDto.timeZone !== undefined && { timeZone: updatePropertyDto.timeZone.trim() }),
       ...(publishedAt !== undefined && { publishedAt }),
     };
 

@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PropertyType, PropertyStatus } from '@prisma/client';
+import { IsIanaTimeZone } from '../validators/is-iana-timezone.decorator';
 
 export class CreateAvailabilityDto {
   @IsNumber()
@@ -67,6 +68,16 @@ export class CreatePropertyDto {
   @IsString()
   @IsNotEmpty()
   city: string;
+
+  /**
+   * IANA time zone for the listing. Interprets weekly `dayOfWeek` and `startTime`/`endTime` on
+   * availability rules. Default at rest is `UTC` when omitted (see Prisma schema).
+   */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @IsIanaTimeZone()
+  timeZone?: string;
 
   @IsString()
   @IsOptional()

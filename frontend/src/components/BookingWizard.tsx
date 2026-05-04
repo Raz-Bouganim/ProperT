@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { format, addMonths, startOfToday } from "date-fns";
+import { useState, useEffect, useMemo } from "react";
+import { DateTime } from "luxon";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,13 +10,28 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import axios from "axios";
 
+/** Keep in sync with backend `AVAILABILITY_SLOT_MINUTES` (30). */
+const VIEWING_SLOT_MINUTES = 30;
+
+/** Calendar day in the listing zone, aligned with the slots API `date=YYYY-MM-DD` parameter. */
+function toPropertyDateKey(date: Date, zone: string): string {
+    return DateTime.fromJSDate(date).setZone(zone).toFormat("yyyy-MM-dd");
+}
+
 interface BookingWizardProps {
     propertyId: string;
+    /** IANA zone for the listing; date + slot `HH:mm` are interpreted in this zone (matches slots API). */
+    propertyTimeZone?: string;
     isOpen: boolean;
     onClose: () => void;
 }
 
-export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProps) {
+export function BookingWizard({
+    propertyId,
+    propertyTimeZone = "UTC",
+    isOpen,
+    onClose,
+}: BookingWizardProps) {
     const [step, setStep] = useState(1);
     const [availabilityRules, setAvailabilityRules] = useState<{ dayOfWeek?: number | null; date?: string | null }[]>([]);
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -26,6 +41,18 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
     const { user } = useAuth();
+
+    /** Listing-local “today” — must not be memoized across renders or past-midnight breaks. */
+    const todayStartInPropertyZone = DateTime.now()
+        .setZone(propertyTimeZone)
+        .startOf("day")
+        .toJSDate();
+
+    /** Initial visible month when the modal opens (listing zone). */
+    const defaultMonthInPropertyZone = useMemo(
+        () => DateTime.now().setZone(propertyTimeZone).toJSDate(),
+        [propertyTimeZone, isOpen],
+    );
 
     // Fetch availability rules on mount
     useEffect(() => {
@@ -44,27 +71,31 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
         }
     };
 
-    // Fetch slots when date changes
+    // Fetch slots when date or listing time zone changes (date key must stay aligned with the API).
     useEffect(() => {
         if (selectedDate) {
-            fetchSlots(selectedDate);
+            void fetchSlots(selectedDate);
         }
-    }, [selectedDate]);
+    }, [selectedDate, propertyTimeZone]);
 
     const isDateAvailable = (date: Date) => {
+        // No owner-defined rules: do not grey out calendar days (no weekly/date restriction in the UI).
+        // Slot generation still returns no windows until rules exist (see backend availability service).
         if (availabilityRules.length === 0) return true;
 
-        const day = date.getDay();
-        const dateStr = format(date, "yyyy-MM-dd");
+        const d = DateTime.fromJSDate(date).setZone(propertyTimeZone);
+        const jsDay = d.weekday === 7 ? 0 : d.weekday;
+        const dateStr = d.toFormat("yyyy-MM-dd");
 
         return availabilityRules.some((r) => {
             if (r?.date) {
-                // Compare in local date to avoid UTC day shifting (e.g. midnight local stored as previous-day UTC)
-                const ruleDateStr = format(new Date(r.date), "yyyy-MM-dd");
-                return ruleDateStr === dateStr;
+                const ruleKey = DateTime.fromJSDate(new Date(r.date))
+                    .setZone(propertyTimeZone)
+                    .toFormat("yyyy-MM-dd");
+                return ruleKey === dateStr;
             }
             if (r?.dayOfWeek === 0 || r?.dayOfWeek) {
-                return Number(r.dayOfWeek) === day;
+                return Number(r.dayOfWeek) === jsDay;
             }
             return false;
         });
@@ -74,7 +105,7 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
         setLoading(true);
         setSelectedSlot(null); // Reset slot when date changes
         try {
-            const dateStr = format(date, "yyyy-MM-dd");
+            const dateStr = toPropertyDateKey(date, propertyTimeZone);
             const res = await api.get(`/properties/${propertyId}/availability/slots?date=${dateStr}`);
             setSlots(res.data);
         } catch (error) {
@@ -91,11 +122,19 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
 
         setSubmitting(true);
         try {
-            const startTime = new Date(selectedDate);
+            const dateStr = toPropertyDateKey(selectedDate, propertyTimeZone);
+            const [y, mo, d] = dateStr.split("-").map(Number);
             const [hours, minutes] = selectedSlot.split(":").map(Number);
-            startTime.setHours(hours, minutes, 0, 0);
-
-            const endTime = new Date(startTime.getTime() + 30 * 60000); // 30 min duration
+            const startDt = DateTime.fromObject(
+                { year: y, month: mo, day: d, hour: hours, minute: minutes, second: 0 },
+                { zone: propertyTimeZone },
+            );
+            if (!startDt.isValid) {
+                toast.error("Invalid date or time for this property.");
+                return;
+            }
+            const startTime = startDt.toJSDate();
+            const endTime = startDt.plus({ minutes: VIEWING_SLOT_MINUTES }).toJSDate();
 
             if (!user) {
                 toast.error("You must be logged in to book a viewing.");
@@ -216,13 +255,22 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
                                     <h2 className="text-xl font-bold">Select viewing date</h2>
                                 </div>
 
+                                <p className="text-xs text-muted-foreground mb-4 text-center px-2">
+                                    Calendar uses the listing time zone ({propertyTimeZone}). Dates match availability
+                                    and slots on the server.
+                                </p>
+
                                 <div className="flex justify-center mb-6">
                                     <DayPicker
                                         mode="single"
+                                        timeZone={propertyTimeZone}
+                                        noonSafe
+                                        today={todayStartInPropertyZone}
+                                        defaultMonth={defaultMonthInPropertyZone}
                                         selected={selectedDate}
                                         onSelect={setSelectedDate}
                                         disabled={[
-                                            { before: startOfToday() },
+                                            { before: todayStartInPropertyZone },
                                             (date: Date) => {
                                                 return !isDateAvailable(date);
                                             }
@@ -267,7 +315,11 @@ export function BookingWizard({ propertyId, isOpen, onClose }: BookingWizardProp
                                     <div>
                                         <h2 className="text-xl font-bold">Select a time</h2>
                                         <p className="text-sm text-muted-foreground">
-                                            {selectedDate ? format(selectedDate, "EEEE, MMM do") : ""}
+                                            {selectedDate
+                                                ? DateTime.fromJSDate(selectedDate)
+                                                      .setZone(propertyTimeZone)
+                                                      .toFormat("EEEE, MMM d")
+                                                : ""}
                                         </p>
                                     </div>
                                 </div>

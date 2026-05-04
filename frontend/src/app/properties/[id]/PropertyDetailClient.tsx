@@ -531,6 +531,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
 
             <BookingWizard
                 propertyId={property.id}
+                propertyTimeZone={property.timeZone ?? "UTC"}
                 isOpen={isBookingOpen}
                 onClose={() => setIsBookingOpen(false)}
             />

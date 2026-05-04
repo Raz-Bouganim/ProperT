@@ -118,10 +118,14 @@ model Property {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  /// IANA time zone (e.g. America/New_York). Weekly `day_of_week` and `start_time` / `end_time` on
+  /// property_availabilities are interpreted in this zone. Default "UTC" when omitted at create.
+  timeZone    String   @default("UTC") @map("time_zone") @db.VarChar(64)
+
   images        PropertyImage[]
   amenities     PropertyAmenity[]
   bookings      Booking[]
-  availabilities Availability[]
+  availabilities PropertyAvailability[]
   conversations Conversation[]
 
   @@map("properties")
@@ -157,7 +161,7 @@ model PropertyAmenity {
   @@map("property_amenities")
 }
 
-model Availability {
+model PropertyAvailability {
   id        String    @id @default(uuid())
   dayOfWeek Int?      @map("day_of_week")
   date      DateTime?
@@ -168,7 +172,7 @@ model Availability {
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId])
-  @@map("Availability")
+  @@map("property_availabilities")
 }
 
 model Booking {
