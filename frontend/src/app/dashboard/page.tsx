@@ -15,10 +15,12 @@ interface Booking {
     startTime: string;
     endTime: string;
     status: string;
+    noteHistory?: string | null;
     property: {
         id: string;
         title: string;
         address: string;
+        timeZone?: string;
         images: string[];
         price: number;
     };
@@ -98,14 +100,10 @@ export default function DashboardPage() {
         }
     };
 
-    const handleStatusUpdate = async (bookingId: string, newStatus: string) => {
-        try {
-            await api.patch(`/bookings/${bookingId}`, { status: newStatus, userId: user?.id });
-            // Optimistic update
-            setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
-        } catch (error) {
-            console.error("Failed to update status:", error);
-            alert("Failed to update booking status");
+    const handleBookingPatched = (updated: unknown) => {
+        const b = updated as Booking;
+        if (b?.id) {
+            setBookings((prev) => prev.map((x) => (x.id === b.id ? { ...x, ...b } : x)));
         }
     };
 
@@ -192,7 +190,7 @@ export default function DashboardPage() {
                                         key={booking.id}
                                         booking={booking as any}
                                         role="OWNER"
-                                        onStatusChange={handleStatusUpdate}
+                                        onPatched={handleBookingPatched}
                                     />
                                 ))
                             )}
@@ -266,7 +264,7 @@ export default function DashboardPage() {
                                     key={booking.id}
                                     booking={booking as any}
                                     role="SEEKER"
-                                    onStatusChange={handleStatusUpdate}
+                                    onPatched={handleBookingPatched}
                                 />
                             ))}
                         </div>

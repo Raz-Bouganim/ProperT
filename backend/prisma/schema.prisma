@@ -29,6 +29,8 @@ enum BookingStatus {
   CONFIRMED
   REJECTED
   CANCELLED
+  COMPLETED
+  LAPSED
 }
 
 enum AmenityType {
@@ -180,7 +182,10 @@ model Booking {
   startTime DateTime      @map("start_time")
   endTime   DateTime      @map("end_time")
   status    BookingStatus @default(PENDING)
-  notes     String?
+  /// Freeform note on create (legacy / display); mutating changes append to `noteHistory`.
+  notes       String?
+  /// Newest-first audit lines: `[ISO8601] OWNER|SEEKER|SYSTEM: text` joined with newlines.
+  noteHistory String?     @map("note_history") @db.Text
 
   propertyId String   @map("property_id")
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
@@ -193,7 +198,7 @@ model Booking {
 
   @@index([propertyId, startTime])
   @@index([seekerId, status])
-  @@map("Booking")
+  @@map("bookings")
 }
 
 model Conversation {

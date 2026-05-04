@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { BookingStatus, type PropertyAvailability } from '@prisma/client';
+import { type PropertyAvailability } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../prisma/prisma.service';
+import { BOOKING_SLOT_BLOCKING_STATUSES } from '../bookings/booking-status.constants';
 import { AVAILABILITY_SLOT_MINUTES } from './availability.constants';
 
 /**
@@ -46,7 +47,15 @@ export class AvailabilityService {
     });
   }
 
-  async getOpenSlots(propertyId: string, dateString: string) {
+  /**
+   * @param excludeBookingId When rescheduling, omit this booking from overlap checks so the
+   *   listing’s own window can be re-offered in generated slots.
+   */
+  async getOpenSlots(
+    propertyId: string,
+    dateString: string,
+    excludeBookingId?: string,
+  ) {
     const property = await this.prisma.property.findUnique({
       where: { id: propertyId },
       select: { timeZone: true },
@@ -97,7 +106,8 @@ export class AvailabilityService {
     const bookings = await this.prisma.booking.findMany({
       where: {
         propertyId,
-        status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
+        status: { in: [...BOOKING_SLOT_BLOCKING_STATUSES] },
+        ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
         startTime: { lt: nextDayStart.toJSDate() },
         endTime: { gt: dayStart.toJSDate() },
       },
@@ -133,5 +143,63 @@ export class AvailabilityService {
     }
 
     return Array.from(slotSet).sort();
+  }
+
+  /**
+   * Reschedule / create guard: 30m window, must match a generated open slot for that local day
+   * (after excluding the booking being moved), and must not overlap another blocking booking.
+   */
+  async assertBookableWindow(
+    propertyId: string,
+    start: Date,
+    end: Date,
+    excludeBookingId?: string,
+  ) {
+    if (end <= start) {
+      throw new BadRequestException('End time must be after start time');
+    }
+    const durationMs = end.getTime() - start.getTime();
+    const expected = AVAILABILITY_SLOT_MINUTES * 60 * 1000;
+    if (durationMs !== expected) {
+      throw new BadRequestException(
+        `Viewing must be exactly ${AVAILABILITY_SLOT_MINUTES} minutes`,
+      );
+    }
+
+    const property = await this.prisma.property.findUnique({
+      where: { id: propertyId },
+      select: { timeZone: true },
+    });
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+
+    const tz = property.timeZone;
+    const startLocal = DateTime.fromJSDate(start).setZone(tz);
+    if (!startLocal.isValid) {
+      throw new BadRequestException('Invalid start time for this listing');
+    }
+
+    const dateString = startLocal.toFormat('yyyy-MM-dd');
+    const slots = await this.getOpenSlots(propertyId, dateString, excludeBookingId);
+    const hhmm = startLocal.toFormat('HH:mm');
+    if (!slots.includes(hhmm)) {
+      throw new BadRequestException(
+        'Selected time is not within listing availability or conflicts with another booking',
+      );
+    }
+
+    const overlap = await this.prisma.booking.findFirst({
+      where: {
+        propertyId,
+        ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
+        status: { in: [...BOOKING_SLOT_BLOCKING_STATUSES] },
+        startTime: { lt: end },
+        endTime: { gt: start },
+      },
+    });
+    if (overlap) {
+      throw new BadRequestException('This slot is already booked');
+    }
   }
 }

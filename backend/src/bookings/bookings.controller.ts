@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Req, UseGuards, Query } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
-import { BookingStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/auth.guards';
+import { PatchBookingDto } from './dto/patch-booking.dto';
 
 @Controller('bookings')
 @UseGuards(JwtAuthGuard)
@@ -25,11 +25,7 @@ export class BookingsController {
     }
 
     @Patch(':id')
-    updateStatus(
-        @Param('id') id: string,
-        @Body('status') status: BookingStatus,
-        @Req() req: any,
-    ) {
-        return this.bookingsService.updateStatus(id, status, req.user.userId);
+    patch(@Param('id') id: string, @Body() dto: PatchBookingDto, @Req() req: any) {
+        return this.bookingsService.updateBooking(id, req.user.userId, dto);
     }
 }
