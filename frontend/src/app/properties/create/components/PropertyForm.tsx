@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { FormProvider } from "react-hook-form";
 import { useListingForm, ListingFormValues } from "../hooks/useListingForm";
 import { useMediaUpload } from "../hooks/useMediaUpload";
@@ -37,18 +37,6 @@ export function PropertyForm() {
         setImages
     } = useMediaUpload();
     const router = useRouter();
-    const flowStartedAtRef = useRef<string | null>(null);
-
-    useEffect(() => {
-        const key = "propert_listing_flow_started_at";
-        let t = typeof window !== "undefined" ? sessionStorage.getItem(key) : null;
-        if (!t && typeof window !== "undefined") {
-            t = new Date().toISOString();
-            sessionStorage.setItem(key, t);
-        }
-        flowStartedAtRef.current = t;
-    }, []);
-
     useEffect(() => {
         window.scrollTo(0, 0);
     }, [currentStep]);
@@ -64,7 +52,7 @@ export function PropertyForm() {
                 formValues.description?.trim() &&
                 formValues.type &&
                 formValues.transactionType &&
-                formValues.address?.trim() &&
+                formValues.addressLine?.trim() &&
                 formValues.latitude != null &&
                 formValues.longitude != null
             );
@@ -72,7 +60,7 @@ export function PropertyForm() {
         if (currentStep === 2) {
             const yearValue = formValues.yearBuilt;
             const isYearValid = !!yearValue && (yearValue >= 1800 && yearValue <= new Date().getFullYear());
-            return !!(formValues.address && formValues.sqft > 0 && formValues.beds >= 0 && formValues.baths >= 0 && isYearValid);
+            return !!(formValues.addressLine && formValues.sqft > 0 && formValues.beds >= 0 && formValues.baths >= 0 && isYearValid);
         }
         if (currentStep === 3) {
             return images.length > 0;
@@ -87,7 +75,7 @@ export function PropertyForm() {
 
     const nextStep = async () => {
         let fields: (keyof ListingFormValues)[] = [];
-        if (currentStep === 1) fields = ["title", "description", "transactionType", "type", "address", "country", "city"];
+        if (currentStep === 1) fields = ["title", "description", "transactionType", "type", "addressLine", "country", "city"];
         if (currentStep === 2) fields = ["sqft", "beds", "baths", "yearBuilt"];
 
         if (currentStep === 3) {
@@ -129,7 +117,7 @@ export function PropertyForm() {
             "description",
             "transactionType",
             "type",
-            "address",
+            "addressLine",
             "country",
             "city",
             "sqft",
@@ -147,27 +135,23 @@ export function PropertyForm() {
         try {
             const values = getValues();
             const imageUrls = images.length > 0 ? await uploadImages() : [];
-            const { sqft, beds, baths, transactionType, ...rest } = values;
+            const { sqft, beds, baths, transactionType, state, zipCode, ...rest } = values;
             const listingData = {
                 ...rest,
-                status: "DRAFT",
-                draftTargetStatus: transactionType,
+                status: transactionType,
+                publish: false,
                 sqft,
                 bedrooms: beds,
                 bathrooms: baths,
                 country: values.country || "Unknown",
                 city: values.city || "Unknown",
+                region: state?.trim() || undefined,
+                postalCode: zipCode?.trim() || undefined,
                 images: imageUrls,
-                features: values.features || [],
-                ...(flowStartedAtRef.current ? { flowStartedAt: flowStartedAtRef.current } : {}),
+                amenities: values.amenities || [],
             };
 
             const { data } = await api.post("/properties", listingData);
-            try {
-                sessionStorage.removeItem("propert_listing_flow_started_at");
-            } catch {
-                /* ignore */
-            }
             const hrefId = data.slug || data.id;
             router.push(`/properties/${hrefId}`);
             toast.success("Draft saved. Finish and publish anytime from your dashboard.");
@@ -201,27 +185,24 @@ export function PropertyForm() {
         try {
             const imageUrls = await uploadImages();
 
-            const { sqft, beds, baths, transactionType, ...rest } = values;
+            const { sqft, beds, baths, transactionType, state, zipCode, ...rest } = values;
 
             const listingData = {
                 ...rest,
                 status: transactionType,
+                publish: true,
                 sqft: sqft,
                 bedrooms: beds,
                 bathrooms: baths,
                 country: values.country || "Unknown",
                 city: values.city || "Unknown",
+                region: state?.trim() || undefined,
+                postalCode: zipCode?.trim() || undefined,
                 images: imageUrls,
-                features: values.features || [],
-                ...(flowStartedAtRef.current ? { flowStartedAt: flowStartedAtRef.current } : {}),
+                amenities: values.amenities || [],
             };
 
             const { data } = await api.post("/properties", listingData);
-            try {
-                sessionStorage.removeItem("propert_listing_flow_started_at");
-            } catch {
-                /* ignore */
-            }
             const hrefId = data.slug || data.id;
             router.push(`/properties/${hrefId}`);
             toast.success("Property published successfully!");
@@ -285,7 +266,7 @@ export function PropertyForm() {
                                         data={{
                                             title: formValues.title,
                                             price: formValues.price || 0,
-                                            address: formValues.address || "Property Location",
+                                            address: formValues.addressLine || "Property Location",
                                             beds: formValues.beds || 0,
                                             baths: formValues.baths || 0,
                                             sqft: formValues.sqft || 0,

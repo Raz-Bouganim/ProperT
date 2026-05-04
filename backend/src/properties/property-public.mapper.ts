@@ -53,7 +53,7 @@ export function mapPropertyPublicResponse(property: any) {
     coverImageUrl,
     images: images?.map((img) => stripPropertyId(img)),
     availabilities: property.availabilities?.map((a: any) => stripPropertyId(a)),
-    features: property.features?.map((f: any) => stripPropertyId(f)),
+    amenities: property.amenities?.map((a: any) => stripPropertyId(a)),
   };
 
   return mapped;

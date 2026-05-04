@@ -15,7 +15,8 @@ interface BookingCardProps {
         property: {
             id: string;
             title: string;
-            address: string;
+            address?: string;
+            addressLine?: string;
             images: string[];
             price: number;
         };
@@ -59,7 +60,7 @@ export function BookingCard({ booking, role, onStatusChange }: BookingCardProps)
                         <div>
                             <h3 className="font-bold text-lg line-clamp-1">{booking.property.title}</h3>
                             <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <MapPin className="w-3 h-3" /> {booking.property.address}
+                                <MapPin className="w-3 h-3" /> {booking.property.addressLine ?? booking.property.address ?? ""}
                             </div>
                         </div>
                         <span className={clsx(

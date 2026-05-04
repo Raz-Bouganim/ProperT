@@ -1,17 +1,14 @@
 import { useForm, UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useEffect } from "react";
 
-// --- Schema Definition ---
-// --- Schema Definition ---
 export const listingSchema = z.object({
     // Step 1: Basic Info & Location
     transactionType: z.enum(["FOR_SALE", "FOR_RENT"]),
     type: z.enum(["APARTMENT", "HOUSE", "OFFICE"]),
     title: z.string().min(1, "Title is required").max(60, "Title max 60 chars"),
     description: z.string().min(1, "Description is required"),
-    address: z.string().min(1, "Address is required"),
+    addressLine: z.string().min(1, "Address is required"),
     country: z.string().optional(),
     city: z.string().optional(),
     state: z.string().optional(),
@@ -26,10 +23,10 @@ export const listingSchema = z.object({
     beds: z.number().min(0, "Bedrooms cannot be negative"),
     baths: z.number().min(0, "Bathrooms cannot be negative"),
     yearBuilt: z.number().min(1800).max(new Date().getFullYear()),
-    features: z.array(z.string()).optional(),
+    amenities: z.array(z.string()).optional(),
 
     // Step 3: Media
-    images: z.any().optional(), // validated manually or via check
+    images: z.any().optional(),
     floorPlanUrl: z.string().optional(),
     virtualTourUrl: z.string().optional(),
 
@@ -45,7 +42,6 @@ export const listingSchema = z.object({
         amount: z.number()
     })).optional(),
 
-    // Availability
     availabilities: z.array(z.object({
         dayOfWeek: z.number().optional(),
         date: z.string().optional(),
@@ -65,7 +61,7 @@ export const useListingForm = () => {
             beds: 1,
             baths: 1,
             currency: "USD",
-            features: [],
+            amenities: [],
             price: undefined,
             negotiable: true,
             leaseDuration: "12 Months",

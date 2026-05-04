@@ -174,7 +174,7 @@ function SearchPageContent() {
                                         id={property.id}
                                         detailsHref={`/properties/${property.slug || property.id}?from=search&returnTo=${encodeURIComponent(returnTo)}`}
                                         title={property.title || "Untitled Property"}
-                                        address={property.address}
+                                        address={property.addressLine ?? property.address ?? ""}
                                         price={Number(property.price)}
                                         beds={property.bedrooms || 0}
                                         baths={property.bathrooms || 0}

@@ -2,7 +2,7 @@ export type TransactionType = "FOR_SALE" | "FOR_RENT";
 export type PropertyType = "APARTMENT" | "HOUSE" | "OFFICE";
 
 export interface PropertyAddress {
-  address: string;
+  addressLine: string;
   country?: string;
   city?: string;
   state?: string;
@@ -18,7 +18,7 @@ export interface PropertyDetails {
   beds: number;
   baths: number;
   yearBuilt: number;
-  features: string[];
+  amenities: string[];
 }
 
 export interface PropertyPricing {

@@ -33,7 +33,8 @@ interface Listing {
     id: string;
     slug?: string;
     title: string;
-    address: string;
+    addressLine?: string;
+    address?: string;
     price: number;
     size: number;
     sqft?: number;
@@ -42,7 +43,7 @@ interface Listing {
     coverImageUrl?: string | null;
     images: Array<string | { url: string }>;
     status?: string;
-    draftTargetStatus?: string;
+    publishedAt?: string | null;
     type?: string;
 }
 
@@ -83,13 +84,8 @@ export default function DashboardPage() {
     }, [user]);
 
     const publishDraft = async (listing: Listing) => {
-        const nextStatus = listing.draftTargetStatus === "FOR_RENT"
-            ? "FOR_RENT"
-            : listing.draftTargetStatus === "FOR_SALE"
-              ? "FOR_SALE"
-              : "FOR_SALE";
         try {
-            await api.patch(`/properties/${listing.id}`, { status: nextStatus });
+            await api.patch(`/properties/${listing.id}`, { publish: true });
             toast.success("Listing published.");
             const listingsRes = await api.get("/properties/mine");
             setListings(listingsRes.data);
@@ -221,14 +217,14 @@ export default function DashboardPage() {
                                             ? firstImg.url
                                             : firstImg) ||
                                         "/placeholder-property.svg";
-                                    const isDraft = String(listing.status ?? "").toUpperCase() === "DRAFT";
+                                    const isDraft = !listing.publishedAt;
                                     return (
                                         <div key={listing.id} className="flex flex-col gap-3">
                                             <PropertyCard
                                                 id={listing.id}
                                                 detailsHref={`/properties/${listing.slug || listing.id}`}
                                                 title={listing.title}
-                                                address={listing.address}
+                                                address={listing.addressLine ?? listing.address ?? ""}
                                                 price={Number(listing.price)}
                                                 beds={listing.bedrooms ?? 0}
                                                 baths={listing.bathrooms ?? 0}

@@ -227,7 +227,7 @@ export default function Home() {
                   id={listing.id || ""}
                   detailsHref={`/properties/${listing.slug || listing.id || ""}?from=home&returnTo=${encodeURIComponent("/")}`}
                   title={listing.title || "Premium Listing"}
-                  address={listing.address || "Location pending"}
+                  address={listing.addressLine ?? listing.address ?? "Location pending"}
                   price={Number(listing.price) || 0}
                   beds={listing.bedrooms || 2}
                   baths={listing.bathrooms || 1}

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Re
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
-import { JwtAuthGuard } from '../auth/auth.guards';
+import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/auth.guards';
 
 @Controller('properties')
 export class PropertiesController {
@@ -67,9 +67,10 @@ export class PropertiesController {
     return this.propertiesService.findAll(req.user.userId);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.propertiesService.findOne(id);
+  findOne(@Request() req: { user?: { userId: string } }, @Param('id') id: string) {
+    return this.propertiesService.findOne(id, req.user?.userId);
   }
 
   @UseGuards(JwtAuthGuard)

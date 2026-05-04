@@ -31,7 +31,7 @@ export function LocationPicker({ images = [] }: LocationPickerProps) {
         reverseGeocode
     } = useGeocoding(setValue);
 
-    const address = watch("address");
+    const addressLine = watch("addressLine");
 
     return (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl space-y-5">
@@ -45,37 +45,37 @@ export function LocationPicker({ images = [] }: LocationPickerProps) {
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-primary transition-colors z-10" />
                     <Input
                         type="text"
-                        {...register("address")}
+                        {...register("addressLine")}
                         error={undefined}
                         placeholder="Enter address..."
                         className={cn(
                             "pl-12 pr-24 h-12 bg-white rounded-xl border-slate-200 font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-medium focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all truncate",
-                            errors.address && "border-red-500 focus-visible:ring-red-500"
+                            errors.addressLine && "border-red-500 focus-visible:ring-red-500"
                         )}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                                 e.preventDefault();
-                                searchAddress(address);
+                                searchAddress(addressLine);
                             }
                         }}
                         onBlur={() => {
-                            if (address && address.length > 3) {
-                                searchAddress(address);
+                            if (addressLine && addressLine.length > 3) {
+                                searchAddress(addressLine);
                             }
                         }}
                     />
                     <button
                         type="button"
-                        onClick={() => searchAddress(address)}
+                        onClick={() => searchAddress(addressLine)}
                         disabled={isGeocoding}
                         className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-primary text-white text-[10px] font-bold px-4 py-1.5 rounded-lg shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-2 z-10"
                     >
                         {isGeocoding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Search"}
                     </button>
                 </div>
-                {errors.address && (
+                {errors.addressLine && (
                     <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider ml-1">
-                        {errors.address.message}
+                        {errors.addressLine.message}
                     </span>
                 )}
             </div>
@@ -95,7 +95,7 @@ export function LocationPicker({ images = [] }: LocationPickerProps) {
                         latitude: watch("latitude"),
                         longitude: watch("longitude"),
                         title: watch("title") || "New Listing",
-                        address: watch("address") || "Property Location",
+                        address: watch("addressLine") || "Property Location",
                         price: watch("price") || 0,
                         images: images.map(img => img.preview || "")
                     }] : []}

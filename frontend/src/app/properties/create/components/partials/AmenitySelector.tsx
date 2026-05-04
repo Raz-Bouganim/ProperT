@@ -5,27 +5,27 @@ import { AMENITIES } from "../../constants/amenities";
 
 export function AmenitySelector() {
     const { watch, setValue } = useFormContext<ListingFormValues>();
-    const features = watch("features") || [];
+    const amenities = watch("amenities") || [];
 
-    const toggleFeature = (featureId: string) => {
-        if (features.includes(featureId)) {
-            setValue("features", features.filter(f => f !== featureId));
+    const toggleAmenity = (amenityId: string) => {
+        if (amenities.includes(amenityId)) {
+            setValue("amenities", amenities.filter((f) => f !== amenityId));
         } else {
-            setValue("features", [...features, featureId]);
+            setValue("amenities", [...amenities, amenityId]);
         }
     };
 
     return (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {AMENITIES.map((amenity) => {
-                const isSelected = features.includes(amenity.id);
+                const isSelected = amenities.includes(amenity.id);
                 return (
                     <label key={amenity.id} className="cursor-pointer group relative">
                         <input
                             type="checkbox"
                             className="peer sr-only"
                             checked={isSelected}
-                            onChange={() => toggleFeature(amenity.id)}
+                            onChange={() => toggleAmenity(amenity.id)}
                         />
                         <div className={cn(
                             "p-4 rounded-xl border-2 h-full flex flex-col items-start gap-3 relative overflow-hidden",

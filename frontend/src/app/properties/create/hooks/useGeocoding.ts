@@ -60,7 +60,7 @@ export const useGeocoding = (setValue: UseFormSetValue<ListingFormValues>) => {
                 // Update display address
                 if (addrDetails.road && extractCityName(addrDetails)) {
                     const fullAddr = formatFullAddress(addrDetails);
-                    safeSetValue("address", fullAddr, { shouldValidate: true });
+                    safeSetValue("addressLine", fullAddr, { shouldValidate: true });
                 }
 
                 setMapCenter([latitude, longitude]);
@@ -98,7 +98,7 @@ export const useGeocoding = (setValue: UseFormSetValue<ListingFormValues>) => {
                 safeSetValue("houseNumber", addrDetails.house_number || "", { shouldValidate: true });
 
                 const fullAddr = formatFullAddress(addrDetails);
-                safeSetValue("address", fullAddr, { shouldValidate: true });
+                safeSetValue("addressLine", fullAddr, { shouldValidate: true });
                 setSearchError(null);
             }
         } catch (error) {

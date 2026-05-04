@@ -1,165 +1,171 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsArray, ValidateNested, IsBoolean, IsDateString } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsArray,
+  ValidateNested,
+  IsBoolean,
+  IsIn,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { PropertyType, PropertyStatus } from '@prisma/client';
 
 export class CreateAvailabilityDto {
-    @IsNumber()
-    @IsOptional()
-    dayOfWeek?: number;
+  @IsNumber()
+  @IsOptional()
+  dayOfWeek?: number;
 
-    @IsString()
-    @IsOptional()
-    date?: string;
+  @IsString()
+  @IsOptional()
+  date?: string;
 
-    @IsString()
-    startTime: string;
+  @IsString()
+  startTime: string;
 
-    @IsString()
-    endTime: string;
+  @IsString()
+  endTime: string;
 }
 
+/**
+ * Create property payload.
+ * - `publish === true`: live listing — strict validation, `publishedAt` set server-side.
+ * - `publish !== true`: draft — `publishedAt` null; `status` is intent (FOR_SALE | FOR_RENT only).
+ * - `price`: sale = listing price; rent = monthly rent (same field).
+ */
 export class CreatePropertyDto {
-    @IsString()
-    @IsNotEmpty()
-    title: string;
+  @IsString()
+  @IsNotEmpty()
+  title: string;
 
-    @IsString()
-    @IsNotEmpty()
-    description: string;
+  @IsString()
+  @IsNotEmpty()
+  description: string;
 
-    @IsNumber()
-    @IsNotEmpty()
-    price: number;
+  @IsNumber()
+  @IsNotEmpty()
+  price: number;
 
-    @IsNumber()
-    @IsNotEmpty()
-    sqft: number;
+  @IsNumber()
+  @IsNotEmpty()
+  sqft: number;
 
-    @IsBoolean()
-    @IsOptional()
-    negotiable?: boolean;
+  @IsBoolean()
+  @IsOptional()
+  negotiable?: boolean;
 
-    @IsString()
-    @IsNotEmpty()
-    address: string;
+  /** Street / single-line address (required). */
+  @IsString()
+  @IsNotEmpty()
+  addressLine: string;
 
-    @IsString()
-    @IsNotEmpty()
-    country: string;
+  @IsString()
+  @IsNotEmpty()
+  country: string;
 
-    @IsString()
-    @IsNotEmpty()
-    city: string;
+  @IsString()
+  @IsNotEmpty()
+  city: string;
 
-    @IsString()
-    @IsOptional()
-    state?: string;
+  @IsString()
+  @IsOptional()
+  region?: string;
 
-    @IsString()
-    @IsOptional()
-    zipCode?: string;
+  @IsString()
+  @IsOptional()
+  postalCode?: string;
 
-    @IsString()
-    @IsOptional()
-    street?: string;
+  @IsEnum(PropertyType)
+  @IsNotEmpty()
+  type: PropertyType;
 
-    @IsString()
-    @IsOptional()
-    houseNumber?: string;
+  /** Sale vs rent intent. Never CLOSED on create. */
+  @IsOptional()
+  @IsIn([PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT])
+  status?: PropertyStatus;
 
-    @IsEnum(PropertyType)
-    @IsNotEmpty()
-    type: PropertyType;
+  @IsOptional()
+  @IsNumber()
+  bedrooms?: number;
 
-    @IsEnum(PropertyStatus)
-    @IsOptional()
-    status?: PropertyStatus;
+  @IsOptional()
+  @IsNumber()
+  bathrooms?: number;
 
-    /** When saving as DRAFT: intended status at publish time (FOR_SALE or FOR_RENT). */
-    @IsEnum(PropertyStatus)
-    @IsOptional()
-    draftTargetStatus?: PropertyStatus;
+  @IsString()
+  @IsOptional()
+  ownerId?: string;
 
-    @IsNumber()
-    @IsNotEmpty()
-    bedrooms: number;
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  latitude?: number;
 
-    @IsNumber()
-    @IsNotEmpty()
-    bathrooms: number;
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  longitude?: number;
 
-    @IsString()
-    @IsOptional()
-    ownerId?: string;
+  @IsString({ each: true })
+  @IsOptional()
+  images?: string[];
 
-    @IsNumber()
-    @IsOptional()
-    @Type(() => Number)
-    latitude?: number;
+  /** Amenity ids from the UI (kebab-case or Prisma enum strings). */
+  @IsString({ each: true })
+  @IsOptional()
+  amenities?: string[];
 
-    @IsNumber()
-    @IsOptional()
-    @Type(() => Number)
-    longitude?: number;
+  @IsString()
+  @IsOptional()
+  videoUrl?: string;
 
-    @IsString({ each: true })
-    @IsOptional()
-    images?: string[];
+  @IsString()
+  @IsOptional()
+  virtualTourUrl?: string;
 
-    @IsString({ each: true })
-    @IsOptional()
-    features?: string[];
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  yearBuilt?: number;
 
-    @IsString()
-    @IsOptional()
-    videoUrl?: string;
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  taxAnnual?: number;
 
-    @IsString()
-    @IsOptional()
-    virtualTourUrl?: string;
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  hoaMonthly?: number;
 
-    @IsNumber()
-    @IsOptional()
-    @Type(() => Number)
-    yearBuilt?: number;
+  @IsString()
+  @IsOptional()
+  currency?: string;
 
-    @IsNumber()
-    @IsOptional()
-    @Type(() => Number)
-    taxAnnual?: number;
+  @IsString()
+  @IsOptional()
+  availableDate?: string;
 
-    @IsNumber()
-    @IsOptional()
-    @Type(() => Number)
-    hoaMonthly?: number;
+  @IsString()
+  @IsOptional()
+  leaseDuration?: string;
 
-    @IsString()
-    @IsOptional()
-    currency?: string;
+  @IsString()
+  @IsOptional()
+  floorPlanUrl?: string;
 
-    @IsString()
-    @IsOptional()
-    availableDate?: string;
+  @IsOptional()
+  customFees?: any;
 
-    /** ISO timestamp when the user opened the create-listing flow (client-generated). */
-    @IsOptional()
-    @IsDateString()
-    flowStartedAt?: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateAvailabilityDto)
+  @IsOptional()
+  availabilities?: CreateAvailabilityDto[];
 
-    @IsString()
-    @IsOptional()
-    leaseDuration?: string;
-
-    @IsString()
-    @IsOptional()
-    floorPlanUrl?: string;
-
-    @IsOptional()
-    customFees?: any;
-
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => CreateAvailabilityDto)
-    @IsOptional()
-    availabilities?: CreateAvailabilityDto[];
+  /** When true, validate and publish; when false/omitted, save as draft (`publishedAt` null). */
+  @IsBoolean()
+  @IsOptional()
+  publish?: boolean;
 }

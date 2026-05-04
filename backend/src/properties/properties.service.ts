@@ -1,9 +1,17 @@
+/**
+ * Property / listing lifecycle (service layer):
+ * - `publishedAt === null` — draft; omitted from public catalog endpoints.
+ * - `publishedAt` set and `status` in FOR_SALE | FOR_RENT — live listing.
+ * - `status === CLOSED` — off-market (owner may still see the row in dashboard); excluded from public browse.
+ * - `deletedAt` — soft-deleted / removed from normal UX; distinct from CLOSED.
+ */
+
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { PropertyType, PropertyStatus, AmenityType } from '@prisma/client';
-import { assertCreatePropertyBusinessRules, assertDraftPropertyRules } from './property-business.validation';
+import { Property, PropertyType, PropertyStatus, AmenityType } from '@prisma/client';
+import { assertDraftPropertyRules, assertPublishPropertyRules } from './property-business.validation';
 import { parseLeaseDurationInput } from './property-lease.util';
 import { publicUrlToObjectKey } from './property-image.util';
 import { makeUniqueSlugCandidate, slugifyTitle } from './property-slug.util';
@@ -22,15 +30,15 @@ const FRONTEND_FEATURE_TO_AMENITY: Record<string, AmenityType> = {
   dishwasher: AmenityType.DISHWASHER,
 };
 
-function resolveAmenityTypes(features: string[] | undefined): AmenityType[] {
-  if (!features?.length) return [];
+function resolveAmenityTypes(raw: string[] | undefined): AmenityType[] {
+  if (!raw?.length) return [];
   const allowed = new Set<string>(Object.values(AmenityType));
   const seen = new Set<AmenityType>();
   const out: AmenityType[] = [];
-  for (const raw of features) {
-    const value = allowed.has(raw)
-      ? (raw as AmenityType)
-      : FRONTEND_FEATURE_TO_AMENITY[raw];
+  for (const item of raw) {
+    const value = allowed.has(item)
+      ? (item as AmenityType)
+      : FRONTEND_FEATURE_TO_AMENITY[item];
     if (value !== undefined && !seen.has(value)) {
       seen.add(value);
       out.push(value);
@@ -39,8 +47,47 @@ function resolveAmenityTypes(features: string[] | undefined): AmenityType[] {
   return out;
 }
 
-function isLiveStatus(status: PropertyStatus | undefined | null) {
+function isLiveMarketStatus(status: PropertyStatus | undefined | null) {
   return status === PropertyStatus.FOR_SALE || status === PropertyStatus.FOR_RENT;
+}
+
+function publishCheckDtoFromRecord(existing: Property, patch: UpdatePropertyDto): CreatePropertyDto {
+  const leaseDuration =
+    patch.leaseDuration ??
+    (existing.leaseDurationMonths != null
+      ? `${existing.leaseDurationMonths} Months`
+      : 'Flexible');
+
+  return {
+    title: patch.title ?? existing.title,
+    description: patch.description ?? existing.description,
+    price: patch.price !== undefined ? Number(patch.price) : Number(existing.price),
+    sqft: patch.sqft !== undefined ? patch.sqft : existing.sqft,
+    negotiable: patch.negotiable ?? existing.negotiable,
+    addressLine: patch.addressLine ?? existing.addressLine,
+    country: patch.country ?? existing.country,
+    city: patch.city ?? existing.city,
+    region: patch.region ?? existing.region ?? undefined,
+    postalCode: patch.postalCode ?? existing.postalCode ?? undefined,
+    type: (patch.type ?? existing.type) as PropertyType,
+    status: (patch.status ?? existing.status) as PropertyStatus,
+    bedrooms: patch.bedrooms !== undefined ? patch.bedrooms : (existing.bedrooms ?? undefined),
+    bathrooms: patch.bathrooms !== undefined ? patch.bathrooms : (existing.bathrooms ?? undefined),
+    latitude: patch.latitude ?? existing.latitude ?? undefined,
+    longitude: patch.longitude ?? existing.longitude ?? undefined,
+    virtualTourUrl: patch.virtualTourUrl ?? existing.virtualTourUrl ?? undefined,
+    floorPlanUrl: patch.floorPlanUrl ?? existing.floorPlanUrl ?? undefined,
+    currency: patch.currency ?? existing.currency,
+    yearBuilt: patch.yearBuilt ?? existing.yearBuilt ?? undefined,
+    availableDate:
+      patch.availableDate ??
+      (existing.availableFrom ? existing.availableFrom.toISOString() : undefined),
+    leaseDuration,
+    amenities: patch.amenities,
+    images: patch.images,
+    availabilities: patch.availabilities,
+    publish: true,
+  };
 }
 
 @Injectable()
@@ -67,34 +114,34 @@ export class PropertiesService {
       availableDate,
       leaseDuration,
       images,
-      features,
-      flowStartedAt,
+      amenities,
     } = createPropertyDto;
 
-    const status = createPropertyDto.status ?? PropertyStatus.DRAFT;
-    const isDraft = status === PropertyStatus.DRAFT;
-
-    if (isDraft) {
-      assertDraftPropertyRules(createPropertyDto);
-    } else {
-      assertCreatePropertyBusinessRules(createPropertyDto);
+    const intent = createPropertyDto.status ?? PropertyStatus.FOR_SALE;
+    if (intent !== PropertyStatus.FOR_SALE && intent !== PropertyStatus.FOR_RENT) {
+      throw new BadRequestException('status must be FOR_SALE or FOR_RENT');
     }
 
-    if (!isDraft && (!images || images.length === 0)) {
+    const willPublish = createPropertyDto.publish === true;
+    if (willPublish) {
+      assertPublishPropertyRules(createPropertyDto);
+    } else {
+      assertDraftPropertyRules(createPropertyDto);
+    }
+
+    if (willPublish && (!images || images.length === 0)) {
       throw new BadRequestException('Published listings require at least one image');
     }
 
-    const effectivePrice = isDraft
-      ? Math.max(Number(createPropertyDto.price) || 0, 0.01)
-      : createPropertyDto.price;
-    const effectiveSqft = isDraft
-      ? Math.max(Number(createPropertyDto.sqft) || 0, 1)
-      : createPropertyDto.sqft;
+    const effectivePrice = willPublish
+      ? createPropertyDto.price
+      : Math.max(Number(createPropertyDto.price) || 0, 0.01);
+    const effectiveSqft = willPublish
+      ? createPropertyDto.sqft
+      : Math.max(Number(createPropertyDto.sqft) || 0, 1);
 
-    const amenityTypes = resolveAmenityTypes(features);
-    const saleIntent = isDraft
-      ? (createPropertyDto.draftTargetStatus ?? PropertyStatus.FOR_SALE) === PropertyStatus.FOR_SALE
-      : status === PropertyStatus.FOR_SALE;
+    const amenityTypes = resolveAmenityTypes(amenities);
+    const saleIntent = intent === PropertyStatus.FOR_SALE;
     const leaseMonths = saleIntent ? null : parseLeaseDurationInput(leaseDuration);
 
     const mappedAvailabilities = availabilities?.map(a => ({
@@ -105,11 +152,7 @@ export class PropertiesService {
     }));
 
     const slug = await this.allocateUniqueSlug(createPropertyDto.title);
-    const publishedAt = !isDraft && isLiveStatus(status) ? new Date() : null;
-
-    const draftTargetStatus = isDraft
-      ? (createPropertyDto.draftTargetStatus ?? PropertyStatus.FOR_SALE)
-      : null;
+    const publishedAt = willPublish && isLiveMarketStatus(intent) ? new Date() : null;
 
     const row = await this.prisma.property.create({
       data: {
@@ -119,14 +162,15 @@ export class PropertiesService {
         price: effectivePrice.toString(),
         sqft: effectiveSqft,
         negotiable: createPropertyDto.negotiable,
-        bedrooms: createPropertyDto.bedrooms,
-        bathrooms: createPropertyDto.bathrooms,
+        bedrooms: createPropertyDto.bedrooms ?? null,
+        bathrooms: createPropertyDto.bathrooms ?? null,
         type: createPropertyDto.type,
-        status,
-        draftTargetStatus,
-        address: createPropertyDto.address,
+        status: intent,
+        addressLine: createPropertyDto.addressLine.trim(),
         city: createPropertyDto.city,
         country: createPropertyDto.country,
+        region: createPropertyDto.region?.trim() || null,
+        postalCode: createPropertyDto.postalCode?.trim() || null,
         latitude: createPropertyDto.latitude,
         longitude: createPropertyDto.longitude,
         virtualTourUrl: createPropertyDto.virtualTourUrl,
@@ -134,15 +178,14 @@ export class PropertiesService {
         currency: createPropertyDto.currency,
         yearBuilt: createPropertyDto.yearBuilt,
         availableFrom:
-          isDraft
-            ? (availableDate ? new Date(availableDate) : undefined)
-            : status === PropertyStatus.FOR_SALE
+          willPublish
+            ? (intent === PropertyStatus.FOR_SALE
               ? null
               : availableDate
                 ? new Date(availableDate)
-                : undefined,
+                : undefined)
+            : (availableDate ? new Date(availableDate) : undefined),
         leaseDurationMonths: saleIntent ? null : leaseMonths,
-        flowStartedAt: flowStartedAt ? new Date(flowStartedAt) : undefined,
         publishedAt,
         availabilities:
           mappedAvailabilities && mappedAvailabilities.length > 0
@@ -159,21 +202,23 @@ export class PropertiesService {
             })),
           }
           : undefined,
-        features: amenityTypes.length > 0
-          ? { create: amenityTypes.map((feature) => ({ feature })) }
+        amenities: amenityTypes.length > 0
+          ? { create: amenityTypes.map((amenity) => ({ amenity })) }
           : undefined,
         owner: { connect: { id: ownerId } },
       },
     });
 
-    return this.findOne(row.id);
+    return this.findOne(row.id, ownerId);
   }
 
   findAll(ownerId?: string) {
+    const base = { deletedAt: null };
     const where = ownerId
-      ? { ownerId, deletedAt: null }
+      ? { ...base, ownerId }
       : {
-        deletedAt: null,
+        ...base,
+        publishedAt: { not: null },
         status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT] },
       };
     return this.prisma.property
@@ -206,28 +251,32 @@ export class PropertiesService {
     const skip = (page - 1) * limit;
 
     const rawProperties = await this.prisma.$queryRaw<{ id: string }[]>`
-      SELECT id FROM "Listing"
+      SELECT id FROM "properties"
       WHERE ST_DWithin(
         location,
         ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
         ${radiusInMeters}
       )
-      AND deleted_at IS NULL;
+      AND deleted_at IS NULL
+      AND published_at IS NOT NULL
+      AND status IN ('FOR_SALE'::"PropertyStatus", 'FOR_RENT'::"PropertyStatus");
     `;
 
     const ids = rawProperties.map(p => p.id);
 
-    const where: any = {
+    const where: Record<string, unknown> = {
       id: { in: ids },
       deletedAt: null,
+      publishedAt: { not: null },
       status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT] },
     };
 
     if (filters) {
       if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-        where.price = {};
-        if (filters.minPrice !== undefined) where.price.gte = filters.minPrice;
-        if (filters.maxPrice !== undefined) where.price.lte = filters.maxPrice;
+        const price: Record<string, number> = {};
+        if (filters.minPrice !== undefined) price.gte = filters.minPrice;
+        if (filters.maxPrice !== undefined) price.lte = filters.maxPrice;
+        where.price = price;
       }
       if (filters.beds !== undefined) where.bedrooms = { gte: filters.beds };
       if (filters.baths !== undefined) where.bathrooms = { gte: filters.baths };
@@ -236,9 +285,9 @@ export class PropertiesService {
     }
 
     const [totalCount, properties] = await Promise.all([
-      this.prisma.property.count({ where }),
+      this.prisma.property.count({ where: where as any }),
       this.prisma.property.findMany({
-        where,
+        where: where as any,
         include: { owner: true, images: true },
         skip,
         take: limit,
@@ -252,15 +301,24 @@ export class PropertiesService {
     };
   }
 
-  async findOne(idOrSlug: string) {
+  /**
+   * Public catalog surfaces only published rows elsewhere; this endpoint must hide drafts
+   * unless `requesterUserId` matches `ownerId` (owner preview after save-as-draft).
+   */
+  async findOne(idOrSlug: string, requesterUserId?: string | null) {
     const property = await this.prisma.property.findFirst({
       where: {
         deletedAt: null,
         OR: [{ id: idOrSlug }, { slug: idOrSlug }],
       },
-      include: { owner: true, availabilities: true, images: true, features: true },
+      include: { owner: true, availabilities: true, images: true, amenities: true },
     });
     if (!property) throw new NotFoundException('Property not found');
+    if (property.publishedAt == null) {
+      if (!requesterUserId || requesterUserId !== property.ownerId) {
+        throw new NotFoundException('Property not found');
+      }
+    }
     return mapPropertyPublicResponse(property);
   }
 
@@ -278,19 +336,36 @@ export class PropertiesService {
     const existing = await this.prisma.property.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Property not found');
 
-    const { price, availableDate, leaseDuration, status: nextStatus } = updatePropertyDto;
+    const {
+      price,
+      availableDate,
+      leaseDuration,
+      status: nextStatus,
+      publish: publishFlag,
+    } = updatePropertyDto;
 
-    if (nextStatus !== undefined && isLiveStatus(nextStatus)) {
+    const mergedStatus = (nextStatus ?? existing.status) as PropertyStatus;
+
+    if (nextStatus !== undefined && isLiveMarketStatus(nextStatus)) {
       const imgCount = await this.prisma.propertyImage.count({ where: { propertyId: id } });
       if (imgCount === 0) {
         throw new BadRequestException('Add at least one image before publishing.');
       }
     }
 
-    const mergedStatus = nextStatus ?? existing.status;
+    if (publishFlag === true && !existing.publishedAt) {
+      const checkDto = publishCheckDtoFromRecord(existing, updatePropertyDto);
+      assertPublishPropertyRules(checkDto);
+      const imgCount = await this.prisma.propertyImage.count({ where: { propertyId: id } });
+      if (imgCount === 0) {
+        throw new BadRequestException('Add at least one image before publishing.');
+      }
+    }
 
     let publishedAt: Date | undefined = undefined;
-    if (nextStatus !== undefined && isLiveStatus(nextStatus) && !existing.publishedAt) {
+    if (publishFlag === true && !existing.publishedAt) {
+      publishedAt = new Date();
+    } else if (nextStatus !== undefined && isLiveMarketStatus(nextStatus) && !existing.publishedAt) {
       publishedAt = new Date();
     }
 
@@ -304,9 +379,11 @@ export class PropertiesService {
       ...(updatePropertyDto.bathrooms !== undefined && { bathrooms: updatePropertyDto.bathrooms }),
       ...(updatePropertyDto.type !== undefined && { type: updatePropertyDto.type }),
       ...(nextStatus !== undefined && { status: nextStatus }),
-      ...(updatePropertyDto.address !== undefined && { address: updatePropertyDto.address }),
+      ...(updatePropertyDto.addressLine !== undefined && { addressLine: updatePropertyDto.addressLine.trim() }),
       ...(updatePropertyDto.city !== undefined && { city: updatePropertyDto.city }),
       ...(updatePropertyDto.country !== undefined && { country: updatePropertyDto.country }),
+      ...(updatePropertyDto.region !== undefined && { region: updatePropertyDto.region?.trim() || null }),
+      ...(updatePropertyDto.postalCode !== undefined && { postalCode: updatePropertyDto.postalCode?.trim() || null }),
       ...(updatePropertyDto.latitude !== undefined && { latitude: updatePropertyDto.latitude }),
       ...(updatePropertyDto.longitude !== undefined && { longitude: updatePropertyDto.longitude }),
       ...(updatePropertyDto.virtualTourUrl !== undefined && { virtualTourUrl: updatePropertyDto.virtualTourUrl }),
@@ -331,8 +408,7 @@ export class PropertiesService {
       }
     }
 
-    if (nextStatus !== undefined && isLiveStatus(nextStatus)) {
-      data.draftTargetStatus = null;
+    if (nextStatus !== undefined && isLiveMarketStatus(nextStatus)) {
       if (nextStatus === PropertyStatus.FOR_RENT) {
         const from =
           availableDate !== undefined
@@ -349,7 +425,17 @@ export class PropertiesService {
       data: data as any,
     });
 
-    return this.findOne(id);
+    if (updatePropertyDto.amenities !== undefined) {
+      await this.prisma.propertyAmenity.deleteMany({ where: { propertyId: id } });
+      const types = resolveAmenityTypes(updatePropertyDto.amenities);
+      if (types.length > 0) {
+        await this.prisma.propertyAmenity.createMany({
+          data: types.map((amenity) => ({ propertyId: id, amenity })),
+        });
+      }
+    }
+
+    return this.findOne(id, userId);
   }
 
   async remove(userId: string, id: string) {

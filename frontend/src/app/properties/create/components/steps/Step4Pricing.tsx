@@ -162,7 +162,7 @@ export function Step4Pricing({ images, onEditStep }: Step4PricingProps) {
                                 </span>
                                 <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
                                     <MapPin className="w-3 h-3" />
-                                    {watch("address") || "No address"}
+                                    {watch("addressLine") || "No address"}
                                 </span>
                             </div>
                         </div>
@@ -178,9 +178,9 @@ export function Step4Pricing({ images, onEditStep }: Step4PricingProps) {
                                 <span className="flex items-center gap-1.5"><Bath className="w-4 h-4 text-slate-400" /> {watch("baths")} Baths</span>
                                 <span className="flex items-center gap-1.5"><Square className="w-4 h-4 text-slate-400" /> {watch("sqft")} sqft</span>
                             </div>
-                            {watch("features") && watch("features")!.length > 0 && (
+                            {watch("amenities") && watch("amenities")!.length > 0 && (
                                 <div className="flex flex-wrap gap-2 pt-1">
-                                    {watch("features")!.map((feature, i) => (
+                                    {watch("amenities")!.map((feature, i) => (
                                         <span key={i} className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
                                             {feature}
                                         </span>

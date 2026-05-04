@@ -15,12 +15,13 @@ enum PropertyType {
   OFFICE
 }
 
+/// Listing intent / lifecycle: live sale/rent vs off-market. Draft is `publishedAt IS NULL`, not a status value.
 enum PropertyStatus {
-  DRAFT
   FOR_SALE
   FOR_RENT
-  SOLD
-  @@map("ListingStatus")
+  CLOSED
+
+  @@map("PropertyStatus")
 }
 
 enum BookingStatus {
@@ -81,20 +82,21 @@ model Property {
   slug        String         @unique @db.VarChar(200)
   title       String         @db.VarChar(255)
   description String
-  status      PropertyStatus @default(DRAFT)
-  /// When status is DRAFT: whether the user intends to publish as sale or rent (drives publish action).
-  draftTargetStatus PropertyStatus? @map("draft_target_status")
+  /// FOR_SALE | FOR_RENT = intent; CLOSED = off-market (still visible to owner per UX). Draft = publishedAt IS NULL.
+  status      PropertyStatus @default(FOR_SALE)
+  /// Sale: listing price. Rent: monthly rent (same column).
   price       Decimal        @db.Decimal(12, 2)
   sqft        Float
   negotiable  Boolean        @default(true)
-  bedrooms    Float          @default(0)
-  bathrooms   Float          @default(0)
+  bedrooms    Float?
+  bathrooms   Float?
   type        PropertyType
 
-  /// Structured address: city-line string plus city and country (no separate state or zip columns)
-  address     String         @db.VarChar(500)
+  addressLine String         @db.VarChar(500) @map("address_line")
   city        String         @db.VarChar(100)
   country     String         @db.VarChar(100)
+  region      String?        @db.VarChar(100)
+  postalCode  String?        @map("postal_code") @db.VarChar(32)
 
   latitude    Float?
   longitude   Float?
@@ -109,9 +111,6 @@ model Property {
   availableFrom        DateTime? @map("available_from")
   leaseDurationMonths  Int?      @map("lease_duration_months")
 
-  /// Client-reported time the user opened the list-property flow (ISO). Distinct from `createdAt` (row inserted at submit).
-  flowStartedAt DateTime? @map("flow_started_at")
-
   ownerId     String   @map("owner_id")
   owner       User     @relation(fields: [ownerId], references: [id])
   publishedAt DateTime? @map("published_at")
@@ -120,12 +119,12 @@ model Property {
   deletedAt   DateTime? @map("deleted_at")
 
   images        PropertyImage[]
-  features      PropertyFeature[]
+  amenities     PropertyAmenity[]
   bookings      Booking[]
   availabilities Availability[]
   conversations Conversation[]
 
-  @@map("Listing")
+  @@map("properties")
   @@index([price])
   @@index([ownerId])
 }
@@ -148,14 +147,14 @@ model PropertyImage {
   @@map("PropertyImage")
 }
 
-model PropertyFeature {
+model PropertyAmenity {
   propertyId String      @map("property_id")
   property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  feature    AmenityType
+  amenity    AmenityType
 
-  @@id([propertyId, feature])
-  @@index([feature])
-  @@map("PropertyFeature")
+  @@id([propertyId, amenity])
+  @@index([amenity])
+  @@map("property_amenities")
 }
 
 model Availability {

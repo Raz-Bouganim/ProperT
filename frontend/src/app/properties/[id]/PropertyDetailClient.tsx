@@ -62,7 +62,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
 
     useEffect(() => {
         if (!property || loading) return;
-        const draft = String(property.status ?? "").toUpperCase() === "DRAFT";
+        const draft = !property.publishedAt;
         let meta = document.querySelector('meta[name="robots"]');
         if (draft) {
             if (!meta) {
@@ -144,6 +144,11 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
         );
     }
 
+    const lineAddress = [property.addressLine, property.address].find(Boolean) as string | undefined;
+    const formattedFullAddress = [lineAddress, property.city, property.region, property.postalCode, property.country]
+        .filter(Boolean)
+        .join(", ");
+
     const displayProperty = {
         ...property,
         images: (property.images && property.images.length > 0)
@@ -157,11 +162,11 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
                 : property.createdAt
                   ? new Date(property.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })
                   : "Recently",
-            listingStarted: property.flowStartedAt
-                ? new Date(property.flowStartedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            listingStarted: property.createdAt
+                ? new Date(property.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                 : null,
         },
-        features: (property.features ?? []).map((f: any) => f.feature ?? f),
+        features: (property.amenities ?? property.features ?? []).map((f: any) => f.amenity ?? f.feature ?? f),
     };
 
     const getImg = (index: number) => displayProperty.images[index] || displayProperty.images[0] || "/placeholder-property.svg";
@@ -181,7 +186,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
     };
 
     const isOffice = String(property.type ?? "").toUpperCase() === "OFFICE";
-    const isDraftListing = String(property.status ?? "").toUpperCase() === "DRAFT";
+    const isDraftListing = !property.publishedAt;
 
     const handleShare = async () => {
         const path = `/properties/${property.slug || property.id}`;
@@ -234,7 +239,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
                     <div className="flex flex-wrap items-center gap-4 text-muted-foreground font-medium">
                         <div className="flex items-center gap-1.5">
                             <MapPin className="w-4 h-4" />
-                            <span>{property.address}</span>
+                            <span>{formattedFullAddress}</span>
                         </div>
                     </div>
                 </header>
@@ -416,7 +421,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
                                 )}
                             </div>
                             <p className="mt-4 text-muted-foreground flex items-center gap-2">
-                                <MapPin className="w-4 h-4 text-primary" /> {property.address}
+                                <MapPin className="w-4 h-4 text-primary" /> {formattedFullAddress}
                             </p>
                         </section>
                     </div>
@@ -509,7 +514,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
                                         Published {displayProperty.owner.published}
                                         {displayProperty.owner.listingStarted && (
                                             <span className="block text-[10px] mt-1 text-muted-foreground/80">
-                                                Flow started {displayProperty.owner.listingStarted}
+                                                Created {displayProperty.owner.listingStarted}
                                             </span>
                                         )}
                                     </div>
@@ -540,7 +545,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
 
             <LightboxGallery
                 images={displayProperty.images}
-                address={property.address}
+                address={formattedFullAddress}
                 isOpen={isGalleryOpen}
                 initialIndex={galleryIndex}
                 onClose={() => setIsGalleryOpen(false)}
