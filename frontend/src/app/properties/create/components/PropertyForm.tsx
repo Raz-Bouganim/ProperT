@@ -135,7 +135,7 @@ export function PropertyForm() {
         try {
             const values = getValues();
             const imageUrls = images.length > 0 ? await uploadImages() : [];
-            const { sqft, beds, baths, transactionType, state, zipCode, ...rest } = values;
+            const { sqft, beds, baths, transactionType, state, zipCode, street, houseNumber, ...rest } = values;
             const listingData = {
                 ...rest,
                 status: transactionType,
@@ -185,7 +185,7 @@ export function PropertyForm() {
         try {
             const imageUrls = await uploadImages();
 
-            const { sqft, beds, baths, transactionType, state, zipCode, ...rest } = values;
+            const { sqft, beds, baths, transactionType, state, zipCode, street, houseNumber, ...rest } = values;
 
             const listingData = {
                 ...rest,
