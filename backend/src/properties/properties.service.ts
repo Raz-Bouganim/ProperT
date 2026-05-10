@@ -11,8 +11,8 @@ import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Property, PropertyType, PropertyStatus, AmenityType } from '@prisma/client';
-import { assertDraftPropertyRules, assertPublishPropertyRules } from './property-business.validation';
 import { parseLeaseDurationInput } from './property-lease.util';
+import { PropertyStrategyFactory } from './strategies/property-strategy.factory';
 import { publicUrlToObjectKey } from './property-image.util';
 import { makeUniqueSlugCandidate, slugifyTitle } from './property-slug.util';
 import { mapPropertyPublicResponse } from './property-public.mapper';
@@ -112,8 +112,6 @@ export class PropertiesService {
     const {
       ownerId,
       availabilities,
-      availableDate,
-      leaseDuration,
       images,
       amenities,
     } = createPropertyDto;
@@ -123,15 +121,16 @@ export class PropertiesService {
       throw new BadRequestException('status must be FOR_SALE or FOR_RENT');
     }
 
+    const strategy = PropertyStrategyFactory.for(createPropertyDto.type, intent);
     const willPublish = createPropertyDto.publish === true;
-    if (willPublish) {
-      assertPublishPropertyRules(createPropertyDto);
-    } else {
-      assertDraftPropertyRules(createPropertyDto);
-    }
 
-    if (willPublish && (!images || images.length === 0)) {
-      throw new BadRequestException('Published listings require at least one image');
+    if (willPublish) {
+      strategy.validatePublish(createPropertyDto);
+      if (!images || images.length === 0) {
+        throw new BadRequestException('Published listings require at least one image');
+      }
+    } else {
+      strategy.validateDraft(createPropertyDto);
     }
 
     const effectivePrice = willPublish
@@ -142,8 +141,12 @@ export class PropertiesService {
       : Math.max(Number(createPropertyDto.sqft) || 0, 1);
 
     const amenityTypes = resolveAmenityTypes(amenities);
-    const saleIntent = intent === PropertyStatus.FOR_SALE;
-    const leaseMonths = saleIntent ? null : parseLeaseDurationInput(leaseDuration);
+    const {
+      leaseMonths,
+      availableFrom: preparedAvailableFrom,
+      bedrooms: preparedBedrooms,
+      bathrooms: preparedBathrooms,
+    } = strategy.prepareData(createPropertyDto, willPublish);
 
     const mappedAvailabilities = availabilities?.map(a => ({
       dayOfWeek: a.dayOfWeek ?? null,
@@ -163,8 +166,8 @@ export class PropertiesService {
         price: effectivePrice.toString(),
         sqft: effectiveSqft,
         negotiable: createPropertyDto.negotiable,
-        bedrooms: createPropertyDto.bedrooms ?? null,
-        bathrooms: createPropertyDto.bathrooms ?? null,
+        bedrooms: preparedBedrooms !== undefined ? preparedBedrooms : (createPropertyDto.bedrooms ?? null),
+        bathrooms: preparedBathrooms !== undefined ? preparedBathrooms : (createPropertyDto.bathrooms ?? null),
         type: createPropertyDto.type,
         status: intent,
         addressLine: createPropertyDto.addressLine.trim(),
@@ -179,15 +182,8 @@ export class PropertiesService {
         currency: createPropertyDto.currency,
         yearBuilt: createPropertyDto.yearBuilt,
         timeZone: createPropertyDto.timeZone?.trim() || undefined,
-        availableFrom:
-          willPublish
-            ? (intent === PropertyStatus.FOR_SALE
-              ? null
-              : availableDate
-                ? new Date(availableDate)
-                : undefined)
-            : (availableDate ? new Date(availableDate) : undefined),
-        leaseDurationMonths: saleIntent ? null : leaseMonths,
+        availableFrom: preparedAvailableFrom,
+        leaseDurationMonths: leaseMonths,
         publishedAt,
         availabilities:
           mappedAvailabilities && mappedAvailabilities.length > 0
@@ -357,7 +353,8 @@ export class PropertiesService {
 
     if (publishFlag === true && !existing.publishedAt) {
       const checkDto = publishCheckDtoFromRecord(existing, updatePropertyDto);
-      assertPublishPropertyRules(checkDto);
+      const mergedType = (updatePropertyDto.type ?? existing.type) as PropertyType;
+      PropertyStrategyFactory.for(mergedType, mergedStatus).validatePublish(checkDto);
       const imgCount = await this.prisma.propertyImage.count({ where: { propertyId: id } });
       if (imgCount === 0) {
         throw new BadRequestException('Add at least one image before publishing.');
