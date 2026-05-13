@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgis/postgis:16-3.4-alpine
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
@@ -20,7 +20,7 @@ services:
 
   redis:
     image: redis:alpine
-    restart: always
+    restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -33,7 +33,7 @@ services:
 
   minio:
     image: minio/minio
-    restart: always
+    restart: unless-stopped
     ports:
       - "${MINIO_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
