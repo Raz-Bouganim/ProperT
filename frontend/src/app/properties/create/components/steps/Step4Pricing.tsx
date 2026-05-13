@@ -6,8 +6,6 @@ import { Tag, MapPin, Bed, Bath, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { PROPERTY_TYPES } from "../../constants/propertyTypes";
-import { StepContainer } from "../shared/StepContainer";
-import { SectionHeader } from "../shared/SectionHeader";
 import { PROPERTY_IANA_TIMEZONES } from "../../constants/timeZones";
 
 interface Step4PricingProps {

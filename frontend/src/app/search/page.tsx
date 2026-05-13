@@ -9,6 +9,8 @@ import { Footer } from "@/components/layout/Footer";
 import dynamic from "next/dynamic";
 import { Loader2, MapPin, Grid, List, Map as MapIcon } from "lucide-react";
 import api from "@/lib/api";
+import { coverImageUrl, type PropertyListingPreview } from "@/types/property-listing";
+import type { SearchFilterPatch } from "@/types/search-filters";
 
 // Dynamically import Map to avoid SSR issues with Leaflet
 const Map = dynamic(() => import("@/components/Map"), {
@@ -23,7 +25,8 @@ const Map = dynamic(() => import("@/components/Map"), {
 function SearchPageContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const [properties, setProperties] = useState<any[]>([]);
+    const status = searchParams.get("status");
+    const [properties, setProperties] = useState<PropertyListingPreview[]>([]);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [hoveredPropertyId, setHoveredPropertyId] = useState<string | null>(null);
@@ -45,7 +48,6 @@ function SearchPageContent() {
         const limit = showMap ? 8 : 9;
         try {
             let url = `/properties?lat=${lat}&lng=${lng}&radius=${radius}&page=${page}&limit=${limit}`;
-            const status = searchParams.get("status");
             if (minPrice) url += `&minPrice=${minPrice}`;
             if (maxPrice) url += `&maxPrice=${maxPrice}`;
             if (beds) url += `&beds=${beds}`;
@@ -60,23 +62,22 @@ function SearchPageContent() {
         } finally {
             setLoading(false);
         }
-    }, [lat, lng, radius, minPrice, maxPrice, beds, propertyType, searchParams.get("status"), page, showMap]);
+    }, [lat, lng, radius, minPrice, maxPrice, beds, propertyType, status, page, showMap]);
 
     useEffect(() => {
         fetchProperties();
     }, [fetchProperties]);
 
-    const handleFilterChange = (newFilters: any) => {
+    const handleFilterChange = (newFilters: SearchFilterPatch) => {
         const params = new URLSearchParams(searchParams.toString());
 
-        const updateParam = (key: string) => {
-            if (key in newFilters) {
-                const value = newFilters[key];
-                if (value !== undefined && value !== null && value !== "") {
-                    params.set(key, value.toString());
-                } else {
-                    params.delete(key);
-                }
+        const updateParam = (key: keyof SearchFilterPatch) => {
+            if (!(key in newFilters)) return;
+            const value = newFilters[key];
+            if (value !== undefined && value !== null && value !== "") {
+                params.set(key, String(value));
+            } else {
+                params.delete(key);
             }
         };
 
@@ -180,13 +181,7 @@ function SearchPageContent() {
                                         baths={property.bathrooms || 0}
                                         sqft={property.sqft ?? property.size ?? 0}
                                         status={property.status}
-                                        image={
-                                            property.coverImageUrl ||
-                                            (typeof property.images?.[0] === "object" && property.images[0]?.url
-                                                ? property.images[0].url
-                                                : property.images?.[0]) ||
-                                            "/placeholder.svg"
-                                        }
+                                        image={coverImageUrl(property, "/placeholder.svg")}
                                         currency={property.currency || "USD"}
                                         leaseDuration={property.leaseDuration}
                                         leaseDurationLabel={property.leaseDurationLabel}
@@ -199,7 +194,7 @@ function SearchPageContent() {
                         ) : (
                             <div className="flex flex-col items-center justify-center py-20 text-center bg-transparent">
                                 <MapPin className="w-12 h-12 text-slate-300 mb-4" />
-                                <h3 className="font-bold text-xl text-slate-900">We couldn't find a perfect match</h3>
+                                <h3 className="font-bold text-xl text-slate-900">We couldn&apos;t find a perfect match</h3>
                                 <p className="text-slate-500 max-w-xs mt-2">
                                     Try adjusting your criteria or expanding your search area.
                                 </p>

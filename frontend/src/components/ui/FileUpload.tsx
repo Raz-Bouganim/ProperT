@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useDropzone, DropzoneOptions } from "react-dropzone";
+import { useDropzone } from "react-dropzone";
 import { cn } from "@/lib/utils";
 import { Upload, X } from "lucide-react";
 import Image from "next/image";

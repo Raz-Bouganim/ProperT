@@ -24,7 +24,10 @@ export function LightboxGallery({ images, address, isOpen, initialIndex = 0, onC
 
   useEffect(() => {
     if (!isOpen) return;
-    setIndex(Math.min(Math.max(initialIndex, 0), safeImages.length - 1));
+    const id = requestAnimationFrame(() => {
+      setIndex(Math.min(Math.max(initialIndex, 0), safeImages.length - 1));
+    });
+    return () => cancelAnimationFrame(id);
   }, [isOpen, initialIndex, safeImages.length]);
 
   useEffect(() => {

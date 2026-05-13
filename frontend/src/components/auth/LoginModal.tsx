@@ -6,6 +6,7 @@ import { X, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
+import axios from 'axios';
 
 interface LoginModalProps {
     isOpen: boolean;
@@ -34,7 +35,6 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setIsLoading(true);
         setError(null);
 
-        const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
         const body = mode === 'login'
             ? { email: formData.email, password: formData.password }
             : formData;
@@ -45,8 +45,17 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
             saveAuth(data.access_token, data.user);
             onClose();
-        } catch (err: any) {
-            setError(err.response?.data?.message || err.message || 'Authentication failed');
+        } catch (err: unknown) {
+            const msg = axios.isAxiosError(err)
+                ? (typeof err.response?.data?.message === 'string'
+                    ? err.response.data.message
+                    : Array.isArray(err.response?.data?.message)
+                      ? err.response.data.message.join(', ')
+                      : undefined)
+                : err instanceof Error
+                  ? err.message
+                  : undefined;
+            setError(msg || 'Authentication failed');
         } finally {
             setIsLoading(false);
         }

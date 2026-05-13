@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { FormProvider } from "react-hook-form";
+import { FormProvider, type SubmitErrorHandler } from "react-hook-form";
+import axios from "axios";
 import { useListingForm, ListingFormValues } from "../hooks/useListingForm";
 import { useMediaUpload } from "../hooks/useMediaUpload";
 import { Button } from "@/components/ui/Button";
@@ -127,7 +128,7 @@ export function PropertyForm() {
             "price",
             "currency",
         ];
-        const ok = await trigger(fields as any);
+        const ok = await trigger(fields);
         if (!ok) {
             toast.error("Please fix the highlighted fields before saving a draft.");
             return;
@@ -135,7 +136,9 @@ export function PropertyForm() {
         try {
             const values = getValues();
             const imageUrls = images.length > 0 ? await uploadImages() : [];
-            const { sqft, beds, baths, transactionType, state, zipCode, street, houseNumber, ...rest } = values;
+            const { sqft, beds, baths, transactionType, state, zipCode, street: _street, houseNumber: _houseNumber, ...rest } = values;
+            void _street;
+            void _houseNumber;
             const listingData = {
                 ...rest,
                 status: transactionType,
@@ -155,9 +158,9 @@ export function PropertyForm() {
             const hrefId = data.slug || data.id;
             router.push(`/properties/${hrefId}`);
             toast.success("Draft saved. Finish and publish anytime from your dashboard.");
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Draft save failed", error);
-            const res = error.response;
+            const res = axios.isAxiosError(error) ? error.response : undefined;
             const errData = res?.data;
             const msg =
                 typeof errData?.message === "string"
@@ -185,7 +188,9 @@ export function PropertyForm() {
         try {
             const imageUrls = await uploadImages();
 
-            const { sqft, beds, baths, transactionType, state, zipCode, street, houseNumber, ...rest } = values;
+            const { sqft, beds, baths, transactionType, state, zipCode, street: _street, houseNumber: _houseNumber, ...rest } = values;
+            void _street;
+            void _houseNumber;
 
             const listingData = {
                 ...rest,
@@ -206,9 +211,9 @@ export function PropertyForm() {
             const hrefId = data.slug || data.id;
             router.push(`/properties/${hrefId}`);
             toast.success("Property published successfully!");
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Submission failed", error);
-            const res = error.response;
+            const res = axios.isAxiosError(error) ? error.response : undefined;
             const data = res?.data;
             if (data && typeof data === "object" && Object.keys(data).length > 0) {
                 const label = res.status === 400 ? "Validation / request errors:" : "API error response:";
@@ -228,11 +233,19 @@ export function PropertyForm() {
         }
     };
 
+    const onInvalid: SubmitErrorHandler<ListingFormValues> = (errors) => {
+        const missingFields = Object.keys(errors).join(", ");
+        toast.error("Please fill in all required fields", {
+            description: `Missing or invalid: ${missingFields}`,
+        });
+        console.error("Form validation errors:", errors);
+    };
+
     return (
         <FormProvider {...form}>
             <div className="min-h-screen bg-[#f8f9fc] font-sans text-slate-800 flex flex-col">
                 <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-                    <form onSubmit={handleSubmit(onSubmit as any)} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
 
                         {/* Left Column: Form Content - Independent Scroll */}
                         <div className="lg:col-span-7 lg:pr-4 space-y-10">
@@ -392,13 +405,7 @@ export function PropertyForm() {
                                     </Button>
                                     <Button
                                         type="button"
-                                        onClick={handleSubmit(onSubmit as any, (errors) => {
-                                            const missingFields = Object.keys(errors).join(", ");
-                                            toast.error("Please fill in all required fields", {
-                                                description: `Missing or invalid: ${missingFields}`
-                                            });
-                                            console.error("Form validation errors:", errors);
-                                        })}
+                                        onClick={handleSubmit(onSubmit, onInvalid)}
                                         disabled={isUploading || !isStepValid}
                                         className={cn(
                                             "w-full sm:w-auto text-white text-sm font-bold px-6 py-2.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2",

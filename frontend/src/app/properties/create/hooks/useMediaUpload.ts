@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { FileWithPreview, MediaUploadResult, UploadError } from '../types/media';
+import { FileWithPreview, UploadError } from '../types/media';
 import { API_ENDPOINTS } from '../constants/apiEndpoints';
 import { revokeObjectURL } from '../utils/imageCleanup';
 

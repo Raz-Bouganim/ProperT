@@ -1,4 +1,3 @@
-import { Heading, Text } from "@/components/ui/Typography";
 import { Card } from "@/components/ui/Card";
 import { LucideIcon } from "lucide-react";
 
@@ -10,7 +9,8 @@ interface PropertyTypeCardProps {
     onClick: () => void;
 }
 
-export function PropertyTypeCard({ id, label, icon: Icon, selected, onClick }: PropertyTypeCardProps) {
+export function PropertyTypeCard({ id: _id, label, icon: Icon, selected, onClick }: PropertyTypeCardProps) {
+    void _id;
     return (
         <Card
             selected={selected}

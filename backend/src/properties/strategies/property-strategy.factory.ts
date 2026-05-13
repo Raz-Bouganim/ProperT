@@ -7,7 +7,10 @@ import { OfficeForSaleStrategy } from './office-for-sale.strategy';
 import { OfficeForRentStrategy } from './office-for-rent.strategy';
 
 export class PropertyStrategyFactory {
-  static for(type: PropertyType, status: PropertyStatus): IPropertyListingStrategy {
+  static for(
+    type: PropertyType,
+    status: PropertyStatus,
+  ): IPropertyListingStrategy {
     if (type === PropertyType.APARTMENT || type === PropertyType.HOUSE) {
       return status === PropertyStatus.FOR_RENT
         ? new ResidentialForRentStrategy()
@@ -18,6 +21,8 @@ export class PropertyStrategyFactory {
         ? new OfficeForRentStrategy()
         : new OfficeForSaleStrategy();
     }
-    throw new BadRequestException(`Unsupported property type: ${type}`);
+    throw new BadRequestException(
+      `Unsupported property type: ${String(type as unknown)}`,
+    );
   }
 }

@@ -8,7 +8,11 @@ export class ResidentialForRentStrategy extends ResidentialBaseStrategy {
     this.assertRentalPublishRules(dto);
   }
 
-  prepareData(dto: CreatePropertyDto, _willPublish: boolean): PreparedListingData {
+  prepareData(
+    dto: CreatePropertyDto,
+    willPublish: boolean,
+  ): PreparedListingData {
+    void willPublish;
     return this.prepareRentalData(dto);
   }
 }

@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  UseGuards,
+  Request,
+  UnauthorizedException,
+} from '@nestjs/common';
+import type { Request as ExpressRequest } from 'express';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
@@ -6,12 +19,15 @@ import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/auth.guards';
 
 @Controller('properties')
 export class PropertiesController {
-  constructor(private readonly propertiesService: PropertiesService) { }
+  constructor(private readonly propertiesService: PropertiesService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Request() req: any, @Body() createPropertyDto: CreatePropertyDto) {
-    if (!req.user || !req.user.userId) {
+  create(
+    @Request() req: ExpressRequest,
+    @Body() createPropertyDto: CreatePropertyDto,
+  ) {
+    if (!req.user?.userId) {
       throw new UnauthorizedException();
     }
     createPropertyDto.ownerId = req.user.userId;
@@ -21,6 +37,7 @@ export class PropertiesController {
   @UseGuards(OptionalJwtAuthGuard)
   @Get()
   findAll(
+    @Request() req: ExpressRequest,
     @Query('owner') owner?: string,
     @Query('lat') lat?: string,
     @Query('lng') lng?: string,
@@ -33,7 +50,6 @@ export class PropertiesController {
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-    @Request() req?: any,
   ) {
     // Geo search: GET /properties?lat=...&lng=...&radius=...
     if (lat && lng && radius) {
@@ -50,13 +66,13 @@ export class PropertiesController {
           status,
           page: page ? parseInt(page) : 1,
           limit: limit ? parseInt(limit) : 9,
-        }
+        },
       );
     }
 
     // Owner filter: GET /properties?owner=me
     if (owner === 'me') {
-      if (!req?.user?.userId) {
+      if (!req.user?.userId) {
         throw new UnauthorizedException();
       }
       return this.propertiesService.findAll(req.user.userId);
@@ -67,25 +83,33 @@ export class PropertiesController {
 
   @UseGuards(JwtAuthGuard)
   @Get('mine')
-  findMine(@Request() req: any) {
-    return this.propertiesService.findAll(req.user.userId);
+  findMine(@Request() req: ExpressRequest) {
+    return this.propertiesService.findAll(req.user!.userId);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  findOne(@Request() req: { user?: { userId: string } }, @Param('id') id: string) {
+  findOne(@Request() req: ExpressRequest, @Param('id') id: string) {
     return this.propertiesService.findOne(id, req.user?.userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  update(@Request() req: any, @Param('id') id: string, @Body() updatePropertyDto: UpdatePropertyDto) {
-    return this.propertiesService.update(req.user.userId, id, updatePropertyDto);
+  update(
+    @Request() req: ExpressRequest,
+    @Param('id') id: string,
+    @Body() updatePropertyDto: UpdatePropertyDto,
+  ) {
+    return this.propertiesService.update(
+      req.user!.userId,
+      id,
+      updatePropertyDto,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  remove(@Request() req: any, @Param('id') id: string) {
-    return this.propertiesService.remove(req.user.userId, id);
+  remove(@Request() req: ExpressRequest, @Param('id') id: string) {
+    return this.propertiesService.remove(req.user!.userId, id);
   }
 }

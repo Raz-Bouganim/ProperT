@@ -3,7 +3,8 @@
 import { Suspense, useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
+import axios from 'axios';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
@@ -59,20 +60,22 @@ function AuthPageContent() {
             toast.success(mode === 'login' ? 'Welcome back!' : 'Account created successfully!');
             saveAuth(data.access_token, data.user);
             router.push(redirectUrl);
-        } catch (err: any) {
-            const responseData = err.response?.data;
+        } catch (err: unknown) {
+            const responseData = axios.isAxiosError(err) ? err.response?.data : undefined;
 
             // Helper to extract a human-readable string from potentially nested error objects
-            const extractMessage = (data: any): string => {
+            const extractMessage = (data: unknown): string => {
                 if (!data) return '';
                 if (typeof data === 'string') return data;
+                if (typeof data !== 'object') return '';
 
                 // NestJS/Express common keys
-                const msg = data.message || data.msg || data.error;
+                const record = data as Record<string, unknown>;
+                const msg = record.message ?? record.msg ?? record.error;
 
                 if (Array.isArray(msg)) return String(msg[0]);
                 if (typeof msg === 'string') return msg;
-                if (typeof msg === 'object') return extractMessage(msg); // Recurse one level
+                if (typeof msg === 'object' && msg !== null) return extractMessage(msg); // Recurse one level
 
                 return '';
             };
@@ -80,13 +83,15 @@ function AuthPageContent() {
             let finalMsg = extractMessage(responseData);
 
             // Special case for 401 Unauthorized (wrong password etc)
-            if (err.response?.status === 401) {
+            if (axios.isAxiosError(err) && err.response?.status === 401) {
                 if (!finalMsg || finalMsg.toLowerCase() === 'unauthorized') {
                     finalMsg = 'Invalid email or password';
                 }
             }
 
-            finalMsg = finalMsg || err.response?.statusText || err.message || 'Authentication failed';
+            const statusText = axios.isAxiosError(err) ? err.response?.statusText : undefined;
+            const errMessage = err instanceof Error ? err.message : undefined;
+            finalMsg = finalMsg || statusText || errMessage || 'Authentication failed';
             toast.error(finalMsg);
         } finally {
             setIsLoading(false);

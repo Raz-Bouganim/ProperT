@@ -18,10 +18,11 @@ import { PropertyCard } from "@/components/PropertyCard";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Footer } from "@/components/layout/Footer";
+import { coverImageUrl, type PropertyListingPreview } from "@/types/property-listing";
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
-  const [featuredListings, setFeaturedListings] = useState<any[]>([]);
+  const [featuredListings, setFeaturedListings] = useState<PropertyListingPreview[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchLocation, setSearchLocation] = useState("");
   const [propertyType, setPropertyType] = useState("All Types");
@@ -232,13 +233,7 @@ export default function Home() {
                   beds={listing.bedrooms || 2}
                   baths={listing.bathrooms || 1}
                   sqft={listing.sqft ?? listing.size ?? 0}
-                  image={
-                    listing.coverImageUrl ||
-                    (typeof listing.images?.[0] === "object" && listing.images[0]?.url
-                      ? listing.images[0].url
-                      : listing.images?.[0]) ||
-                    fallbackImages[index % 3]
-                  }
+                  image={coverImageUrl(listing, fallbackImages[index % 3])}
                   isFeatured
                   type={listing.type || "For Sale"}
                   status={listing.status}

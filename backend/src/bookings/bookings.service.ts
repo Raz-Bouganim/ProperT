@@ -8,7 +8,11 @@ import { BookingStatus } from '@prisma/client';
 import { AvailabilityService } from '../availability/availability.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BOOKING_SLOT_BLOCKING_STATUSES } from './booking-status.constants';
-import { formatBookingHistoryLine, prependBookingNoteHistory, type BookingAuditRole } from './booking-note.util';
+import {
+  formatBookingHistoryLine,
+  prependBookingNoteHistory,
+  type BookingAuditRole,
+} from './booking-note.util';
 
 const TERMINAL_STATUSES: BookingStatus[] = [
   BookingStatus.REJECTED,
@@ -57,7 +61,9 @@ export class BookingsService {
     });
 
     if (existingUserBooking) {
-      throw new BadRequestException('You already have a booking for this property');
+      throw new BadRequestException(
+        'You already have a booking for this property',
+      );
     }
 
     const initialNote = createBookingDto.notes?.trim();
@@ -90,7 +96,8 @@ export class BookingsService {
     for (const b of rows) {
       if (
         b.endTime < now &&
-        (b.status === BookingStatus.PENDING || b.status === BookingStatus.CONFIRMED)
+        (b.status === BookingStatus.PENDING ||
+          b.status === BookingStatus.CONFIRMED)
       ) {
         const line = formatBookingHistoryLine(
           new Date(),
@@ -113,7 +120,16 @@ export class BookingsService {
 
   async findAllByUser(userId: string, role: 'SEEKER' | 'OWNER') {
     const base = {
-      include: { property: true, ...(role === 'OWNER' ? { seeker: { select: { firstName: true, lastName: true, email: true } } } : {}) },
+      include: {
+        property: true,
+        ...(role === 'OWNER'
+          ? {
+              seeker: {
+                select: { firstName: true, lastName: true, email: true },
+              },
+            }
+          : {}),
+      },
       orderBy: { startTime: 'desc' as const },
     };
 
@@ -174,14 +190,21 @@ export class BookingsService {
       throw new BadRequestException('This booking can no longer be changed');
     }
 
-    const role = this.resolveRole(booking.seekerId, booking.property.ownerId, userId);
+    const role = this.resolveRole(
+      booking.seekerId,
+      booking.property.ownerId,
+      userId,
+    );
     if (!role) {
       throw new ForbiddenException('You cannot modify this booking');
     }
 
     const noteText = dto.note.trim();
     const line = (r: BookingAuditRole, msg: string) =>
-      prependBookingNoteHistory(booking.noteHistory, formatBookingHistoryLine(new Date(), r, msg));
+      prependBookingNoteHistory(
+        booking.noteHistory,
+        formatBookingHistoryLine(new Date(), r, msg),
+      );
 
     const reschedule = hasStart && hasEnd;
 
@@ -193,7 +216,9 @@ export class BookingsService {
         booking.status !== BookingStatus.PENDING &&
         booking.status !== BookingStatus.CONFIRMED
       ) {
-        throw new BadRequestException('Can only reschedule pending or confirmed bookings');
+        throw new BadRequestException(
+          'Can only reschedule pending or confirmed bookings',
+        );
       }
       const start = new Date(dto.startTime!);
       const end = new Date(dto.endTime!);
@@ -212,7 +237,10 @@ export class BookingsService {
           status: BookingStatus.PENDING,
           noteHistory: line('SEEKER', `Rescheduled: ${noteText}`),
         },
-        include: { property: true, seeker: { select: { firstName: true, lastName: true, email: true } } },
+        include: {
+          property: true,
+          seeker: { select: { firstName: true, lastName: true, email: true } },
+        },
       });
     }
 
@@ -227,9 +255,15 @@ export class BookingsService {
       where: { id },
       data: {
         status: next,
-        noteHistory: line(role, this.transitionNote(role, booking.status, next, noteText)),
+        noteHistory: line(
+          role,
+          this.transitionNote(role, booking.status, next, noteText),
+        ),
       },
-      include: { property: true, seeker: { select: { firstName: true, lastName: true, email: true } } },
+      include: {
+        property: true,
+        seeker: { select: { firstName: true, lastName: true, email: true } },
+      },
     });
   }
 
@@ -273,7 +307,10 @@ export class BookingsService {
 
     if (role === 'OWNER') {
       if (current === BookingStatus.PENDING) {
-        if (next !== BookingStatus.CONFIRMED && next !== BookingStatus.REJECTED) {
+        if (
+          next !== BookingStatus.CONFIRMED &&
+          next !== BookingStatus.REJECTED
+        ) {
           throw new BadRequestException(
             'Owner can only confirm or reject a pending request (cannot cancel from pending)',
           );

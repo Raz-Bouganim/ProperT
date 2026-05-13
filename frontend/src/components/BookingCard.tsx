@@ -26,28 +26,30 @@ export type BookingPatchBody = {
     note: string;
 };
 
-interface BookingCardProps {
-    booking: {
+export type BookingCardBooking = {
+    id: string;
+    startTime: string;
+    endTime: string;
+    status: string;
+    noteHistory?: string | null;
+    property: {
         id: string;
-        startTime: string;
-        endTime: string;
-        status: string;
-        noteHistory?: string | null;
-        property: {
-            id: string;
-            title: string;
-            address?: string;
-            addressLine?: string;
-            timeZone?: string;
-            images: Array<string | { url: string }>;
-            price: number;
-        };
-        seeker?: {
-            firstName: string;
-            lastName: string;
-            email: string;
-        };
+        title: string;
+        address?: string;
+        addressLine?: string;
+        timeZone?: string;
+        images: Array<string | { url: string }>;
+        price: number | string;
     };
+    seeker?: {
+        firstName: string;
+        lastName: string;
+        email: string;
+    };
+};
+
+interface BookingCardProps {
+    booking: BookingCardBooking;
     role: "SEEKER" | "OWNER";
     onPatched?: (updated: unknown) => void;
 }

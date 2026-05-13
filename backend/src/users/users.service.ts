@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotImplementedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotImplementedException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,11 +12,16 @@ import { resolveAvatarUrl } from './user-avatar.util';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   // Local-password registration is replaced by Auth0 in Phase 2.
-  async create(_createUserDto: CreateUserDto): Promise<User> {
-    throw new NotImplementedException('User creation must go through the Auth0 OAuth flow.');
+  create(createUserDto: CreateUserDto): Promise<User> {
+    void createUserDto;
+    return Promise.reject(
+      new NotImplementedException(
+        'User creation must go through the Auth0 OAuth flow.',
+      ),
+    );
   }
 
   toPublic(user: User) {
@@ -33,13 +42,20 @@ export class UsersService {
   }
 
   findByEmail(email: string) {
-    return this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    return this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
   }
 
-  private namesFromAuth0Profile(p: Auth0UserProfile): { firstName: string; lastName: string } {
+  private namesFromAuth0Profile(p: Auth0UserProfile): {
+    firstName: string;
+    lastName: string;
+  } {
     const firstName = p.given_name || p.name?.split(/\s+/)[0] || 'User';
     const lastName =
-      p.family_name || (p.name?.includes(' ') ? p.name.split(/\s+/).slice(1).join(' ') : '') || 'User';
+      p.family_name ||
+      (p.name?.includes(' ') ? p.name.split(/\s+/).slice(1).join(' ') : '') ||
+      'User';
     return { firstName, lastName };
   }
 
@@ -50,7 +66,9 @@ export class UsersService {
       );
     }
     const email = p.email.toLowerCase();
-    const bySub = await this.prisma.user.findUnique({ where: { externalId: p.sub } });
+    const bySub = await this.prisma.user.findUnique({
+      where: { externalId: p.sub },
+    });
     if (bySub) {
       return bySub;
     }

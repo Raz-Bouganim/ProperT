@@ -1,4 +1,4 @@
-import { useForm, UseFormReturn } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
@@ -26,7 +26,7 @@ export const listingSchema = z.object({
     amenities: z.array(z.string()).optional(),
 
     // Step 3: Media
-    images: z.any().optional(),
+    images: z.unknown().optional(),
     floorPlanUrl: z.string().optional(),
     virtualTourUrl: z.string().optional(),
 
@@ -56,7 +56,7 @@ export type ListingFormValues = z.infer<typeof listingSchema>;
 
 export const useListingForm = () => {
     const form = useForm<ListingFormValues>({
-        resolver: zodResolver(listingSchema) as any,
+        resolver: zodResolver(listingSchema) as Resolver<ListingFormValues>,
         defaultValues: {
             transactionType: "FOR_SALE",
             type: "APARTMENT",

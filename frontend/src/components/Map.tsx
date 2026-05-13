@@ -2,11 +2,13 @@ import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-lea
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useState, useMemo } from "react";
+import Image from "next/image";
 import { X, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { PropertyListingPreview } from "@/types/property-listing";
 
 interface MapProps {
-    listings: any[];
+    listings: PropertyListingPreview[];
     center?: [number, number];
     zoom?: number;
     hoveredListingId?: string | null;
@@ -91,9 +93,18 @@ export default function Map({
     isNavigable: isNavigableProp,
     allowMarkerClick: allowMarkerClickProp,
 }: MapProps) {
-    const [selectedListing, setSelectedListing] = useState<any>(null);
+    const [selectedListing, setSelectedListing] = useState<PropertyListingPreview | null>(null);
     const isNavigable = isNavigableProp ?? !!isInteractive;
     const allowMarkerClick = allowMarkerClickProp ?? true;
+
+    const hoverListing = useMemo(
+        () =>
+            hoveredListingId
+                ? listings.find((l) => l.id === hoveredListingId) ?? null
+                : null,
+        [hoveredListingId, listings],
+    );
+    const floatingListing = hoverListing ?? selectedListing;
 
     const getCurrencySymbol = (currencyCode?: string) => {
         const symbols: Record<string, string> = {
@@ -112,14 +123,6 @@ export default function Map({
         }
         return center;
     }, [listings, center]);
-
-    // Effect to auto-select highlighted listing
-    useEffect(() => {
-        if (hoveredListingId) {
-            const listing = listings.find(l => l.id === hoveredListingId);
-            if (listing) setSelectedListing(listing);
-        }
-    }, [hoveredListingId, listings]);
 
     // Custom Marker Icons
     const createCustomIcon = (highlighted: boolean) => {
@@ -166,7 +169,7 @@ export default function Map({
                         <Marker
                             key={listing.id}
                             position={[listing.latitude, listing.longitude]}
-                            icon={createCustomIcon(hoveredListingId === listing.id || selectedListing?.id === listing.id)}
+                            icon={createCustomIcon(hoveredListingId === listing.id || floatingListing?.id === listing.id)}
                             draggable={isInteractive && listing.id === "preview"}
                             interactive={allowMarkerClick || (isInteractive && listing.id === "preview")}
                             eventHandlers={
@@ -189,21 +192,35 @@ export default function Map({
             </MapContainer>
 
             {/* Floating Property Card */}
-            {selectedListing && selectedListing.id !== "preview" && (
+            {floatingListing && floatingListing.id !== "preview" && (
                 <div className="absolute bottom-6 left-6 right-6 md:right-auto md:w-80 bg-white p-4 rounded-xl shadow-2xl z-20 animate-in slide-in-from-bottom-4 duration-300 border border-slate-100">
                     <div className="flex gap-4">
                         <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-slate-100">
-                            <img
-                                src={selectedListing.images?.[0] || "/placeholder.svg"}
-                                alt={selectedListing.title}
-                                className="object-cover w-full h-full"
+                            <Image
+                                src={(() => {
+                                    const raw = floatingListing.images?.[0];
+                                    if (typeof raw === "string") return raw;
+                                    if (raw && typeof raw === "object" && "url" in raw && raw.url)
+                                        return raw.url;
+                                    return "/placeholder.svg";
+                                })()}
+                                alt={floatingListing.title ?? "Property"}
+                                fill
+                                sizes="80px"
+                                className="object-cover"
+                                unoptimized
                             />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h3 className="font-bold text-slate-900 truncate">{selectedListing.title}</h3>
-                            <p className="text-slate-500 text-sm truncate">{selectedListing.address}</p>
+                            <h3 className="font-bold text-slate-900 truncate">{floatingListing.title}</h3>
+                            <p className="text-slate-500 text-sm truncate">
+                                {floatingListing.addressLine ?? floatingListing.address ?? ""}
+                            </p>
                             <div className="flex items-center justify-between mt-2">
-                                <span className="font-bold text-primary">{getCurrencySymbol(selectedListing.currency)}{Number(selectedListing.price).toLocaleString()}</span>
+                                <span className="font-bold text-primary">
+                                    {getCurrencySymbol(floatingListing.currency)}
+                                    {Number(floatingListing.price ?? 0).toLocaleString()}
+                                </span>
                                 <button
                                     type="button"
                                     className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 transition-colors cursor-pointer"
