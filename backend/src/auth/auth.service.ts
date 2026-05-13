@@ -40,18 +40,26 @@ export class AuthService {
     return this.issueAppTokens(user);
   }
 
-  async validateUser(_email: string, _pass: string): Promise<User | null> {
+  validateUser(email: string, pass: string): Promise<User | null> {
+    void email;
+    void pass;
     // Local password auth removed — all auth goes through Auth0 (Phase 2 cleans this up fully).
-    return null;
+    return Promise.resolve(null);
   }
 
   async loginWithCredentials(email: string, password: string) {
     const normalized = email.toLowerCase();
     if (this.useAuth0()) {
       try {
-        const tokens = await this.auth0Service.loginWithPassword(normalized, password);
-        const profile = await this.auth0Service.getUserProfile(tokens.access_token);
-        const user = await this.usersService.findOrCreateFromAuth0Profile(profile);
+        const tokens = await this.auth0Service.loginWithPassword(
+          normalized,
+          password,
+        );
+        const profile = await this.auth0Service.getUserProfile(
+          tokens.access_token,
+        );
+        const user =
+          await this.usersService.findOrCreateFromAuth0Profile(profile);
         return this.issueAppTokens(user);
       } catch (e) {
         if (e instanceof UnauthorizedException) {
@@ -85,7 +93,10 @@ export class AuthService {
       return this.loginWithCredentials(userDto.email, userDto.password);
     }
     const hashedPassword = await bcrypt.hash(userDto.password, 10);
-    const user = await this.usersService.create({ ...userDto, password: hashedPassword });
+    const user = await this.usersService.create({
+      ...userDto,
+      password: hashedPassword,
+    });
     return this.issueAppTokens(user);
   }
 
@@ -93,7 +104,10 @@ export class AuthService {
     if (!this.useAuth0()) {
       throw new BadRequestException('Auth0 is not configured on this server');
     }
-    const tokens = await this.auth0Service.exchangeAuthorizationCode(code, redirectUri);
+    const tokens = await this.auth0Service.exchangeAuthorizationCode(
+      code,
+      redirectUri,
+    );
     const profile = await this.auth0Service.getUserProfile(tokens.access_token);
     const user = await this.usersService.findOrCreateFromAuth0Profile(profile);
     return this.issueAppTokens(user);

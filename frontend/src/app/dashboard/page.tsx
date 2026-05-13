@@ -3,33 +3,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
-import { BookingCard } from "@/components/BookingCard";
+import { BookingCard, type BookingCardBooking } from "@/components/BookingCard";
 import { PropertyCard } from "@/components/PropertyCard";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-
-interface Booking {
-    id: string;
-    startTime: string;
-    endTime: string;
-    status: string;
-    noteHistory?: string | null;
-    property: {
-        id: string;
-        title: string;
-        address: string;
-        timeZone?: string;
-        images: string[];
-        price: number;
-    };
-    seeker?: {
-        firstName: string;
-        lastName: string;
-        email: string;
-    };
-}
 
 interface Listing {
     id: string;
@@ -51,7 +30,7 @@ interface Listing {
 
 export default function DashboardPage() {
     const { user, isLoading: authLoading } = useAuth();
-    const [bookings, setBookings] = useState<Booking[]>([]);
+    const [bookings, setBookings] = useState<BookingCardBooking[]>([]);
     const [listings, setListings] = useState<Listing[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'bookings' | 'listings'>('bookings');
@@ -101,7 +80,7 @@ export default function DashboardPage() {
     };
 
     const handleBookingPatched = (updated: unknown) => {
-        const b = updated as Booking;
+        const b = updated as Partial<BookingCardBooking> & { id: string };
         if (b?.id) {
             setBookings((prev) => prev.map((x) => (x.id === b.id ? { ...x, ...b } : x)));
         }
@@ -188,7 +167,7 @@ export default function DashboardPage() {
                                 bookings.map(booking => (
                                     <BookingCard
                                         key={booking.id}
-                                        booking={booking as any}
+                                        booking={booking}
                                         role="OWNER"
                                         onPatched={handleBookingPatched}
                                     />
@@ -201,7 +180,7 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {listings.length === 0 ? (
                                 <div className="col-span-full text-center py-12 border rounded-2xl bg-muted/20">
-                                    <p className="text-muted-foreground mb-4">You haven't listed any properties yet.</p>
+                                    <p className="text-muted-foreground mb-4">You haven&apos;t listed any properties yet.</p>
                                     <Link href="/properties/create">
                                         <Button variant="outline">Create your first listing</Button>
                                     </Link>
@@ -252,7 +231,7 @@ export default function DashboardPage() {
                     <h2 className="text-xl font-bold">My Bookings</h2>
                     {bookings.length === 0 ? (
                         <div className="text-center py-12 border rounded-2xl bg-muted/20">
-                            <p className="text-muted-foreground mb-4">You haven't made any bookings yet.</p>
+                            <p className="text-muted-foreground mb-4">You haven&apos;t made any bookings yet.</p>
                             <Link href="/search">
                                 <Button variant="outline">Browse Homes</Button>
                             </Link>
@@ -262,7 +241,7 @@ export default function DashboardPage() {
                             {bookings.map(booking => (
                                 <BookingCard
                                     key={booking.id}
-                                    booking={booking as any}
+                                    booking={booking}
                                     role="SEEKER"
                                     onPatched={handleBookingPatched}
                                 />

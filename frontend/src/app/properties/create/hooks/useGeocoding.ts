@@ -18,7 +18,7 @@ export const useGeocoding = (setValue: UseFormSetValue<ListingFormValues>) => {
         options?: { shouldValidate?: boolean }
     ) => {
         try {
-            setValue(field, value, options);
+            setValue(field, value as never, options);
         } catch (error) {
             console.error(`Failed to set ${String(field)}:`, error);
         }

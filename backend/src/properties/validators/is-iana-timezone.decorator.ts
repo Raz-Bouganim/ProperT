@@ -1,4 +1,8 @@
-import { registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+import {
+  registerDecorator,
+  ValidationOptions,
+  ValidationArguments,
+} from 'class-validator';
 import { IANAZone } from 'luxon';
 
 /** Validates `value` is a known IANA time zone name (e.g. America/New_York). */
@@ -10,7 +14,8 @@ export function IsIanaTimeZone(validationOptions?: ValidationOptions) {
       propertyName,
       options: validationOptions,
       validator: {
-        validate(value: unknown, _args: ValidationArguments) {
+        validate(value: unknown, args: ValidationArguments) {
+          void args;
           if (value === undefined || value === null) return true;
           if (typeof value !== 'string') return false;
           const z = value.trim();

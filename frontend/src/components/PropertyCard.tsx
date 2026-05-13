@@ -41,8 +41,6 @@ export function PropertyCard({
     image,
     detailsHref,
     isLoading,
-    isFeatured,
-    type = "New Construction",
     status = "For Sale",
     onMouseEnter,
     onMouseLeave,
@@ -80,16 +78,12 @@ export function PropertyCard({
     }
 
     const isRent = status?.toLowerCase().includes("rent") || status === "FOR_RENT";
-    const Wrapper = (preview ? 'div' : Link) as any;
-    const wrapperProps = preview ? {} : { href: (detailsHref ?? `/properties/${id}`) };
 
-    return (
-        <Wrapper
-            {...wrapperProps}
-            onMouseEnter={onMouseEnter}
-            onMouseLeave={onMouseLeave}
-            className="group block bg-transparent border border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 h-full bg-white"
-        >
+    const cardClassName =
+        "group block bg-transparent border border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 h-full bg-white";
+
+    const inner = (
+        <>
             <div className="relative aspect-[4/3] overflow-hidden">
                 <Image
                     src={image || "/placeholder.svg"}
@@ -160,6 +154,29 @@ export function PropertyCard({
                     </div>
                 </div>
             </div>
-        </Wrapper>
+        </>
+    );
+
+    if (preview) {
+        return (
+            <div
+                className={cardClassName}
+                onMouseEnter={onMouseEnter}
+                onMouseLeave={onMouseLeave}
+            >
+                {inner}
+            </div>
+        );
+    }
+
+    return (
+        <Link
+            href={detailsHref ?? `/properties/${id}`}
+            className={cardClassName}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
+        >
+            {inner}
+        </Link>
     );
 }

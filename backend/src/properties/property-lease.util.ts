@@ -1,7 +1,9 @@
 import { PropertyStatus } from '@prisma/client';
 
 /** Parse UI strings like "12 Months" or "Flexible / Short Term" + Prisma month count. */
-export function parseLeaseDurationInput(leaseDuration?: string | null): number | null {
+export function parseLeaseDurationInput(
+  leaseDuration?: string | null,
+): number | null {
   if (leaseDuration == null || !String(leaseDuration).trim()) return null;
   const s = String(leaseDuration).trim();
   if (/^flexible/i.test(s)) return null;

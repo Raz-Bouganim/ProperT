@@ -12,11 +12,57 @@ import { BookingWizard } from "@/components/BookingWizard";
 import { ChatWindow } from "@/components/ChatWindow";
 import { LightboxGallery } from "@/components/listing/LightboxGallery";
 import api from "@/lib/api";
-import { useAuth } from "@/context/AuthContext";
 import { PROPERTY_TYPES } from "@/app/properties/create/constants/propertyTypes";
 import { AMENITIES } from "@/app/properties/create/constants/amenities";
 import { Footer } from "@/components/layout/Footer";
 import { toast } from "sonner";
+
+type DetailImage = string | { url?: string };
+type AmenityLike = string | { amenity?: string; feature?: string };
+
+interface PropertyDetailState {
+    id: string;
+    slug?: string;
+    title?: string;
+    publishedAt?: string | null;
+    createdAt?: string;
+    addressLine?: string;
+    address?: string;
+    city?: string;
+    region?: string;
+    postalCode?: string;
+    country?: string;
+    images?: DetailImage[];
+    amenities?: AmenityLike[];
+    features?: AmenityLike[];
+    owner?: { firstName?: string; lastName?: string; avatar?: string };
+    ownerId?: string;
+    status?: string;
+    type?: string;
+    timeZone?: string;
+    price?: number | string;
+    negotiable?: boolean;
+    leaseDurationLabel?: string;
+    leaseDuration?: string;
+    availableFrom?: string;
+    description?: string;
+    bedrooms?: number;
+    bathrooms?: number;
+    sqft?: number | string;
+    latitude?: number | string;
+    longitude?: number | string;
+    currency?: string;
+}
+
+function resolveDetailImage(img: DetailImage): string {
+    if (typeof img === "string") return img;
+    return img.url ?? "";
+}
+
+function resolveAmenityToken(f: AmenityLike): string {
+    if (typeof f === "string") return f;
+    return String(f.amenity ?? f.feature ?? "");
+}
 
 // Dynamically import Map to avoid SSR issues with Leaflet
 const Map = dynamic(() => import("@/components/Map"), {
@@ -34,8 +80,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isGalleryOpen, setIsGalleryOpen] = useState(false);
     const [galleryIndex, setGalleryIndex] = useState(0);
-    const { user } = useAuth();
-    const [property, setProperty] = useState<any>(null);
+    const [property, setProperty] = useState<PropertyDetailState | null>(null);
     const [loading, setLoading] = useState(true);
 
     const searchParams = useSearchParams();
@@ -109,7 +154,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
         const fetchProperty = async () => {
             try {
                 const res = await api.get(`/properties/${id}`);
-                setProperty(res.data);
+                setProperty(res.data as PropertyDetailState);
             } catch (error) {
                 console.error("Failed to fetch property:", error);
             } finally {
@@ -135,7 +180,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
             <div className="min-h-screen flex items-center justify-center p-4 text-center">
                 <div>
                     <h2 className="text-2xl font-bold mb-2">Property not found</h2>
-                    <p className="text-muted-foreground mb-6">The property you're looking for doesn't exist or has been removed.</p>
+                    <p className="text-muted-foreground mb-6">The property you&apos;re looking for doesn&apos;t exist or has been removed.</p>
                     <Link href={returnHref}>
                         <Button variant="outline">{returnLabel}</Button>
                     </Link>
@@ -152,7 +197,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
     const displayProperty = {
         ...property,
         images: (property.images && property.images.length > 0)
-            ? property.images.map((img: any) => img.url ?? img)
+            ? property.images.map((img) => resolveDetailImage(img))
             : ["/placeholder-property.svg"],
         owner: {
             name: property.owner?.firstName ? `${property.owner.firstName} ${property.owner.lastName}` : "Property Owner",
@@ -166,7 +211,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
                 ? new Date(property.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                 : null,
         },
-        features: (property.amenities ?? property.features ?? []).map((f: any) => f.amenity ?? f.feature ?? f),
+        features: (property.amenities ?? property.features ?? []).map((f) => resolveAmenityToken(f)),
     };
 
     const getImg = (index: number) => displayProperty.images[index] || displayProperty.images[0] || "/placeholder-property.svg";
@@ -522,7 +567,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
                             </div>
 
                             <p className="mt-6 text-[10px] text-center text-muted-foreground italic">
-                                By clicking "Request a viewing", you agree to our terms of service and direct connection policy.
+                                By clicking &quot;Request a viewing&quot;, you agree to our terms of service and direct connection policy.
                             </p>
                         </div>
                     </div>
@@ -538,8 +583,8 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
 
             <ChatWindow
                 propertyId={property.id}
-                ownerId={property.ownerId}
-                propertyTitle={property.title}
+                ownerId={property.ownerId ?? ""}
+                propertyTitle={property.title ?? "Listing"}
                 isOpen={isChatOpen}
                 onClose={() => setIsChatOpen(false)}
             />

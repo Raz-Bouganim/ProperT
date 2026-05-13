@@ -54,7 +54,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
 
         checkAuth();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Rolling session: refresh logic

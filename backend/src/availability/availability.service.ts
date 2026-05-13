@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { type PropertyAvailability } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,7 +26,12 @@ export class AvailabilityService {
 
   async setAvailability(
     propertyId: string,
-    schedule: { dayOfWeek?: number; date?: string; startTime: string; endTime: string }[],
+    schedule: {
+      dayOfWeek?: number;
+      date?: string;
+      startTime: string;
+      endTime: string;
+    }[],
   ) {
     return this.prisma.$transaction(async (tx) => {
       await tx.propertyAvailability.deleteMany({ where: { propertyId } });
@@ -70,7 +79,10 @@ export class AvailabilityService {
       throw new BadRequestException('Invalid date');
     }
     const [year, month, day] = parts;
-    const dayStart = DateTime.fromObject({ year, month, day }, { zone: tz }).startOf('day');
+    const dayStart = DateTime.fromObject(
+      { year, month, day },
+      { zone: tz },
+    ).startOf('day');
     if (!dayStart.isValid) {
       throw new BadRequestException('Invalid date');
     }
@@ -93,7 +105,11 @@ export class AvailabilityService {
       }
       if (r.date != null) {
         const ruleLocal = DateTime.fromJSDate(r.date).setZone(tz);
-        return ruleLocal.year === year && ruleLocal.month === month && ruleLocal.day === day;
+        return (
+          ruleLocal.year === year &&
+          ruleLocal.month === month &&
+          ruleLocal.day === day
+        );
       }
       return false;
     });
@@ -119,8 +135,18 @@ export class AvailabilityService {
       const [startH, startM] = availability.startTime.split(':').map(Number);
       const [endH, endM] = availability.endTime.split(':').map(Number);
 
-      let current = dayStart.set({ hour: startH, minute: startM, second: 0, millisecond: 0 });
-      const endLimit = dayStart.set({ hour: endH, minute: endM, second: 0, millisecond: 0 });
+      let current = dayStart.set({
+        hour: startH,
+        minute: startM,
+        second: 0,
+        millisecond: 0,
+      });
+      const endLimit = dayStart.set({
+        hour: endH,
+        minute: endM,
+        second: 0,
+        millisecond: 0,
+      });
 
       while (current < endLimit) {
         const slotStart = current;
@@ -131,7 +157,10 @@ export class AvailabilityService {
         const overlapsBooked = bookings.some((b) => {
           const bStart = DateTime.fromJSDate(b.startTime);
           const bEnd = DateTime.fromJSDate(b.endTime);
-          return slotStart.toMillis() < bEnd.toMillis() && slotEnd.toMillis() > bStart.toMillis();
+          return (
+            slotStart.toMillis() < bEnd.toMillis() &&
+            slotEnd.toMillis() > bStart.toMillis()
+          );
         });
 
         if (!overlapsBooked) {
@@ -181,7 +210,11 @@ export class AvailabilityService {
     }
 
     const dateString = startLocal.toFormat('yyyy-MM-dd');
-    const slots = await this.getOpenSlots(propertyId, dateString, excludeBookingId);
+    const slots = await this.getOpenSlots(
+      propertyId,
+      dateString,
+      excludeBookingId,
+    );
     const hhmm = startLocal.toFormat('HH:mm');
     if (!slots.includes(hhmm)) {
       throw new BadRequestException(

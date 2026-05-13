@@ -49,7 +49,10 @@ export class Auth0Service {
     return res.data;
   }
 
-  async loginWithPassword(email: string, password: string): Promise<{ access_token: string }> {
+  async loginWithPassword(
+    email: string,
+    password: string,
+  ): Promise<{ access_token: string }> {
     const client_id = this.config.getOrThrow<string>('AUTH0_CLIENT_ID');
     const client_secret = this.config.getOrThrow<string>('AUTH0_CLIENT_SECRET');
     const audience = this.config.get<string>('AUTH0_AUDIENCE')?.trim();
@@ -72,9 +75,13 @@ export class Auth0Service {
     }
     try {
       const res = await firstValueFrom(
-        this.http.post<{ access_token: string }>(`${this.issuerBase()}/oauth/token`, body, {
-          headers: { 'content-type': 'application/json' },
-        }),
+        this.http.post<{ access_token: string }>(
+          `${this.issuerBase()}/oauth/token`,
+          body,
+          {
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
       );
       return res.data;
     } catch (e) {
@@ -132,9 +139,13 @@ export class Auth0Service {
     }
     try {
       const res = await firstValueFrom(
-        this.http.post<{ access_token: string }>(`${this.issuerBase()}/oauth/token`, body, {
-          headers: { 'content-type': 'application/json' },
-        }),
+        this.http.post<{ access_token: string }>(
+          `${this.issuerBase()}/oauth/token`,
+          body,
+          {
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
       );
       return res.data;
     } catch (e) {

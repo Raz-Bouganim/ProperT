@@ -4,9 +4,9 @@ import { MediaService } from './media.service';
 import { MediaController } from './media.controller';
 
 @Module({
-    imports: [ConfigModule],
-    controllers: [MediaController],
-    providers: [MediaService],
-    exports: [MediaService],
+  imports: [ConfigModule],
+  controllers: [MediaController],
+  providers: [MediaService],
+  exports: [MediaService],
 })
-export class MediaModule { }
+export class MediaModule {}

@@ -11,5 +11,8 @@ export interface PreparedListingData {
 export interface IPropertyListingStrategy {
   validateDraft(dto: CreatePropertyDto): void;
   validatePublish(dto: CreatePropertyDto): void;
-  prepareData(dto: CreatePropertyDto, willPublish: boolean): PreparedListingData;
+  prepareData(
+    dto: CreatePropertyDto,
+    willPublish: boolean,
+  ): PreparedListingData;
 }

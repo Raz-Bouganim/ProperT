@@ -1,40 +1,56 @@
 "use client";
 
 import { useState } from "react";
-import { Search, MapPin, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { MapPin, ChevronDown, SlidersHorizontal } from "lucide-react";
+import type { SearchFilterInitial, SearchFilterPatch } from "@/types/search-filters";
 
 interface FilterBarProps {
-    onFilterChange: (filters: any) => void;
+    onFilterChange: (filters: SearchFilterPatch) => void;
     initialLocation?: string;
-    initialFilters?: any;
+    initialFilters?: SearchFilterInitial;
 }
 
 export function FilterBar({ onFilterChange, initialLocation = "San Francisco, CA", initialFilters = {} }: FilterBarProps) {
     const [location, setLocation] = useState(initialLocation);
-    const [status, setStatus] = useState<"FOR_SALE" | "FOR_RENT">(initialFilters.status || "FOR_SALE");
-    const [priceRange, setPriceRange] = useState<{ min: number; max: number } | null>(
-        initialFilters.minPrice || initialFilters.maxPrice ? { min: initialFilters.minPrice, max: initialFilters.maxPrice } : null
+    const [status, setStatus] = useState<"FOR_SALE" | "FOR_RENT">(
+        (initialFilters.status === "FOR_RENT" ? "FOR_RENT" : "FOR_SALE"),
+    );
+    const [, setPriceRange] = useState<{ min: number; max: number } | null>(
+        initialFilters.minPrice || initialFilters.maxPrice
+            ? {
+                  min: initialFilters.minPrice ? Number(initialFilters.minPrice) : 0,
+                  max: initialFilters.maxPrice ? Number(initialFilters.maxPrice) : 0,
+              }
+            : null
     );
     const [propertyType, setPropertyType] = useState<string | null>(initialFilters.type || null);
-    const [beds, setBeds] = useState<number | null>(initialFilters.beds ? parseInt(initialFilters.beds) : null);
+    const [beds, setBeds] = useState<number | null>(initialFilters.beds ? parseInt(initialFilters.beds, 10) : null);
 
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
-    const handleFilterUpdate = (key: string, value: any) => {
-        const newFilters: any = {};
+    const handleFilterUpdate = (
+        key: "status" | "price" | "type" | "beds",
+        value: "FOR_SALE" | "FOR_RENT" | { min?: number; max?: number } | null | string | number | null,
+    ) => {
+        const newFilters: SearchFilterPatch = {};
         if (key === "status") {
-            setStatus(value);
-            newFilters.status = value;
+            setStatus(value as "FOR_SALE" | "FOR_RENT");
+            newFilters.status = value as "FOR_SALE" | "FOR_RENT";
         } else if (key === "price") {
-            setPriceRange(value);
-            newFilters.minPrice = value?.min;
-            newFilters.maxPrice = value?.max;
+            const pr = value as { min?: number; max?: number } | null;
+            setPriceRange(
+                pr && (pr.min !== undefined || pr.max !== undefined)
+                    ? { min: pr.min ?? 0, max: pr.max ?? pr.min ?? 0 }
+                    : null,
+            );
+            newFilters.minPrice = pr?.min;
+            newFilters.maxPrice = pr?.max;
         } else if (key === "type") {
-            setPropertyType(value);
-            newFilters.type = value;
+            setPropertyType(value as string | null);
+            newFilters.type = value as string | null;
         } else if (key === "beds") {
-            setBeds(value);
-            newFilters.beds = value;
+            setBeds(value as number | null);
+            newFilters.beds = value as number | null;
         }
 
         onFilterChange(newFilters);

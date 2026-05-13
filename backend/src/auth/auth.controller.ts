@@ -11,7 +11,10 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() loginDto: LoginDto) {
-    return this.authService.loginWithCredentials(loginDto.email, loginDto.password);
+    return this.authService.loginWithCredentials(
+      loginDto.email,
+      loginDto.password,
+    );
   }
 
   @Post('register')

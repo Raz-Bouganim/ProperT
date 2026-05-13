@@ -51,9 +51,7 @@ export function LivePreview({ data, className }: LivePreviewProps) {
         propertyType,
     } = data;
 
-    const formattedPrice = price ? price.toLocaleString() : "0";
     const statusText = transactionType === "FOR_RENT" ? "For Rent" : "For Sale";
-    const priceDisplay = transactionType === "FOR_RENT" ? `$${formattedPrice}/mo` : `$${formattedPrice}`;
 
     return (
         <div className={cn("space-y-4", className)}>

@@ -14,7 +14,10 @@
 
 const UI_AVATARS_BASE = 'https://ui-avatars.com/api/';
 
-export function buildInitialsAvatarUrl(firstName: string, lastName: string): string {
+export function buildInitialsAvatarUrl(
+  firstName: string,
+  lastName: string,
+): string {
   const a = (firstName.trim()[0] ?? '?').toUpperCase();
   const b = (lastName.trim()[0] ?? '?').toUpperCase();
   const initials = `${a}${b}`;
@@ -27,7 +30,9 @@ export function buildInitialsAvatarUrl(firstName: string, lastName: string): str
   return `${UI_AVATARS_BASE}?${params.toString()}`;
 }
 
-export function isValidHttpsProfilePictureUrl(url: string | undefined | null): boolean {
+export function isValidHttpsProfilePictureUrl(
+  url: string | undefined | null,
+): boolean {
   if (url == null || typeof url !== 'string') return false;
   const trimmed = url.trim();
   if (!trimmed || trimmed.length > 2048) return false;

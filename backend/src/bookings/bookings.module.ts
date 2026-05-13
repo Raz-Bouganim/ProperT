@@ -10,4 +10,4 @@ import { PrismaModule } from '../prisma/prisma.module';
   controllers: [BookingsController],
   exports: [BookingsService],
 })
-export class BookingsModule { }
+export class BookingsModule {}

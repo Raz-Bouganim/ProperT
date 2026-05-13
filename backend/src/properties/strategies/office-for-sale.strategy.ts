@@ -6,7 +6,11 @@ export class OfficeForSaleStrategy extends BasePropertyStrategy {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected validateTypeAndStatusRules(_dto: CreatePropertyDto): void {}
 
-  prepareData(dto: CreatePropertyDto, _willPublish: boolean): PreparedListingData {
+  prepareData(
+    dto: CreatePropertyDto,
+    willPublish: boolean,
+  ): PreparedListingData {
+    void willPublish;
     return {
       leaseMonths: null,
       availableFrom: dto.availableDate ? new Date(dto.availableDate) : null,

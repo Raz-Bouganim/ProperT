@@ -13,7 +13,10 @@ export class PropertyAuthorizationService {
   /**
    * Loads a non–soft-deleted row owned by `userId`, or throws 404 (including wrong owner).
    */
-  async requireWritableProperty(userId: string, propertyId: string): Promise<Property> {
+  async requireWritableProperty(
+    userId: string,
+    propertyId: string,
+  ): Promise<Property> {
     const property = await this.prisma.property.findFirst({
       where: { id: propertyId, ownerId: userId, deletedAt: null },
     });

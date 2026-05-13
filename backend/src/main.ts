@@ -17,11 +17,13 @@ async function bootstrap() {
   });
 
   // Global Pipes & Filters
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-    forbidNonWhitelisted: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
 
   const httpAdapter = app.get(HttpAdapterHost);
   app.useGlobalFilters(new AllExceptionsFilter(httpAdapter));
@@ -37,9 +39,11 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   // Default 4000: macOS often uses 5000 for AirPlay Receiver (AirTunes), which breaks local API calls.
-  const port = configService.get('PORT') || 4000;
+  const rawPort = configService.get<string>('PORT');
+  const parsed = rawPort !== undefined ? Number(rawPort) : NaN;
+  const port = Number.isFinite(parsed) && parsed > 0 ? parsed : 4000;
   await app.listen(port);
   console.log(`Backend is running on: http://localhost:${port}`);
   console.log(`Swagger docs available at: http://localhost:${port}/api`);
 }
-bootstrap();
+void bootstrap();

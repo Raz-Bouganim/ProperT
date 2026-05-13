@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { DateTime } from "luxon";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Calendar as CalendarIcon, Clock, CheckCircle2, Loader2, ChevronRight, ChevronLeft } from "lucide-react";
+import { X, Calendar as CalendarIcon, Clock, CheckCircle2, Loader2, ChevronLeft } from "lucide-react";
 import { Button } from "./ui/Button";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -51,17 +51,10 @@ export function BookingWizard({
     /** Initial visible month when the modal opens (listing zone). */
     const defaultMonthInPropertyZone = useMemo(
         () => DateTime.now().setZone(propertyTimeZone).toJSDate(),
-        [propertyTimeZone, isOpen],
+        [propertyTimeZone],
     );
 
-    // Fetch availability rules on mount
-    useEffect(() => {
-        if (isOpen) {
-            fetchAvailability();
-        }
-    }, [isOpen, propertyId]);
-
-    const fetchAvailability = async () => {
+    const fetchAvailability = useCallback(async () => {
         try {
             const res = await api.get(`/properties/${propertyId}/availability`);
             setAvailabilityRules(res.data);
@@ -69,14 +62,40 @@ export function BookingWizard({
             console.error(error);
             toast.error("Failed to load availability.");
         }
-    };
+    }, [propertyId]);
+
+    const fetchSlots = useCallback(
+        async (date: Date) => {
+            setLoading(true);
+            setSelectedSlot(null); // Reset slot when date changes
+            try {
+                const dateStr = toPropertyDateKey(date, propertyTimeZone);
+                const res = await api.get(`/properties/${propertyId}/availability/slots?date=${dateStr}`);
+                setSlots(res.data);
+            } catch (error) {
+                console.error(error);
+                setSlots([]);
+                toast.error("Failed to load time slots.");
+            } finally {
+                setLoading(false);
+            }
+        },
+        [propertyId, propertyTimeZone],
+    );
+
+    // Fetch availability rules when the wizard opens or listing changes.
+    useEffect(() => {
+        if (isOpen) {
+            void fetchAvailability();
+        }
+    }, [isOpen, fetchAvailability]);
 
     // Fetch slots when date or listing time zone changes (date key must stay aligned with the API).
     useEffect(() => {
         if (selectedDate) {
             void fetchSlots(selectedDate);
         }
-    }, [selectedDate, propertyTimeZone]);
+    }, [selectedDate, fetchSlots]);
 
     const isDateAvailable = (date: Date) => {
         // No owner-defined rules: do not grey out calendar days (no weekly/date restriction in the UI).
@@ -99,22 +118,6 @@ export function BookingWizard({
             }
             return false;
         });
-    };
-
-    const fetchSlots = async (date: Date) => {
-        setLoading(true);
-        setSelectedSlot(null); // Reset slot when date changes
-        try {
-            const dateStr = toPropertyDateKey(date, propertyTimeZone);
-            const res = await api.get(`/properties/${propertyId}/availability/slots?date=${dateStr}`);
-            setSlots(res.data);
-        } catch (error) {
-            console.error(error);
-            setSlots([]);
-            toast.error("Failed to load time slots.");
-        } finally {
-            setLoading(false);
-        }
     };
 
     const handleBooking = async () => {
@@ -161,9 +164,9 @@ export function BookingWizard({
                 }, 500);
             }, 2000);
 
-        } catch (error) {
+        } catch (error: unknown) {
             const isAxios = axios.isAxiosError(error);
-            const response = isAxios ? error.response : (error as any)?.response;
+            const response = isAxios ? error.response : undefined;
             const data = response?.data;
 
             const shouldDebug =
