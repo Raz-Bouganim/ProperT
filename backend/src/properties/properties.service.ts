@@ -6,12 +6,13 @@
  * - `deletedAt` — soft-deleted / removed from normal UX; distinct from CLOSED.
  */
 
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Property, PropertyType, PropertyStatus, AmenityType } from '@prisma/client';
 import { parseLeaseDurationInput } from './property-lease.util';
+import { PropertyAuthorizationService } from './property-authorization.service';
 import { PropertyStrategyFactory } from './strategies/property-strategy.factory';
 import { publicUrlToObjectKey } from './property-image.util';
 import { makeUniqueSlugCandidate, slugifyTitle } from './property-slug.util';
@@ -93,7 +94,10 @@ function publishCheckDtoFromRecord(existing: Property, patch: UpdatePropertyDto)
 
 @Injectable()
 export class PropertiesService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private propertyAuthorization: PropertyAuthorizationService,
+  ) {}
 
   private async allocateUniqueSlug(title: string): Promise<string> {
     const base = slugifyTitle(title);
@@ -320,19 +324,8 @@ export class PropertiesService {
     return mapPropertyPublicResponse(property);
   }
 
-  private async assertOwner(userId: string, propertyId: string) {
-    const property = await this.prisma.property.findUnique({
-      where: { id: propertyId },
-      select: { ownerId: true },
-    });
-    if (!property) throw new NotFoundException('Property not found');
-    if (property.ownerId !== userId) throw new ForbiddenException('You can only modify your own listings');
-  }
-
   async update(userId: string, id: string, updatePropertyDto: UpdatePropertyDto) {
-    await this.assertOwner(userId, id);
-    const existing = await this.prisma.property.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Property not found');
+    const existing = await this.propertyAuthorization.requireWritableProperty(userId, id);
 
     const {
       price,
@@ -344,9 +337,11 @@ export class PropertiesService {
 
     const mergedStatus = (nextStatus ?? existing.status) as PropertyStatus;
 
-    if (nextStatus !== undefined && isLiveMarketStatus(nextStatus)) {
-      const imgCount = await this.prisma.propertyImage.count({ where: { propertyId: id } });
-      if (imgCount === 0) {
+    const needsImagesForLive = nextStatus !== undefined && isLiveMarketStatus(nextStatus);
+    const needsImagesForFirstPublish = publishFlag === true && !existing.publishedAt;
+    if (needsImagesForLive || needsImagesForFirstPublish) {
+      const imageCount = await this.prisma.propertyImage.count({ where: { propertyId: id } });
+      if (imageCount === 0) {
         throw new BadRequestException('Add at least one image before publishing.');
       }
     }
@@ -355,10 +350,6 @@ export class PropertiesService {
       const checkDto = publishCheckDtoFromRecord(existing, updatePropertyDto);
       const mergedType = (updatePropertyDto.type ?? existing.type) as PropertyType;
       PropertyStrategyFactory.for(mergedType, mergedStatus).validatePublish(checkDto);
-      const imgCount = await this.prisma.propertyImage.count({ where: { propertyId: id } });
-      if (imgCount === 0) {
-        throw new BadRequestException('Add at least one image before publishing.');
-      }
     }
 
     let publishedAt: Date | undefined = undefined;
@@ -420,10 +411,13 @@ export class PropertiesService {
       }
     }
 
-    await this.prisma.property.update({
-      where: { id },
+    const updated = await this.prisma.property.updateMany({
+      where: { id, ownerId: userId, deletedAt: null },
       data: data as any,
     });
+    if (updated.count !== 1) {
+      throw new NotFoundException('Property not found');
+    }
 
     if (updatePropertyDto.amenities !== undefined) {
       await this.prisma.propertyAmenity.deleteMany({ where: { propertyId: id } });
@@ -439,10 +433,20 @@ export class PropertiesService {
   }
 
   async remove(userId: string, id: string) {
-    await this.assertOwner(userId, id);
-    return this.prisma.property.update({
-      where: { id },
+    const deleted = await this.prisma.property.updateMany({
+      where: { id, ownerId: userId, deletedAt: null },
       data: { deletedAt: new Date() },
     });
+    if (deleted.count !== 1) {
+      throw new NotFoundException('Property not found');
+    }
+    const property = await this.prisma.property.findFirst({
+      where: { id, ownerId: userId },
+      include: { owner: true, availabilities: true, images: true, amenities: true },
+    });
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+    return mapPropertyPublicResponse(property);
   }
 }

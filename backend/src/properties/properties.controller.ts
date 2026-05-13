@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
@@ -12,12 +12,13 @@ export class PropertiesController {
   @Post()
   create(@Request() req: any, @Body() createPropertyDto: CreatePropertyDto) {
     if (!req.user || !req.user.userId) {
-      throw new Error("User ID missing in request");
+      throw new UnauthorizedException();
     }
     createPropertyDto.ownerId = req.user.userId;
     return this.propertiesService.create(createPropertyDto);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get()
   findAll(
     @Query('owner') owner?: string,
@@ -54,7 +55,10 @@ export class PropertiesController {
     }
 
     // Owner filter: GET /properties?owner=me
-    if (owner === 'me' && req?.user?.userId) {
+    if (owner === 'me') {
+      if (!req?.user?.userId) {
+        throw new UnauthorizedException();
+      }
       return this.propertiesService.findAll(req.user.userId);
     }
 
