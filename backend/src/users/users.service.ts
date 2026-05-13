@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotImplementedException,
 } from '@nestjs/common';
@@ -8,6 +9,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { User } from '@prisma/client';
 import type { Auth0UserProfile } from '../auth/auth0.service';
+import { AUTH_USER_MESSAGES } from '../auth/auth-user-messages';
 import { resolveAvatarUrl } from './user-avatar.util';
 
 @Injectable()
@@ -61,9 +63,7 @@ export class UsersService {
 
   async findOrCreateFromAuth0Profile(p: Auth0UserProfile) {
     if (!p.email) {
-      throw new BadRequestException(
-        'Auth0 did not return an email for this account. Try another provider or contact support.',
-      );
+      throw new BadRequestException(AUTH_USER_MESSAGES.oauthProfileIncomplete);
     }
     const email = p.email.toLowerCase();
     const bySub = await this.prisma.user.findUnique({
@@ -74,13 +74,10 @@ export class UsersService {
     }
     const byEmail = await this.findByEmail(email);
     if (byEmail) {
-      if (byEmail.externalId !== p.sub) {
-        return this.prisma.user.update({
-          where: { id: byEmail.id },
-          data: { externalId: p.sub },
-        });
+      if (byEmail.externalId === p.sub) {
+        return byEmail;
       }
-      return byEmail;
+      throw new ConflictException(AUTH_USER_MESSAGES.oauthCannotUseThisMethod);
     }
     const { firstName, lastName } = this.namesFromAuth0Profile(p);
     const avatar = resolveAvatarUrl(p.picture, firstName, lastName);

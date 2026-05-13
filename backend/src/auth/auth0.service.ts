@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
+import { AUTH_USER_MESSAGES } from './auth-user-messages';
 
 export type Auth0UserProfile = {
   sub: string;
@@ -189,10 +190,10 @@ export class Auth0Service {
       lower.includes('user already exists') ||
       data?.code === 'user_exists'
     ) {
-      throw new ConflictException(msg);
+      throw new ConflictException(AUTH_USER_MESSAGES.signUpCouldNotComplete);
     }
     if (status === 409) {
-      throw new ConflictException(msg);
+      throw new ConflictException(AUTH_USER_MESSAGES.signUpCouldNotComplete);
     }
     throw new BadRequestException(msg);
   }

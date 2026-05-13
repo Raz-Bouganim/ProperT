@@ -8,6 +8,19 @@ import {
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 
+function httpExceptionMessage(exception: HttpException): string | string[] {
+  const res = exception.getResponse();
+  if (typeof res === 'string') {
+    return res;
+  }
+  if (typeof res === 'object' && res !== null && 'message' in res) {
+    const msg = (res as { message: unknown }).message;
+    if (typeof msg === 'string') return msg;
+    if (Array.isArray(msg)) return msg as string[];
+  }
+  return exception.message;
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -32,7 +45,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       path: String(httpAdapter.getRequestUrl(ctx.getRequest())),
       message:
         exception instanceof HttpException
-          ? exception.getResponse()
+          ? httpExceptionMessage(exception)
           : 'Internal server error',
     };
 

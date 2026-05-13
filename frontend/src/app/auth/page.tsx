@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
+import { extractApiErrorMessage } from '@/lib/apiErrorMessage';
+import { AUTH_USER_MESSAGES } from '@/lib/authUserMessages';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { startAuth0SocialLogin } from '@/lib/auth0';
@@ -63,35 +65,28 @@ function AuthPageContent() {
         } catch (err: unknown) {
             const responseData = axios.isAxiosError(err) ? err.response?.data : undefined;
 
-            // Helper to extract a human-readable string from potentially nested error objects
-            const extractMessage = (data: unknown): string => {
-                if (!data) return '';
-                if (typeof data === 'string') return data;
-                if (typeof data !== 'object') return '';
+            let finalMsg = extractApiErrorMessage(responseData);
 
-                // NestJS/Express common keys
-                const record = data as Record<string, unknown>;
-                const msg = record.message ?? record.msg ?? record.error;
-
-                if (Array.isArray(msg)) return String(msg[0]);
-                if (typeof msg === 'string') return msg;
-                if (typeof msg === 'object' && msg !== null) return extractMessage(msg); // Recurse one level
-
-                return '';
-            };
-
-            let finalMsg = extractMessage(responseData);
-
-            // Special case for 401 Unauthorized (wrong password etc)
             if (axios.isAxiosError(err) && err.response?.status === 401) {
-                if (!finalMsg || finalMsg.toLowerCase() === 'unauthorized') {
-                    finalMsg = 'Invalid email or password';
+                if (mode === 'login') {
+                    finalMsg = AUTH_USER_MESSAGES.loginFailed;
+                } else if (
+                    !finalMsg ||
+                    finalMsg.toLowerCase() === 'unauthorized'
+                ) {
+                    finalMsg = AUTH_USER_MESSAGES.signUpCouldNotComplete;
                 }
             }
 
             const statusText = axios.isAxiosError(err) ? err.response?.statusText : undefined;
             const errMessage = err instanceof Error ? err.message : undefined;
-            finalMsg = finalMsg || statusText || errMessage || 'Authentication failed';
+            finalMsg =
+                finalMsg ||
+                statusText ||
+                errMessage ||
+                (mode === 'login'
+                    ? AUTH_USER_MESSAGES.loginFailed
+                    : AUTH_USER_MESSAGES.signUpCouldNotComplete);
             toast.error(finalMsg);
         } finally {
             setIsLoading(false);

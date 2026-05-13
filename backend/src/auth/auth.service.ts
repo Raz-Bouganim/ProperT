@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { Auth0Service } from './auth0.service';
+import { AUTH_USER_MESSAGES } from './auth-user-messages';
 import { User } from '@prisma/client';
 
 @Injectable()
@@ -67,13 +68,14 @@ export class AuthService {
           if (legacy) {
             return this.issueAppTokens(legacy);
           }
+          throw new UnauthorizedException(AUTH_USER_MESSAGES.loginFailed);
         }
         throw e;
       }
     }
     const user = await this.validateUser(normalized, password);
     if (!user) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException(AUTH_USER_MESSAGES.loginFailed);
     }
     return this.issueAppTokens(user);
   }
@@ -81,7 +83,7 @@ export class AuthService {
   async register(userDto: CreateUserDto) {
     const existing = await this.usersService.findByEmail(userDto.email);
     if (existing) {
-      throw new ConflictException('User already exists');
+      throw new ConflictException(AUTH_USER_MESSAGES.signUpCouldNotComplete);
     }
     if (this.useAuth0()) {
       await this.auth0Service.signUp(
@@ -104,10 +106,18 @@ export class AuthService {
     if (!this.useAuth0()) {
       throw new BadRequestException('Auth0 is not configured on this server');
     }
-    const tokens = await this.auth0Service.exchangeAuthorizationCode(
-      code,
-      redirectUri,
-    );
+    let tokens: { access_token: string };
+    try {
+      tokens = await this.auth0Service.exchangeAuthorizationCode(
+        code,
+        redirectUri,
+      );
+    } catch (e) {
+      if (e instanceof UnauthorizedException || e instanceof BadRequestException) {
+        throw new BadRequestException(AUTH_USER_MESSAGES.oauthExchangeFailed);
+      }
+      throw e;
+    }
     const profile = await this.auth0Service.getUserProfile(tokens.access_token);
     const user = await this.usersService.findOrCreateFromAuth0Profile(profile);
     return this.issueAppTokens(user);

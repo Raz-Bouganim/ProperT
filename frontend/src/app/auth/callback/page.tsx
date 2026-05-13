@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { extractApiErrorMessage } from '@/lib/apiErrorMessage';
+import { AUTH_USER_MESSAGES } from '@/lib/authUserMessages';
 import { useAuth } from '@/context/AuthContext';
 import { getAuth0CallbackRedirectUri } from '@/lib/auth0';
 
@@ -54,10 +56,11 @@ function AuthCallbackContent() {
         toast.success('Welcome back!');
         router.replace(next);
       } catch (e: unknown) {
-        const ax = e as { response?: { data?: { message?: string | string[] } } };
-        const m = ax.response?.data?.message;
-        const msg = Array.isArray(m) ? m[0] : m || 'Sign-in failed';
-        fail(String(msg));
+        const ax = e as { response?: { data?: unknown } };
+        const msg =
+          extractApiErrorMessage(ax.response?.data) ||
+          AUTH_USER_MESSAGES.oauthExchangeFailed;
+        fail(msg);
       }
     })();
   }, [login, router, searchParams]);
