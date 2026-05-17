@@ -8,14 +8,14 @@ import {
   Delete,
   Query,
   UseGuards,
-  Request,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { Request as ExpressRequest } from 'express';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/auth.guards';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtAuthUser } from '../auth/jwt-auth.types';
 
 @Controller('properties')
 export class PropertiesController {
@@ -24,20 +24,17 @@ export class PropertiesController {
   @UseGuards(JwtAuthGuard)
   @Post()
   create(
-    @Request() req: ExpressRequest,
+    @CurrentUser() user: JwtAuthUser,
     @Body() createPropertyDto: CreatePropertyDto,
   ) {
-    if (!req.user?.userId) {
-      throw new UnauthorizedException();
-    }
-    createPropertyDto.ownerId = req.user.userId;
+    createPropertyDto.ownerId = user.userId;
     return this.propertiesService.create(createPropertyDto);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get()
   findAll(
-    @Request() req: ExpressRequest,
+    @CurrentUser() user: JwtAuthUser | undefined,
     @Query('owner') owner?: string,
     @Query('lat') lat?: string,
     @Query('lng') lng?: string,
@@ -72,10 +69,10 @@ export class PropertiesController {
 
     // Owner filter: GET /properties?owner=me
     if (owner === 'me') {
-      if (!req.user?.userId) {
+      if (!user?.userId) {
         throw new UnauthorizedException();
       }
-      return this.propertiesService.findAll(req.user.userId);
+      return this.propertiesService.findAll(user.userId);
     }
 
     return this.propertiesService.findAll();
@@ -83,33 +80,29 @@ export class PropertiesController {
 
   @UseGuards(JwtAuthGuard)
   @Get('mine')
-  findMine(@Request() req: ExpressRequest) {
-    return this.propertiesService.findAll(req.user!.userId);
+  findMine(@CurrentUser() user: JwtAuthUser) {
+    return this.propertiesService.findAll(user.userId);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  findOne(@Request() req: ExpressRequest, @Param('id') id: string) {
-    return this.propertiesService.findOne(id, req.user?.userId);
+  findOne(@CurrentUser() user: JwtAuthUser | undefined, @Param('id') id: string) {
+    return this.propertiesService.findOne(id, user?.userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
   update(
-    @Request() req: ExpressRequest,
+    @CurrentUser() user: JwtAuthUser,
     @Param('id') id: string,
     @Body() updatePropertyDto: UpdatePropertyDto,
   ) {
-    return this.propertiesService.update(
-      req.user!.userId,
-      id,
-      updatePropertyDto,
-    );
+    return this.propertiesService.update(user.userId, id, updatePropertyDto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  remove(@Request() req: ExpressRequest, @Param('id') id: string) {
-    return this.propertiesService.remove(req.user!.userId, id);
+  remove(@CurrentUser() user: JwtAuthUser, @Param('id') id: string) {
+    return this.propertiesService.remove(user.userId, id);
   }
 }

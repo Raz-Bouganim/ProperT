@@ -7,13 +7,14 @@ import {
   Param,
   Delete,
   UseGuards,
-  Request,
   UnauthorizedException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/auth.guards';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtAuthUser } from '../auth/jwt-auth.types';
 
 @Controller('users')
 export class UsersController {
@@ -26,8 +27,8 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getMe(@Request() req: { user: { userId: string } }) {
-    const user = await this.usersService.findOnePublic(req.user.userId);
+  async getMe(@CurrentUser() currentUser: JwtAuthUser) {
+    const user = await this.usersService.findOnePublic(currentUser.userId);
     if (!user) {
       throw new UnauthorizedException();
     }
