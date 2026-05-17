@@ -46,6 +46,19 @@ export class BookingsService {
     endTime: Date;
     notes?: string;
   }) {
+    const property = await this.prisma.property.findUnique({
+      where: { id: createBookingDto.propertyId },
+      select: { ownerId: true },
+    });
+
+    if (!property) {
+      throw new NotFoundException('Property not found');
+    }
+
+    if (property.ownerId === createBookingDto.seekerId) {
+      throw new ForbiddenException('You cannot book a viewing for your own property');
+    }
+
     await this.availability.assertBookableWindow(
       createBookingDto.propertyId,
       createBookingDto.startTime,
