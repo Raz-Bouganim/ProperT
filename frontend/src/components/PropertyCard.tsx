@@ -4,6 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { Bed, Bath, Square, Heart, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/context/FavoritesContext";
+import { toast } from "sonner";
 
 export interface PropertyCardProps {
     id: string;
@@ -28,6 +31,7 @@ export interface PropertyCardProps {
     /** Hide bedroom / bathroom row (e.g. office listings). */
     hideBedBath?: boolean;
     currency?: string;
+    ownerId?: string;
 }
 
 export function PropertyCard({
@@ -49,7 +53,13 @@ export function PropertyCard({
     leaseDurationLabel,
     hideBedBath = false,
     currency = "USD",
+    ownerId,
 }: PropertyCardProps) {
+    const { isAuthenticated, user } = useAuth();
+    const { isFavorited, toggleFavorite } = useFavorites();
+    const isOwner = !!ownerId && ownerId === user?.id;
+    const favorited = isFavorited(id);
+
     const getCurrencySymbol = (currencyCode: string) => {
         const symbols: Record<string, string> = {
             USD: "$",
@@ -95,20 +105,26 @@ export function PropertyCard({
                 <div className="absolute top-3 left-3 bg-[#FDF6F0] px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-[#1A1A1A] shadow-sm z-10 border border-[#F5E6D8]">
                     {status?.replace(/_/g, " ")}
                 </div>
-                <button
+                {!isOwner && <button
                     onClick={(e) => {
                         e.preventDefault();
-                        if (!preview) {
-                            // Favorite logic
+                        if (preview) return;
+                        if (!isAuthenticated) {
+                            toast.error("Please log in to save favorites");
+                            return;
                         }
+                        void toggleFavorite(id);
                     }}
                     className={cn(
-                        "absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-red-500 transition-all shadow-sm z-10",
-                        preview ? "pointer-events-none opacity-80" : "cursor-pointer"
+                        "absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-black/20 backdrop-blur-md rounded-full transition-all shadow-sm z-10",
+                        preview ? "pointer-events-none opacity-80" : "cursor-pointer",
+                        favorited
+                            ? "text-red-500 bg-white"
+                            : "text-white hover:bg-white hover:text-red-500"
                     )}
                 >
-                    <Heart className="w-5 h-5" />
-                </button>
+                    <Heart className={cn("w-5 h-5", favorited && "fill-red-500")} />
+                </button>}
             </div>
 
             <div className="p-5">

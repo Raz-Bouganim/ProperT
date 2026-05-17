@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/context/FavoritesContext";
 import api from "@/lib/api";
+import { type PropertyListingPreview } from "@/types/property-listing";
 import { BookingCard, type BookingCardBooking } from "@/components/BookingCard";
 import { PropertyCard } from "@/components/PropertyCard";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+
 
 interface Listing {
     id: string;
@@ -30,10 +33,13 @@ interface Listing {
 
 export default function DashboardPage() {
     const { user, isLoading: authLoading } = useAuth();
+    const { favorites: favoriteIds, initialized: favoritesInitialized } = useFavorites();
     const [bookings, setBookings] = useState<BookingCardBooking[]>([]);
     const [listings, setListings] = useState<Listing[]>([]);
+    const [favoriteProperties, setFavoriteProperties] = useState<PropertyListingPreview[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'bookings' | 'listings'>('bookings');
+    const [ownerTab, setOwnerTab] = useState<'bookings' | 'listings'>('bookings');
+    const [seekerTab, setSeekerTab] = useState<'bookings' | 'saved'>('bookings');
 
     useEffect(() => {
         if (!user) return;
@@ -50,9 +56,12 @@ export default function DashboardPage() {
                     const bookingsRes = await api.get(`/bookings/mine?role=OWNER`);
                     setBookings(bookingsRes.data);
                 } else {
-                    // Fetch My Bookings (Seeker)
-                    const bookingsRes = await api.get(`/bookings/mine?role=SEEKER`);
+                    const [bookingsRes, favRes] = await Promise.all([
+                        api.get(`/bookings/mine?role=SEEKER`),
+                        api.get('/favorites'),
+                    ]);
                     setBookings(bookingsRes.data);
+                    setFavoriteProperties(favRes.data);
                 }
             } catch (error) {
                 console.error("Failed to fetch dashboard data:", error);
@@ -63,6 +72,11 @@ export default function DashboardPage() {
 
         fetchData();
     }, [user]);
+
+    useEffect(() => {
+        if (!favoritesInitialized) return;
+        setFavoriteProperties((prev) => prev.filter((p) => favoriteIds.has(p.id)));
+    }, [favoriteIds, favoritesInitialized]);
 
     const publishDraft = async (listing: Listing) => {
         try {
@@ -134,8 +148,8 @@ export default function DashboardPage() {
                     {/* Tabs (Simple implementation) */}
                     <div className="flex border-b">
                         <button
-                            onClick={() => setActiveTab('bookings')}
-                            className={`pb-4 px-6 font-bold text-sm transition-colors relative ${activeTab === 'bookings' ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+                            onClick={() => setOwnerTab('bookings')}
+                            className={`pb-4 px-6 font-bold text-sm transition-colors relative ${ownerTab === 'bookings' ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
                                 }`}
                         >
                             Incoming Requests
@@ -146,8 +160,8 @@ export default function DashboardPage() {
                             )}
                         </button>
                         <button
-                            onClick={() => setActiveTab('listings')}
-                            className={`pb-4 px-6 font-bold text-sm transition-colors relative ${activeTab === 'listings' ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+                            onClick={() => setOwnerTab('listings')}
+                            className={`pb-4 px-6 font-bold text-sm transition-colors relative ${ownerTab === 'listings' ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
                                 }`}
                         >
                             My Properties
@@ -157,7 +171,7 @@ export default function DashboardPage() {
                         </button>
                     </div>
 
-                    {activeTab === 'bookings' && (
+                    {ownerTab === 'bookings' && (
                         <div className="space-y-4">
                             {bookings.length === 0 ? (
                                 <div className="text-center py-12 border rounded-2xl bg-muted/20">
@@ -176,7 +190,7 @@ export default function DashboardPage() {
                         </div>
                     )}
 
-                    {activeTab === 'listings' && (
+                    {ownerTab === 'listings' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {listings.length === 0 ? (
                                 <div className="col-span-full text-center py-12 border rounded-2xl bg-muted/20">
@@ -209,6 +223,7 @@ export default function DashboardPage() {
                                                 image={cover}
                                                 status={listing.status}
                                                 hideBedBath={listing.type === "OFFICE"}
+                                                ownerId={user.id}
                                             />
                                             {isDraft && (
                                                 <Button
@@ -227,25 +242,92 @@ export default function DashboardPage() {
                     )}
                 </div>
             ) : (
-                <div className="space-y-6">
-                    <h2 className="text-xl font-bold">My Bookings</h2>
-                    {bookings.length === 0 ? (
-                        <div className="text-center py-12 border rounded-2xl bg-muted/20">
-                            <p className="text-muted-foreground mb-4">You haven&apos;t made any bookings yet.</p>
-                            <Link href="/search">
-                                <Button variant="outline">Browse Homes</Button>
-                            </Link>
+                <div className="space-y-8">
+                    <div className="flex border-b">
+                        <button
+                            onClick={() => setSeekerTab('bookings')}
+                            className={`pb-4 px-6 font-bold text-sm transition-colors relative ${seekerTab === 'bookings' ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            My Bookings
+                            <span className="ml-2 bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded-full">
+                                {bookings.length}
+                            </span>
+                        </button>
+                        <button
+                            onClick={() => setSeekerTab('saved')}
+                            className={`pb-4 px-6 font-bold text-sm transition-colors relative ${seekerTab === 'saved' ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            Saved Homes
+                            <span className="ml-2 bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded-full">
+                                {favoriteProperties.length}
+                            </span>
+                        </button>
+                    </div>
+
+                    {seekerTab === 'bookings' && (
+                        <div>
+                            {bookings.length === 0 ? (
+                                <div className="text-center py-12 border rounded-2xl bg-muted/20">
+                                    <p className="text-muted-foreground mb-4">You haven&apos;t made any bookings yet.</p>
+                                    <Link href="/search">
+                                        <Button variant="outline">Browse Homes</Button>
+                                    </Link>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 gap-4">
+                                    {bookings.map(booking => (
+                                        <BookingCard
+                                            key={booking.id}
+                                            booking={booking}
+                                            role="SEEKER"
+                                            onPatched={handleBookingPatched}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-4">
-                            {bookings.map(booking => (
-                                <BookingCard
-                                    key={booking.id}
-                                    booking={booking}
-                                    role="SEEKER"
-                                    onPatched={handleBookingPatched}
-                                />
-                            ))}
+                    )}
+
+                    {seekerTab === 'saved' && (
+                        <div>
+                            {favoriteProperties.length === 0 ? (
+                                <div className="text-center py-12 border rounded-2xl bg-muted/20">
+                                    <p className="text-muted-foreground mb-4">You haven&apos;t saved any homes yet.</p>
+                                    <Link href="/search">
+                                        <Button variant="outline">Browse Homes →</Button>
+                                    </Link>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {favoriteProperties.map((p) => {
+                                        const firstImg = p.images?.[0];
+                                        const cover =
+                                            p.coverImageUrl ||
+                                            (typeof firstImg === "object" && firstImg && "url" in firstImg
+                                                ? firstImg.url
+                                                : firstImg) ||
+                                            "/placeholder-property.svg";
+                                        return (
+                                            <PropertyCard
+                                                key={p.id}
+                                                id={p.id}
+                                                detailsHref={`/properties/${p.slug || p.id}`}
+                                                title={p.title ?? ""}
+                                                address={p.addressLine ?? p.address ?? ""}
+                                                price={Number(p.price)}
+                                                beds={p.bedrooms ?? 0}
+                                                baths={p.bathrooms ?? 0}
+                                                sqft={p.sqft ?? p.size ?? 0}
+                                                image={cover as string}
+                                                status={p.status}
+                                                leaseDurationLabel={p.leaseDurationLabel ?? undefined}
+                                                hideBedBath={p.type === "OFFICE"}
+                                                currency={p.currency}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

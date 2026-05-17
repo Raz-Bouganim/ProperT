@@ -241,6 +241,7 @@ export default function Home() {
                   leaseDuration={listing.leaseDuration}
                   leaseDurationLabel={listing.leaseDurationLabel}
                   hideBedBath={listing.type === "OFFICE"}
+                  ownerId={listing.ownerId}
                 />
               ))
             ) : (

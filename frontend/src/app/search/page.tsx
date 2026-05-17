@@ -186,6 +186,7 @@ function SearchPageContent() {
                                         leaseDuration={property.leaseDuration}
                                         leaseDurationLabel={property.leaseDurationLabel}
                                         hideBedBath={property.type === "OFFICE"}
+                                        ownerId={property.ownerId}
                                         onMouseEnter={() => setHoveredPropertyId(property.id)}
                                         onMouseLeave={() => setHoveredPropertyId(null)}
                                     />

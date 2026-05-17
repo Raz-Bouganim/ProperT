@@ -12,6 +12,7 @@ import { MediaModule } from './media/media.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { GeoModule } from './geo/geo.module';
+import { FavoritesModule } from './favorites/favorites.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { GeoModule } from './geo/geo.module';
     BookingsModule,
     AvailabilityModule,
     GeoModule,
+    FavoritesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
