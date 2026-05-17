@@ -49,6 +49,7 @@ interface PropertyDetailState {
     bedrooms?: number;
     bathrooms?: number;
     sqft?: number | string;
+    yearBuilt?: number;
     latitude?: number | string;
     longitude?: number | string;
     currency?: string;
@@ -220,8 +221,8 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
     const propertyTypeLabel = propertyTypeOption?.label ?? (property.type ? String(property.type).replace(/_/g, " ") : "—");
     const listingStatus = String(property.status ?? "").toUpperCase();
     const isRent = listingStatus === "FOR_RENT" || listingStatus.includes("RENT");
-    const statusLabel = listingStatus ? listingStatus.replace(/_/g, " ") : "—";
-    const statusBadgeLabel = statusLabel
+    const statusBadgeLabel = listingStatus
+        .replace(/_/g, " ")
         .toLowerCase()
         .replace(/\b\w/g, (m) => m.toUpperCase());
     const formatHalfSteps = (value: unknown) => {
@@ -231,6 +232,7 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
     };
 
     const isOffice = String(property.type ?? "").toUpperCase() === "OFFICE";
+    const hasYearBuilt = typeof property.yearBuilt === "number";
     const isDraftListing = !property.publishedAt;
 
     const handleShare = async () => {
@@ -367,7 +369,9 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
                         <div
                             className={[
                                 "grid gap-y-6 gap-x-6 px-2 sm:px-8 py-6 border-b border-t mb-8 sm:items-center sm:gap-x-0 sm:justify-items-center",
-                                isOffice ? "grid-cols-2 sm:grid-cols-2" : "grid-cols-2 sm:grid-cols-4",
+                                isOffice
+                                    ? hasYearBuilt ? "grid-cols-3 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-2"
+                                    : hasYearBuilt ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4",
                             ].join(" ")}
                         >
                             {!isOffice && (
@@ -395,12 +399,17 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
                                     <span className="text-xs text-muted-foreground uppercase tracking-widest">Sqft</span>
                                 </div>
                             </div>
-                            <div
-                                className={[
-                                    "flex items-center gap-3 sm:justify-center",
-                                    isOffice ? "justify-self-end sm:col-start-2" : "justify-self-end sm:justify-center sm:justify-self-center",
-                                ].join(" ")}
-                            >
+                            {hasYearBuilt && (
+                                <div className="flex items-center gap-3 sm:justify-center">
+                                    <Calendar className="w-7 h-7 text-primary" />
+                                    <div className="flex flex-col leading-tight">
+                                        <span className="font-bold text-lg">{property.yearBuilt}</span>
+                                        <span className="text-xs text-muted-foreground uppercase tracking-widest">Built</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-3 sm:justify-center">
                                 <PropertyTypeIcon className="w-7 h-7 text-primary" />
                                 <div className="flex flex-col leading-tight">
                                     <span className="font-bold text-sm">{propertyTypeLabel}</span>
