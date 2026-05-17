@@ -146,7 +146,6 @@ export function BookingWizard({
 
             await api.post("/bookings", {
                 propertyId,
-                seekerId: user.id,
                 startTime: startTime.toISOString(),
                 endTime: endTime.toISOString(),
                 notes: "Interested in viewing the property.",

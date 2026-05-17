@@ -60,7 +60,7 @@ export function PropertyForm() {
         }
         if (currentStep === 2) {
             const yearValue = formValues.yearBuilt;
-            const isYearValid = !!yearValue && (yearValue >= 1800 && yearValue <= new Date().getFullYear());
+            const isYearValid = !yearValue || (yearValue >= 1800 && yearValue <= new Date().getFullYear());
             return !!(formValues.addressLine && formValues.sqft > 0 && formValues.beds >= 0 && formValues.baths >= 0 && isYearValid);
         }
         if (currentStep === 3) {
@@ -77,7 +77,7 @@ export function PropertyForm() {
     const nextStep = async () => {
         let fields: (keyof ListingFormValues)[] = [];
         if (currentStep === 1) fields = ["title", "description", "transactionType", "type", "addressLine", "country", "city"];
-        if (currentStep === 2) fields = ["sqft", "beds", "baths", "yearBuilt"];
+        if (currentStep === 2) fields = ["sqft", "beds", "baths"];
 
         if (currentStep === 3) {
             if (images.length === 0) {
@@ -124,7 +124,7 @@ export function PropertyForm() {
             "sqft",
             "beds",
             "baths",
-            "yearBuilt",
+
             "price",
             "currency",
         ];
@@ -268,36 +268,38 @@ export function PropertyForm() {
                             )}
                         </div>
 
-                        {/* Right Column - Independent Scroll */}
+                        {/* Right Column - Sticky Scroll */}
                         <div className="lg:col-span-5 lg:pl-4">
-                            {currentStep === 1 ? (
-                                <LocationPicker images={images} />
-                            ) : (
-                                /* Live Preview for Step 2+ */
-                                <div>
-                                    <LivePreview
-                                        data={{
-                                            title: formValues.title,
-                                            price: formValues.price || 0,
-                                            address: formValues.addressLine || "Property Location",
-                                            beds: formValues.beds || 0,
-                                            baths: formValues.baths || 0,
-                                            sqft: formValues.sqft || 0,
-                                            image: images[0]?.preview,
-                                            transactionType: formValues.transactionType,
-                                            latitude: formValues.latitude ?? 0,
-                                            longitude: formValues.longitude ?? 0,
-                                            leaseDuration: formValues.leaseDuration,
-                                            currency: formValues.currency || "USD",
-                                            propertyType: formValues.type,
-                                        }}
-                                    />
-                                    <div className="mt-6 p-4 rounded-xl bg-slate-100 border border-slate-200 flex items-center gap-3 text-slate-500">
-                                        <span className="material-icons-outlined text-xl">visibility</span>
-                                        <p className="text-xs font-medium">This is how your listing will appear to potential tenants.</p>
+                            <div className="sticky top-24">
+                                {currentStep === 1 ? (
+                                    <LocationPicker images={images} />
+                                ) : (
+                                    /* Live Preview for Step 2+ */
+                                    <div>
+                                        <LivePreview
+                                            data={{
+                                                title: formValues.title,
+                                                price: formValues.price || 0,
+                                                address: formValues.addressLine || "Property Location",
+                                                beds: formValues.beds || 0,
+                                                baths: formValues.baths || 0,
+                                                sqft: formValues.sqft || 0,
+                                                image: images[0]?.preview,
+                                                transactionType: formValues.transactionType,
+                                                latitude: formValues.latitude ?? 0,
+                                                longitude: formValues.longitude ?? 0,
+                                                leaseDuration: formValues.leaseDuration,
+                                                currency: formValues.currency || "USD",
+                                                propertyType: formValues.type,
+                                            }}
+                                        />
+                                        <div className="mt-6 p-4 rounded-xl bg-slate-100 border border-slate-200 flex items-center gap-3 text-slate-500">
+                                            <span className="material-icons-outlined text-xl">visibility</span>
+                                            <p className="text-xs font-medium">This is how your listing will appear to potential tenants.</p>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </form>
                 </main>

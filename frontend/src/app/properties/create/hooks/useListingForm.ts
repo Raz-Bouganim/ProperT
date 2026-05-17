@@ -22,7 +22,7 @@ export const listingSchema = z.object({
     sqft: z.number().min(1, "Square footage must be positive"),
     beds: z.number().min(0, "Bedrooms cannot be negative"),
     baths: z.number().min(0, "Bathrooms cannot be negative"),
-    yearBuilt: z.number().min(1800).max(new Date().getFullYear()),
+    yearBuilt: z.number().min(1800).max(new Date().getFullYear()).optional(),
     amenities: z.array(z.string()).optional(),
 
     // Step 3: Media
