@@ -8,6 +8,8 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/context/FavoritesContext";
 import { BookingWizard } from "@/components/BookingWizard";
 import { ChatWindow } from "@/components/ChatWindow";
 import { LightboxGallery } from "@/components/listing/LightboxGallery";
@@ -77,6 +79,8 @@ const Map = dynamic(() => import("@/components/Map"), {
 
 function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const { isAuthenticated, user } = useAuth();
+    const { isFavorited, toggleFavorite } = useFavorites();
     const [isBookingOpen, setIsBookingOpen] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -264,9 +268,24 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
                         >
                             <Share2 className="w-4 h-4" /> Share
                         </Button>
-                        <Button variant="ghost" size="sm" className="gap-2 rounded-full">
-                            <Heart className="w-4 h-4" /> Save
-                        </Button>
+                        {property && user?.id !== property.ownerId && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="gap-2 rounded-full"
+                                onClick={() => {
+                                    if (!isAuthenticated) {
+                                        toast.error("Please log in to save favorites");
+                                        return;
+                                    }
+                                    void toggleFavorite(property.id);
+                                }}
+                            >
+                                <Heart className={isFavorited(property.id) ? "w-4 h-4 fill-red-500 text-red-500" : "w-4 h-4"} />
+                                {isFavorited(property.id) ? "Saved" : "Save"}
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>

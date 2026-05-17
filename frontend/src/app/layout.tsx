@@ -5,6 +5,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { cn } from '@/lib/utils';
 
 import { AuthProvider } from '@/context/AuthContext';
+import { FavoritesProvider } from '@/context/FavoritesContext';
 import { GlobalToaster } from '@/components/ui/GlobalToaster';
 
 const inter = Inter({
@@ -35,11 +36,13 @@ export default function RootLayout({
       </head>
       <body className={cn(inter.className, "bg-background text-foreground antialiased")}>
         <AuthProvider>
-          <div className="flex flex-col min-h-screen">
-            <Navbar />
-            <main className="flex-grow">{children}</main>
-          </div>
-          <GlobalToaster />
+          <FavoritesProvider>
+            <div className="flex flex-col min-h-screen">
+              <Navbar />
+              <main className="flex-grow">{children}</main>
+            </div>
+            <GlobalToaster />
+          </FavoritesProvider>
         </AuthProvider>
       </body>
     </html>

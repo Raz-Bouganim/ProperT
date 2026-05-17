@@ -72,6 +72,7 @@ model User {
 
   properties       Property[]
   bookings         Booking[]
+  favorites        Favorite[]
   sentMessages              Message[]
   conversationParticipants  ConversationParticipant[]
   seekerConversations       Conversation[] @relation("ConversationSeeker")
@@ -129,6 +130,7 @@ model Property {
   bookings      Booking[]
   availabilities PropertyAvailability[]
   conversations Conversation[]
+  favorites     Favorite[]
 
   @@map("properties")
   @@index([price])
@@ -273,4 +275,17 @@ model Message {
   @@index([conversationId, createdAt])
   @@index([replyToMessageId])
   @@map("messages")
+}
+
+model Favorite {
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  propertyId String   @map("property_id")
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@id([userId, propertyId])
+  @@index([userId])
+  @@index([propertyId])
+  @@map("favorites")
 }
