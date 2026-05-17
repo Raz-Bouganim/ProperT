@@ -545,36 +545,53 @@ function PropertyDetailInner({ params }: { params: Promise<{ id: string }> }) {
                                 </span>
                             </div>
 
-                            <div className="space-y-4 mb-8">
-                                <div
-                                    onClick={() => setIsBookingOpen(true)}
-                                    className="p-4 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
-                                >
-                                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 group-hover:text-primary transition-colors">Select Dates</div>
-                                    <div className="flex items-center gap-2 font-bold">
-                                        <Calendar className="w-4 h-4" />
-                                        Choose available slot
+                            {user?.id === property.ownerId ? (
+                                <div className="space-y-3">
+                                    <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 text-center">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Your Listing</div>
+                                        <div className="text-sm text-muted-foreground">You own this property. Visitors can request a viewing from here.</div>
                                     </div>
+                                    <Link
+                                        href={`/properties/${property.id}/edit`}
+                                        className="flex items-center justify-center w-full h-14 text-lg rounded-2xl font-bold border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+                                    >
+                                        Edit Listing
+                                    </Link>
                                 </div>
-                            </div>
+                            ) : (
+                                <>
+                                    <div className="space-y-4 mb-8">
+                                        <div
+                                            onClick={() => setIsBookingOpen(true)}
+                                            className="p-4 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
+                                        >
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 group-hover:text-primary transition-colors">Select Dates</div>
+                                            <div className="flex items-center gap-2 font-bold">
+                                                <Calendar className="w-4 h-4" />
+                                                Choose available slot
+                                            </div>
+                                        </div>
+                                    </div>
 
-                            <div className="space-y-3">
-                                <Button
-                                    size="lg"
-                                    className="w-full h-14 text-lg rounded-2xl font-bold cursor-pointer"
-                                    onClick={() => setIsBookingOpen(true)}
-                                >
-                                    Request a viewing
-                                </Button>
-                                <Button
-                                    size="lg"
-                                    variant="outline"
-                                    className="w-full h-14 text-lg rounded-2xl font-bold gap-2 cursor-pointer"
-                                    onClick={() => setIsChatOpen(true)}
-                                >
-                                    <Mail className="w-5 h-5" /> Message Owner
-                                </Button>
-                            </div>
+                                    <div className="space-y-3">
+                                        <Button
+                                            size="lg"
+                                            className="w-full h-14 text-lg rounded-2xl font-bold cursor-pointer"
+                                            onClick={() => setIsBookingOpen(true)}
+                                        >
+                                            Request a viewing
+                                        </Button>
+                                        <Button
+                                            size="lg"
+                                            variant="outline"
+                                            className="w-full h-14 text-lg rounded-2xl font-bold gap-2 cursor-pointer"
+                                            onClick={() => setIsChatOpen(true)}
+                                        >
+                                            <Mail className="w-5 h-5" /> Message Owner
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
 
                             <div className="mt-8 pt-8 border-t flex items-center gap-4">
                                 <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
