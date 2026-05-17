@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { format } from "date-fns";
 import { Calendar, Clock, Loader2, MapPin, ScrollText, User, X } from "lucide-react";
 import { clsx } from "clsx";
@@ -12,11 +13,27 @@ import { Button } from "./ui/Button";
 
 const VIEWING_SLOT_MINUTES = 30;
 
-function propertyCoverUrl(images: Array<string | { url: string } | undefined> | undefined): string {
-    const first = images?.[0];
+function propertyCoverUrl(images: Array<string | { url: string; isPrimary?: boolean } | undefined> | undefined): string {
+    if (!images?.length) return "/placeholder-property.svg";
+    const primary = images.find((img) => img && typeof img === "object" && "isPrimary" in img && img.isPrimary);
+    const first = primary ?? images[0];
     if (typeof first === "string") return first;
     if (first && typeof first === "object" && "url" in first) return first.url;
     return "/placeholder-property.svg";
+}
+
+function formatNoteHistory(raw: string): string {
+    return raw.replace(
+        /\[(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\]/g,
+        (_, iso) => {
+            try {
+                const d = new Date(iso);
+                return `[${format(d, "MMM d, yyyy h:mm a")}]`;
+            } catch {
+                return `[${iso}]`;
+            }
+        },
+    );
 }
 
 export type BookingPatchBody = {
@@ -34,11 +51,12 @@ export type BookingCardBooking = {
     noteHistory?: string | null;
     property: {
         id: string;
+        slug?: string;
         title: string;
         address?: string;
         addressLine?: string;
         timeZone?: string;
-        images: Array<string | { url: string }>;
+        images: Array<string | { url: string; isPrimary?: boolean }>;
         price: number | string;
     };
     seeker?: {
@@ -202,20 +220,25 @@ export function BookingCard({ booking, role, onPatched }: BookingCardProps) {
 
     return (
         <div className="flex flex-col md:flex-row gap-4 p-4 border rounded-2xl bg-card shadow-sm hover:shadow-md transition-shadow">
-            <div className="w-full md:w-48 aspect-video md:aspect-square relative rounded-xl overflow-hidden bg-muted flex-shrink-0">
+            <Link
+                href={`/properties/${booking.property.slug ?? booking.property.id}`}
+                className="w-full md:w-48 aspect-video md:aspect-square relative rounded-xl overflow-hidden bg-muted flex-shrink-0 block"
+            >
                 <Image
                     src={propertyCoverUrl(booking.property.images)}
                     alt={booking.property.title}
                     fill
                     className="object-cover"
                 />
-            </div>
+            </Link>
 
             <div className="flex-grow flex flex-col justify-between">
                 <div>
                     <div className="flex justify-between items-start mb-2">
                         <div>
+                            <Link href={`/properties/${booking.property.slug ?? booking.property.id}`} className="hover:underline">
                             <h3 className="font-bold text-lg line-clamp-1">{booking.property.title}</h3>
+                            </Link>
                             <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                 <MapPin className="w-3 h-3" />{" "}
                                 {booking.property.addressLine ?? booking.property.address ?? ""}
@@ -261,7 +284,7 @@ export function BookingCard({ booking, role, onPatched }: BookingCardProps) {
                                 <ScrollText className="w-4 h-4" /> Activity (newest first)
                             </div>
                             <pre className="text-xs whitespace-pre-wrap font-sans text-foreground/90 max-h-40 overflow-y-auto">
-                                {booking.noteHistory}
+                                {formatNoteHistory(booking.noteHistory)}
                             </pre>
                         </div>
                     ) : null}
