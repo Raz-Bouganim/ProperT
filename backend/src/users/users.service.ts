@@ -32,7 +32,11 @@ export class UsersService {
 
   async findOnePublic(id: string) {
     const user = await this.findOne(id);
-    return user ? this.toPublic(user) : null;
+    if (!user) return null;
+    const propertyCount = await this.prisma.property.count({
+      where: { ownerId: id, deletedAt: null },
+    });
+    return { ...this.toPublic(user), role: propertyCount > 0 ? 'OWNER' : 'SEEKER' };
   }
 
   findAll() {

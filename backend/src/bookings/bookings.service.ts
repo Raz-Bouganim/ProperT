@@ -134,7 +134,7 @@ export class BookingsService {
   async findAllByUser(userId: string, role: 'SEEKER' | 'OWNER') {
     const base = {
       include: {
-        property: true,
+        property: { include: { images: { orderBy: { sortOrder: 'asc' as const } } } },
         ...(role === 'OWNER'
           ? {
               seeker: {
@@ -251,7 +251,7 @@ export class BookingsService {
           noteHistory: line('SEEKER', `Rescheduled: ${noteText}`),
         },
         include: {
-          property: true,
+          property: { include: { images: { orderBy: { sortOrder: 'asc' as const } } } },
           seeker: { select: { firstName: true, lastName: true, email: true } },
         },
       });
@@ -274,7 +274,7 @@ export class BookingsService {
         ),
       },
       include: {
-        property: true,
+        property: { include: { images: { orderBy: { sortOrder: 'asc' as const } } } },
         seeker: { select: { firstName: true, lastName: true, email: true } },
       },
     });

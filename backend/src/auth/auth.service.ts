@@ -24,8 +24,8 @@ export class AuthService {
     return this.auth0Service.isEnabled();
   }
 
-  issueAppTokens(user: User) {
-    const publicUser = this.usersService.toPublic(user);
+  async issueAppTokens(user: User) {
+    const publicUser = await this.usersService.findOnePublic(user.id) ?? this.usersService.toPublic(user);
     const payload = { email: publicUser.email, sub: publicUser.id };
     return {
       access_token: this.jwtService.sign(payload),
