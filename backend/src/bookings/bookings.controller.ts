@@ -5,13 +5,13 @@ import {
   Body,
   Patch,
   Param,
-  Req,
   UseGuards,
   Query,
 } from '@nestjs/common';
-import type { Request } from 'express';
 import { BookingsService } from './bookings.service';
 import { JwtAuthGuard } from '../auth/auth.guards';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtAuthUser } from '../auth/jwt-auth.types';
 import { PatchBookingDto } from './dto/patch-booking.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 
@@ -21,10 +21,10 @@ export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
   @Post()
-  create(@Body() createBookingDto: CreateBookingDto, @Req() req: Request) {
+  create(@CurrentUser() user: JwtAuthUser, @Body() createBookingDto: CreateBookingDto) {
     const data = {
       ...createBookingDto,
-      seekerId: req.user!.userId,
+      seekerId: user.userId,
       startTime: new Date(createBookingDto.startTime),
       endTime: new Date(createBookingDto.endTime),
     };
@@ -32,16 +32,16 @@ export class BookingsController {
   }
 
   @Get('mine')
-  findAll(@Req() req: Request, @Query('role') role: 'SEEKER' | 'OWNER') {
-    return this.bookingsService.findAllByUser(req.user!.userId, role);
+  findAll(@CurrentUser() user: JwtAuthUser, @Query('role') role: 'SEEKER' | 'OWNER') {
+    return this.bookingsService.findAllByUser(user.userId, role);
   }
 
   @Patch(':id')
   patch(
+    @CurrentUser() user: JwtAuthUser,
     @Param('id') id: string,
     @Body() dto: PatchBookingDto,
-    @Req() req: Request,
   ) {
-    return this.bookingsService.updateBooking(id, req.user!.userId, dto);
+    return this.bookingsService.updateBooking(id, user.userId, dto);
   }
 }

@@ -6,11 +6,12 @@ import {
   Patch,
   Post,
   Query,
-  Request,
   UseGuards,
 } from '@nestjs/common';
 import { ChatService, MAX_MESSAGE_PAGE_SIZE } from './chat.service';
 import { JwtAuthGuard } from '../auth/auth.guards';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtAuthUser } from '../auth/jwt-auth.types';
 import { ArchiveConversationDto } from './dto/archive-conversation.dto';
 import { ConversationsQueryDto } from './dto/conversations-query.dto';
 import { CreateConversationDto } from './dto/create-conversation.dto';
@@ -24,70 +25,54 @@ export class ChatController {
 
   @Get('conversations')
   async getConversations(
-    @Request() req: { user: { userId: string } },
+    @CurrentUser() user: JwtAuthUser,
     @Query() query: ConversationsQueryDto,
   ) {
-    return this.chatService.getConversations(
-      req.user.userId,
-      query.folder ?? 'inbox',
-    );
+    return this.chatService.getConversations(user.userId, query.folder ?? 'inbox');
   }
 
   @Get('conversations/:id')
   async getConversation(
-    @Request() req: { user: { userId: string } },
+    @CurrentUser() user: JwtAuthUser,
     @Param('id') id: string,
   ) {
-    return this.chatService.getConversation(req.user.userId, id);
+    return this.chatService.getConversation(user.userId, id);
   }
 
   @Patch('conversations/:id')
   async patchConversation(
-    @Request() req: { user: { userId: string } },
+    @CurrentUser() user: JwtAuthUser,
     @Param('id') id: string,
     @Body() body: ArchiveConversationDto,
   ) {
-    await this.chatService.setArchived(req.user.userId, id, body.archived);
+    await this.chatService.setArchived(user.userId, id, body.archived);
     return { ok: true };
   }
 
   @Get('messages/:conversationId')
   async getMessages(
-    @Request() req: { user: { userId: string } },
+    @CurrentUser() user: JwtAuthUser,
     @Param('conversationId') conversationId: string,
     @Query() query: MessagesQueryDto,
   ) {
     const limit = query.limit ?? MAX_MESSAGE_PAGE_SIZE;
-    return this.chatService.getMessagesPage(
-      req.user.userId,
-      conversationId,
-      limit,
-      query.cursor,
-    );
+    return this.chatService.getMessagesPage(user.userId, conversationId, limit, query.cursor);
   }
 
   @Patch('messages/:messageId')
   async editMessage(
-    @Request() req: { user: { userId: string } },
+    @CurrentUser() user: JwtAuthUser,
     @Param('messageId') messageId: string,
     @Body() body: EditMessageDto,
   ) {
-    return this.chatService.editMessage(
-      messageId,
-      req.user.userId,
-      body.content,
-    );
+    return this.chatService.editMessage(messageId, user.userId, body.content);
   }
 
   @Post('conversations')
   async getOrCreateConversation(
-    @Request() req: { user: { userId: string } },
+    @CurrentUser() user: JwtAuthUser,
     @Body() body: CreateConversationDto,
   ) {
-    return this.chatService.getOrCreateConversation(
-      body.propertyId,
-      req.user.userId,
-      body.ownerId,
-    );
+    return this.chatService.getOrCreateConversation(body.propertyId, user.userId, body.ownerId);
   }
 }
