@@ -58,6 +58,20 @@ function resolveAmenityTypes(raw: string[] | undefined): AmenityType[] {
   return out;
 }
 
+function validatePropertyType(raw?: string): PropertyType | undefined {
+  if (!raw) return undefined;
+  if (!(Object.values(PropertyType) as string[]).includes(raw))
+    throw new BadRequestException(`Invalid propertyType: ${raw}`);
+  return raw as PropertyType;
+}
+
+function validatePropertyStatus(raw?: string): PropertyStatus | undefined {
+  if (!raw) return undefined;
+  if (!(Object.values(PropertyStatus) as string[]).includes(raw))
+    throw new BadRequestException(`Invalid status: ${raw}`);
+  return raw as PropertyStatus;
+}
+
 function isLiveMarketStatus(status: PropertyStatus | undefined | null) {
   return (
     status === PropertyStatus.FOR_SALE || status === PropertyStatus.FOR_RENT
@@ -282,12 +296,17 @@ export class PropertiesService {
       status?: string;
       page?: number;
       limit?: number;
+      sort?: string;
     },
   ) {
     const radiusInMeters = radiusInKm * 1000;
     const page = filters?.page || 1;
     const limit = filters?.limit || 9;
     const skip = (page - 1) * limit;
+    const orderBy =
+      filters?.sort === 'price_asc' ? { price: 'asc' as const } :
+      filters?.sort === 'price_desc' ? { price: 'desc' as const } :
+      { createdAt: 'desc' as const };
 
     const rawProperties = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT id FROM "properties"
@@ -319,9 +338,10 @@ export class PropertiesService {
       }
       if (filters.beds !== undefined) where.bedrooms = { gte: filters.beds };
       if (filters.baths !== undefined) where.bathrooms = { gte: filters.baths };
-      if (filters.propertyType)
-        where.type = filters.propertyType as PropertyType;
-      if (filters.status) where.status = filters.status as PropertyStatus;
+      const validType = validatePropertyType(filters.propertyType);
+      if (validType !== undefined) where.type = validType;
+      const validStatus = validatePropertyStatus(filters.status);
+      if (validStatus !== undefined) where.status = validStatus;
     }
 
     const [totalCount, properties] = await Promise.all([
@@ -331,7 +351,82 @@ export class PropertiesService {
         include: { owner: true, images: true },
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
+      }),
+    ]);
+
+    return {
+      properties: properties.map(mapPropertyPublicResponse),
+      totalCount,
+    };
+  }
+
+  async findAllWithinBounds(
+    minLat: number,
+    minLng: number,
+    maxLat: number,
+    maxLng: number,
+    filters?: {
+      minPrice?: number;
+      maxPrice?: number;
+      beds?: number;
+      baths?: number;
+      propertyType?: string;
+      status?: string;
+      page?: number;
+      limit?: number;
+      sort?: string;
+    },
+  ) {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 9;
+    const skip = (page - 1) * limit;
+    const orderBy =
+      filters?.sort === 'price_asc' ? { price: 'asc' as const } :
+      filters?.sort === 'price_desc' ? { price: 'desc' as const } :
+      { createdAt: 'desc' as const };
+
+    // && is the bounding-box overlap operator — hits the GiST index on location
+    const rawProperties = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "properties"
+      WHERE location::geometry && ST_MakeEnvelope(${minLng}, ${minLat}, ${maxLng}, ${maxLat}, 4326)
+      AND deleted_at IS NULL
+      AND published_at IS NOT NULL
+      AND status IN ('FOR_SALE'::"PropertyStatus", 'FOR_RENT'::"PropertyStatus");
+    `;
+
+    const ids = rawProperties.map((p) => p.id);
+
+    const where: Prisma.PropertyWhereInput = {
+      id: { in: ids },
+      deletedAt: null,
+      publishedAt: { not: null },
+      status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT] },
+    };
+
+    if (filters) {
+      if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+        const price: Prisma.DecimalFilter = {};
+        if (filters.minPrice !== undefined) price.gte = filters.minPrice;
+        if (filters.maxPrice !== undefined) price.lte = filters.maxPrice;
+        where.price = price;
+      }
+      if (filters.beds !== undefined) where.bedrooms = { gte: filters.beds };
+      if (filters.baths !== undefined) where.bathrooms = { gte: filters.baths };
+      const validType = validatePropertyType(filters.propertyType);
+      if (validType !== undefined) where.type = validType;
+      const validStatus = validatePropertyStatus(filters.status);
+      if (validStatus !== undefined) where.status = validStatus;
+    }
+
+    const [totalCount, properties] = await Promise.all([
+      this.prisma.property.count({ where }),
+      this.prisma.property.findMany({
+        where,
+        include: { owner: true, images: true },
+        skip,
+        take: limit,
+        orderBy,
       }),
     ]);
 

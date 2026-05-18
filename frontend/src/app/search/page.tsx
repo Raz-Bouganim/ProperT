@@ -1,16 +1,25 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PropertyCard } from "@/components/PropertyCard";
 import { FilterBar } from "@/components/search/FilterBar";
 import { Pagination } from "@/components/search/Pagination";
 import { Footer } from "@/components/layout/Footer";
 import dynamic from "next/dynamic";
-import { Loader2, MapPin, Grid, List, Map as MapIcon } from "lucide-react";
+import { Loader2, MapPin, Grid, List, Map as MapIcon, ChevronDown, ZoomIn } from "lucide-react";
 import api from "@/lib/api";
 import { coverImageUrl, type PropertyListingPreview } from "@/types/property-listing";
 import type { SearchFilterPatch } from "@/types/search-filters";
+import type { MapBounds } from "@/components/Map";
+
+const MIN_ZOOM = 14;
+
+const SORT_OPTIONS = [
+    { value: "newest", label: "Newest" },
+    { value: "price_asc", label: "Price: Low → High" },
+    { value: "price_desc", label: "Price: High → Low" },
+];
 
 // Dynamically import Map to avoid SSR issues with Leaflet
 const Map = dynamic(() => import("@/components/Map"), {
@@ -29,9 +38,15 @@ function SearchPageContent() {
     const [properties, setProperties] = useState<PropertyListingPreview[]>([]);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [hoveredPropertyId, setHoveredPropertyId] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [showMap, setShowMap] = useState(false);
+    const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
+    const [showSortDropdown, setShowSortDropdown] = useState(false);
+    const [mapFlyTo, setMapFlyTo] = useState<[number, number] | null>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     // Search Params
     const lat = parseFloat(searchParams.get("lat") || "40.7128");
@@ -40,33 +55,69 @@ function SearchPageContent() {
     const minPrice = searchParams.get("minPrice");
     const maxPrice = searchParams.get("maxPrice");
     const beds = searchParams.get("beds");
-    const propertyType = searchParams.get("type");
+    const baths = searchParams.get("baths");
+    const propertyType = searchParams.get("propertyType");
     const page = parseInt(searchParams.get("page") || "1");
+    const sort = searchParams.get("sort") || "newest";
+
+    // zoom < MIN_ZOOM → map shows overlay and stops bbox queries; results panel unchanged
+    const zoomTooLow = showMap && mapBounds !== null && mapBounds.zoom < MIN_ZOOM;
+
+    const handleBoundsChange = useCallback((bounds: MapBounds) => {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => setMapBounds(bounds), 500);
+    }, []);
 
     const fetchProperties = useCallback(async () => {
+        abortControllerRef.current?.abort();
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         setLoading(true);
         const limit = showMap ? 8 : 9;
         try {
-            let url = `/properties?lat=${lat}&lng=${lng}&radius=${radius}&page=${page}&limit=${limit}`;
+            let url: string;
+            // Use bbox only when map is open, bounds are known, and zoom is sufficient
+            if (showMap && mapBounds && mapBounds.zoom >= MIN_ZOOM) {
+                url = `/properties?minLat=${mapBounds.minLat}&minLng=${mapBounds.minLng}&maxLat=${mapBounds.maxLat}&maxLng=${mapBounds.maxLng}&page=${page}&limit=${limit}`;
+            } else {
+                url = `/properties?lat=${lat}&lng=${lng}&radius=${radius}&page=${page}&limit=${limit}`;
+            }
             if (minPrice) url += `&minPrice=${minPrice}`;
             if (maxPrice) url += `&maxPrice=${maxPrice}`;
             if (beds) url += `&beds=${beds}`;
+            if (baths) url += `&baths=${baths}`;
             if (propertyType) url += `&propertyType=${propertyType}`;
             if (status) url += `&status=${status}`;
+            if (sort && sort !== "newest") url += `&sort=${sort}`;
 
-            const res = await api.get(url);
+            const res = await api.get(url, { signal: controller.signal });
             setProperties(res.data.properties);
             setTotalCount(res.data.totalCount);
-        } catch (error) {
-            console.error(error);
+            setError(null);
+        } catch (err: unknown) {
+            if (err instanceof Error && (err.name === 'CanceledError' || err.name === 'AbortError')) return;
+            console.error(err);
+            setError("Failed to load properties. Please try again.");
         } finally {
             setLoading(false);
         }
-    }, [lat, lng, radius, minPrice, maxPrice, beds, propertyType, status, page, showMap]);
+    }, [lat, lng, radius, minPrice, maxPrice, beds, baths, propertyType, status, page, showMap, mapBounds, sort]);
 
     useEffect(() => {
         fetchProperties();
+        return () => abortControllerRef.current?.abort();
     }, [fetchProperties]);
+
+    // Close sort dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest("[data-sort-dropdown]")) setShowSortDropdown(false);
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
 
     const handleFilterChange = (newFilters: SearchFilterPatch) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -84,10 +135,22 @@ function SearchPageContent() {
         updateParam("minPrice");
         updateParam("maxPrice");
         updateParam("beds");
-        updateParam("type");
+        updateParam("baths");
+        updateParam("propertyType");
         updateParam("status");
 
         params.set("page", "1");
+        router.push(`/search?${params.toString()}`);
+    };
+
+    const handleLocationSelect = (newLat: number, newLng: number) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("lat", newLat.toString());
+        params.set("lng", newLng.toString());
+        params.set("radius", "10");
+        params.set("page", "1");
+        setMapBounds(null);
+        setMapFlyTo([newLat, newLng]);
         router.push(`/search?${params.toString()}`);
     };
 
@@ -97,37 +160,85 @@ function SearchPageContent() {
         router.push(`/search?${params.toString()}`);
     };
 
+    const handleSortChange = (newSort: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("sort", newSort);
+        params.set("page", "1");
+        router.push(`/search?${params.toString()}`);
+        setShowSortDropdown(false);
+    };
+
     const returnTo = `/search?${searchParams.toString()}`;
+    const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Newest";
+
+    const initialFilters = useMemo(() => ({
+        status: searchParams.get("status"),
+        minPrice: searchParams.get("minPrice"),
+        maxPrice: searchParams.get("maxPrice"),
+        beds: searchParams.get("beds"),
+        baths: searchParams.get("baths"),
+        propertyType: searchParams.get("propertyType"),
+    }), [searchParams]);
 
     return (
         <div className="min-h-screen bg-slate-50/50">
             <FilterBar
                 onFilterChange={handleFilterChange}
-                initialFilters={{
-                    status: searchParams.get("status"),
-                    minPrice: searchParams.get("minPrice"),
-                    maxPrice: searchParams.get("maxPrice"),
-                    beds: searchParams.get("beds"),
-                    type: searchParams.get("type"),
-                }}
+                onLocationSelect={handleLocationSelect}
+                initialLocation={searchParams.get("location") ?? ""}
+                initialFilters={initialFilters}
             />
+            {error && (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+                    <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                </div>
+            )}
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Results Summary & Tools */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                     <div>
                         <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-4 tracking-tight">
-                            {loading ? (
+                            {loading && properties.length === 0 ? (
                                 <span className="h-8 w-48 bg-slate-200 dark:bg-slate-800 animate-pulse rounded" />
                             ) : (
-                                <>{totalCount} Properties found</>
+                                <span className={`transition-opacity duration-200 ${loading ? "opacity-40" : "opacity-100"}`}>
+                                    {totalCount} Properties found
+                                </span>
                             )}
                         </h2>
                         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
                             Showing homes matching your search criteria
                         </p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        {/* Sort Dropdown */}
+                        <div className="relative" data-sort-dropdown>
+                            <button
+                                onClick={() => setShowSortDropdown((p) => !p)}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm cursor-pointer h-10"
+                            >
+                                <span>{sortLabel}</span>
+                                <ChevronDown className="w-4 h-4 text-slate-400" />
+                            </button>
+                            {showSortDropdown && (
+                                <div className="absolute top-full mt-2 right-0 w-48 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50">
+                                    {SORT_OPTIONS.map((opt) => (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => handleSortChange(opt.value)}
+                                            className={`w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm cursor-pointer ${sort === opt.value ? "font-bold text-primary" : "text-slate-700"}`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* View mode + Map toggle */}
                         <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-sm h-10">
                             <button
                                 onClick={() => setViewMode("grid")}
@@ -147,7 +258,7 @@ function SearchPageContent() {
                             <div className="w-px h-5 bg-slate-200 mx-1.5" />
 
                             <button
-                                onClick={() => setShowMap(!showMap)}
+                                onClick={() => { setShowMap((prev) => !prev); if (showMap) setMapBounds(null); }}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all cursor-pointer font-bold text-xs uppercase tracking-wider ${showMap ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"}`}
                                 title="Toggle Map"
                             >
@@ -161,14 +272,14 @@ function SearchPageContent() {
                 <div className="flex flex-col lg:flex-row gap-8">
                     {/* Left: Properties Grid */}
                     <div className="flex-1">
-                        {loading ? (
+                        {loading && properties.length === 0 ? (
                             <div className={`grid gap-8 ${showMap ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}>
                                 {[1, 2, 3, 4, 5, 6].map((i) => (
                                     <PropertyCard key={i} id="" title="" address="" price={0} beds={0} baths={0} sqft={0} image="" isLoading />
                                 ))}
                             </div>
                         ) : properties.length > 0 ? (
-                            <div className={`grid gap-8 ${viewMode === "grid" ? (showMap ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3") : "grid-cols-1"}`}>
+                            <div className={`grid gap-8 transition-opacity duration-200 ${loading ? "opacity-50 pointer-events-none" : "opacity-100"} ${viewMode === "grid" ? (showMap ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3") : "grid-cols-1"}`}>
                                 {properties.map((property) => (
                                     <PropertyCard
                                         key={property.id}
@@ -187,12 +298,13 @@ function SearchPageContent() {
                                         leaseDurationLabel={property.leaseDurationLabel}
                                         hideBedBath={property.type === "OFFICE"}
                                         ownerId={property.ownerId}
+                                        isHighlighted={hoveredPropertyId === property.id}
                                         onMouseEnter={() => setHoveredPropertyId(property.id)}
                                         onMouseLeave={() => setHoveredPropertyId(null)}
                                     />
                                 ))}
                             </div>
-                        ) : (
+                        ) : !loading ? (
                             <div className="flex flex-col items-center justify-center py-20 text-center bg-transparent">
                                 <MapPin className="w-12 h-12 text-slate-300 mb-4" />
                                 <h3 className="font-bold text-xl text-slate-900">We couldn&apos;t find a perfect match</h3>
@@ -200,7 +312,7 @@ function SearchPageContent() {
                                     Try adjusting your criteria or expanding your search area.
                                 </p>
                             </div>
-                        )}
+                        ) : null}
 
                         {/* Pagination */}
                         {totalCount > 0 && (
@@ -214,10 +326,28 @@ function SearchPageContent() {
                         )}
                     </div>
 
-                    {/* Right: Map (Sticky) - Conditional */}
+                    {/* Right: Map (Sticky) */}
                     {showMap && (
-                        <div className="hidden lg:block w-[450px] h-[calc(100vh-200px)] sticky top-44 rounded-2xl overflow-hidden shadow-2xl border border-slate-200/50 dark:border-slate-800/50 z-10 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <Map listings={properties} center={[lat, lng]} zoom={13} hoveredListingId={hoveredPropertyId} />
+                        <div className="hidden lg:block w-[450px] h-[calc(100vh-200px)] sticky top-44 rounded-2xl overflow-hidden shadow-2xl border border-slate-200/50 dark:border-slate-800/50 z-10 animate-in fade-in slide-in-from-right-4 duration-300 relative">
+                            <Map
+                                listings={zoomTooLow ? [] : properties}
+                                center={[lat, lng]}
+                                zoom={13}
+                                hoveredListingId={hoveredPropertyId}
+                                onBoundsChange={handleBoundsChange}
+                                onListingClick={(id) => setHoveredPropertyId(id)}
+                                flyTo={mapFlyTo}
+                                isNavigable
+                            />
+                            {zoomTooLow && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center z-[1100] rounded-2xl pointer-events-none">
+                                    <div className="flex flex-col items-center gap-2 bg-white/90 backdrop-blur-[2px] shadow-lg rounded-2xl px-6 py-4 border border-slate-100">
+                                        <ZoomIn className="w-8 h-8 text-slate-500" />
+                                        <p className="font-bold text-slate-800 text-sm">Zoom in to see properties</p>
+                                        <p className="text-slate-400 text-xs">Pan closer to a neighbourhood</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

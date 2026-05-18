@@ -7,6 +7,14 @@ import { X, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PropertyListingPreview } from "@/types/property-listing";
 
+export interface MapBounds {
+    minLat: number;
+    minLng: number;
+    maxLat: number;
+    maxLng: number;
+    zoom: number;
+}
+
 interface MapProps {
     listings: PropertyListingPreview[];
     center?: [number, number];
@@ -14,6 +22,9 @@ interface MapProps {
     hoveredListingId?: string | null;
     className?: string;
     onLocationSelect?: (lat: number, lng: number) => void;
+    onBoundsChange?: (bounds: MapBounds) => void;
+    onListingClick?: (id: string | null) => void;
+    flyTo?: [number, number] | null;
     isInteractive?: boolean;
     /**
      * Allows users to pan/zoom the map without enabling "pick a location" behavior.
@@ -31,7 +42,7 @@ function ZoomControls() {
     const map = useMap();
 
     return (
-        <div className="absolute top-6 right-6 flex flex-col gap-2 z-10 isolate">
+        <div className="absolute top-6 right-6 flex flex-col gap-2 z-[1000]">
             <button
                 type="button"
                 onClick={() => map.zoomIn()}
@@ -71,6 +82,37 @@ function MapEvents({ onLocationSelect, isInteractive }: { onLocationSelect?: (la
     return null;
 }
 
+function MapBoundsHandler({ onBoundsChange }: { onBoundsChange: (bounds: MapBounds) => void }) {
+    const map = useMapEvents({
+        moveend() {
+            const b = map.getBounds();
+            onBoundsChange({ minLat: b.getSouth(), minLng: b.getWest(), maxLat: b.getNorth(), maxLng: b.getEast(), zoom: map.getZoom() });
+        },
+        zoomend() {
+            const b = map.getBounds();
+            onBoundsChange({ minLat: b.getSouth(), minLng: b.getWest(), maxLat: b.getNorth(), maxLng: b.getEast(), zoom: map.getZoom() });
+        },
+    });
+
+    useEffect(() => {
+        const b = map.getBounds();
+        onBoundsChange({ minLat: b.getSouth(), minLng: b.getWest(), maxLat: b.getNorth(), maxLng: b.getEast(), zoom: map.getZoom() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    return null;
+}
+
+function FlyToHandler({ target }: { target: [number, number] | null | undefined }) {
+    const map = useMap();
+    useEffect(() => {
+        if (target) {
+            map.flyTo(target, 14, { duration: 1.2 });
+        }
+    }, [target, map]);
+    return null;
+}
+
 function InvalidateMapSize() {
     const map = useMap();
     useEffect(() => {
@@ -89,6 +131,9 @@ export default function Map({
     hoveredListingId,
     className,
     onLocationSelect,
+    onBoundsChange,
+    onListingClick,
+    flyTo,
     isInteractive,
     isNavigable: isNavigableProp,
     allowMarkerClick: allowMarkerClickProp,
@@ -156,9 +201,11 @@ export default function Map({
                 keyboard={isNavigable}
                 zoomControl={false}
             >
-                <ChangeView center={mapCenter} zoom={zoom} />
+                {!onBoundsChange && <ChangeView center={mapCenter} zoom={zoom} />}
                 <InvalidateMapSize />
                 <MapEvents onLocationSelect={onLocationSelect} isInteractive={isInteractive} />
+                {onBoundsChange && <MapBoundsHandler onBoundsChange={onBoundsChange} />}
+                <FlyToHandler target={flyTo} />
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -175,7 +222,7 @@ export default function Map({
                             eventHandlers={
                                 allowMarkerClick || (isInteractive && listing.id === "preview")
                                     ? {
-                                        click: allowMarkerClick ? () => setSelectedListing(listing) : undefined,
+                                        click: allowMarkerClick ? () => { setSelectedListing(listing); onListingClick?.(listing.id); } : undefined,
                                         dragend: (e) => {
                                             if (isInteractive && onLocationSelect) {
                                                 const marker = e.target;
@@ -193,7 +240,7 @@ export default function Map({
 
             {/* Floating Property Card */}
             {floatingListing && floatingListing.id !== "preview" && (
-                <div className="absolute bottom-6 left-6 right-6 md:right-auto md:w-80 bg-white p-4 rounded-xl shadow-2xl z-20 animate-in slide-in-from-bottom-4 duration-300 border border-slate-100">
+                <div className="absolute bottom-6 left-6 right-6 md:right-auto md:w-80 bg-white p-4 rounded-xl shadow-2xl z-[1000] animate-in slide-in-from-bottom-4 duration-300 border border-slate-100">
                     <div className="flex gap-4">
                         <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-slate-100">
                             <Image
@@ -224,7 +271,7 @@ export default function Map({
                                 <button
                                     type="button"
                                     className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 transition-colors cursor-pointer"
-                                    onClick={() => setSelectedListing(null)}
+                                    onClick={() => { setSelectedListing(null); onListingClick?.(null); }}
                                 >
                                     <X size={16} />
                                 </button>

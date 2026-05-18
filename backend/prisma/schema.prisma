@@ -135,6 +135,10 @@ model Property {
   @@map("properties")
   @@index([price])
   @@index([ownerId])
+  @@index([city])
+  @@index([status, price])
+  @@index([bedrooms])
+  @@index([bathrooms])
 }
 
 model PropertyImage {
