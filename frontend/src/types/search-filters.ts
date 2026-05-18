@@ -5,6 +5,10 @@ export type SearchFilterPatch = Partial<{
   baths: number | string | null;
   propertyType: string | null;
   status: string | null;
+  minSqft: number | string | null;
+  maxSqft: number | string | null;
+  maxLeaseDuration: number | string | null;
+  amenities: string[] | null;
 }>;
 
 export type SearchFilterInitial = Partial<{
@@ -14,4 +18,8 @@ export type SearchFilterInitial = Partial<{
   beds: string | null;
   baths: string | null;
   propertyType: string | null;
+  minSqft: string | null;
+  maxSqft: string | null;
+  maxLeaseDuration: string | null;
+  amenities: string | null; // comma-separated in URL
 }>;
