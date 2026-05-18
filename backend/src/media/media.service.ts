@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -14,6 +15,23 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import { OnModuleInit } from '@nestjs/common';
+
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/avif',
+  'video/mp4',
+  'video/webm',
+  'video/ogg',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+]);
+
+const MAX_FILE_BYTES = 100 * 1024 * 1024; // 100 MB
 
 @Injectable()
 export class MediaService implements OnModuleInit {
@@ -86,7 +104,14 @@ export class MediaService implements OnModuleInit {
     }
   }
 
-  async getPresignedUrl(fileName: string, contentType: string) {
+  async getPresignedUrl(fileName: string, contentType: string, fileSize?: number) {
+    if (!ALLOWED_MIME_TYPES.has(contentType)) {
+      throw new BadRequestException(`File type '${contentType}' is not allowed`);
+    }
+    if (fileSize !== undefined && fileSize > MAX_FILE_BYTES) {
+      throw new BadRequestException('File exceeds the 100 MB size limit');
+    }
+
     const bucketName = this.configService.getOrThrow<string>('S3_BUCKET_NAME');
     const key = `${uuidv4()}-${fileName}`;
 

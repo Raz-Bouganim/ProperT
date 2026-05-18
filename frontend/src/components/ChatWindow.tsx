@@ -8,7 +8,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { clsx } from "clsx";
 import { createChatSocket } from "@/lib/chatSocket";
-import { MessageAttachment, MEDIA_TYPES } from "@/components/chat/MessageAttachment";
+import { MessageAttachment } from "@/components/chat/MessageAttachment";
 
 type ReplyRef = {
     id: string;
@@ -62,9 +62,6 @@ export function ChatWindow({
     const scrollRef = useRef<HTMLDivElement>(null);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [mediaUrl, setMediaUrl] = useState("");
-    const [mediaType, setMediaType] = useState<(typeof MEDIA_TYPES)[number] | "">("");
-    const [showMediaFields, setShowMediaFields] = useState(false);
 
     const initChat = useCallback(async () => {
         if (!user) return;
@@ -174,35 +171,21 @@ export function ChatWindow({
         }
 
         const text = newMessage.trim();
-        const mUrl = mediaUrl.trim();
-        if (mUrl && !mediaType) return;
-        if (!text && !mUrl) return;
+        if (!text) return;
 
         const payload: {
             conversationId: string;
             content?: string;
-            mediaUrl?: string;
-            mediaType?: string;
             replyToMessageId?: string;
-        } = { conversationId };
-        if (text) payload.content = text;
-        if (mUrl && mediaType) {
-            payload.mediaUrl = mUrl;
-            payload.mediaType = mediaType;
-        }
+        } = { conversationId, content: text };
         if (replyingTo?.id) payload.replyToMessageId = replyingTo.id;
 
         socket.emit("sendMessage", payload);
         setNewMessage("");
-        setMediaUrl("");
-        setMediaType("");
-        setShowMediaFields(false);
         setReplyingTo(null);
     };
 
-    const textOrMediaReady =
-        Boolean(newMessage.trim()) || (Boolean(mediaUrl.trim()) && Boolean(mediaType));
-    const canSubmit = editingId ? Boolean(newMessage.trim()) : textOrMediaReady;
+    const canSubmit = Boolean(newMessage.trim());
 
     if (!isOpen) return null;
 
@@ -350,41 +333,6 @@ export function ChatWindow({
                         <button type="button" className="shrink-0 text-primary" onClick={() => setReplyingTo(null)}>
                             Cancel
                         </button>
-                    </div>
-                )}
-                {!editingId && (
-                    <div className="flex flex-col gap-2">
-                        <button
-                            type="button"
-                            className="w-fit text-left text-xs text-primary hover:underline"
-                            onClick={() => setShowMediaFields((v) => !v)}
-                        >
-                            {showMediaFields ? "Hide media attachment" : "Attach media (URL)"}
-                        </button>
-                        {showMediaFields && (
-                            <div className="flex flex-col gap-2 rounded-lg border bg-slate-50 p-2">
-                                <input
-                                    value={mediaUrl}
-                                    onChange={(e) => setMediaUrl(e.target.value)}
-                                    className="rounded-lg border bg-white px-2 py-1.5 text-xs"
-                                    placeholder="https://…"
-                                />
-                                <select
-                                    value={mediaType}
-                                    onChange={(e) =>
-                                        setMediaType(e.target.value as (typeof MEDIA_TYPES)[number] | "")
-                                    }
-                                    className="rounded-lg border bg-white px-2 py-1.5 text-xs"
-                                >
-                                    <option value="">Media type</option>
-                                    {MEDIA_TYPES.map((t) => (
-                                        <option key={t} value={t}>
-                                            {t}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
                     </div>
                 )}
                 <div className="flex gap-2">

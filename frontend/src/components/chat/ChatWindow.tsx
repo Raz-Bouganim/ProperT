@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, ChevronLeft, Loader2, User, CornerUpLeft, Pencil } from 'lucide-react';
+import { Send, ChevronLeft, Loader2, User, CornerUpLeft, Pencil, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -10,7 +10,7 @@ import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import Image from 'next/image';
 import { createChatSocket } from '@/lib/chatSocket';
-import { MessageAttachment, MEDIA_TYPES } from '@/components/chat/MessageAttachment';
+import { MessageAttachment } from '@/components/chat/MessageAttachment';
 
 type ReplyRef = {
     id: string;
@@ -38,7 +38,17 @@ interface Message {
 
 const PAGE_SIZE = 50;
 
-export function ChatWindow({ chatId }: { chatId: string }) {
+export function ChatWindow({
+    chatId,
+    embedded,
+    onNewMessage,
+    onRead,
+}: {
+    chatId: string;
+    embedded?: boolean;
+    onNewMessage?: (preview: string, timestamp: string) => void;
+    onRead?: () => void;
+}) {
     const { user } = useAuth();
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
@@ -51,15 +61,15 @@ export function ChatWindow({ chatId }: { chatId: string }) {
         lastName: string;
         avatar?: string;
     } | null>(null);
+    const [property, setProperty] = useState<{ id: string; title: string } | null>(null);
     const endRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [mediaUrl, setMediaUrl] = useState('');
-    const [mediaType, setMediaType] = useState<(typeof MEDIA_TYPES)[number] | ''>(
-        '',
-    );
-    const [showMediaFields, setShowMediaFields] = useState(false);
+    const [pendingFile, setPendingFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [firstUnreadIdx, setFirstUnreadIdx] = useState(-1);
 
     const loadInitial = useCallback(async () => {
         if (!chatId || !user) return;
@@ -72,16 +82,36 @@ export function ChatWindow({ chatId }: { chatId: string }) {
                 ),
                 api.get(`/chat/conversations/${chatId}`),
             ]);
-            setMessages(msgRes.data.items);
+            const items = msgRes.data.items;
+            setMessages(items);
             setOlderCursor(msgRes.data.nextCursor);
             const currentConv = convRes.data;
             if (currentConv) {
                 const other = currentConv.participants.find(
                     (p: { user: { id: string } }) => p.user.id !== user.id,
                 )?.user;
-                if (other) {
-                    setPartner(other);
-                }
+                if (other) setPartner(other);
+                if (currentConv.property) setProperty(currentConv.property);
+
+                const myParticipant = currentConv.participants.find(
+                    (p: { user: { id: string }; lastReadAt?: string | null }) =>
+                        p.user.id === user.id,
+                );
+                const lastReadAt = myParticipant?.lastReadAt
+                    ? new Date(myParticipant.lastReadAt)
+                    : null;
+
+                const idx = lastReadAt
+                    ? items.findIndex(
+                          (m) =>
+                              m.senderId !== user.id &&
+                              new Date(m.createdAt) > lastReadAt,
+                      )
+                    : -1;
+                setFirstUnreadIdx(idx);
+
+                void api.patch(`/chat/conversations/${chatId}/read`);
+                onRead?.();
             }
         } catch (error) {
             console.error('Failed to load chat:', error);
@@ -149,6 +179,8 @@ export function ChatWindow({ chatId }: { chatId: string }) {
                 }
                 return [...prev, message];
             });
+            const preview = message.content?.trim() || (message.mediaUrl ? '[attachment]' : '');
+            if (preview) onNewMessage?.(preview, message.createdAt);
         };
         socket.on('newMessage', onNew);
         return () => {
@@ -162,7 +194,7 @@ export function ChatWindow({ chatId }: { chatId: string }) {
         endRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [lastMessageId, loading, loadingOlder]);
 
-    const sendMessage = async (e: React.FormEvent) => {
+    const sendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!socket || !user) return;
 
@@ -182,9 +214,37 @@ export function ChatWindow({ chatId }: { chatId: string }) {
         }
 
         const text = input.trim();
-        const mUrl = mediaUrl.trim();
-        if (mUrl && !mediaType) return;
-        if (!text && !mUrl) return;
+        if (!text && !pendingFile) return;
+
+        let uploadedUrl: string | undefined;
+        let uploadedType: string | undefined;
+
+        if (pendingFile) {
+            setUploading(true);
+            try {
+                const { data: presigned } = await api.post<{ url: string; publicUrl: string }>(
+                    '/media/presigned-url',
+                    { fileName: pendingFile.name, contentType: pendingFile.type, fileSize: pendingFile.size },
+                );
+                await fetch(presigned.url, {
+                    method: 'PUT',
+                    body: pendingFile,
+                    headers: { 'Content-Type': pendingFile.type },
+                });
+                uploadedUrl = presigned.publicUrl;
+                uploadedType = pendingFile.type.startsWith('image/')
+                    ? 'IMAGE'
+                    : pendingFile.type.startsWith('video/')
+                    ? 'VIDEO'
+                    : 'FILE';
+            } catch (err) {
+                console.error('Upload failed', err);
+                setPendingFile(null);
+                setUploading(false);
+                return;
+            }
+            setUploading(false);
+        }
 
         const payload: {
             conversationId: string;
@@ -194,24 +254,21 @@ export function ChatWindow({ chatId }: { chatId: string }) {
             replyToMessageId?: string;
         } = { conversationId: chatId };
         if (text) payload.content = text;
-        if (mUrl && mediaType) {
-            payload.mediaUrl = mUrl;
-            payload.mediaType = mediaType;
+        if (uploadedUrl && uploadedType) {
+            payload.mediaUrl = uploadedUrl;
+            payload.mediaType = uploadedType;
         }
         if (replyingTo?.id) payload.replyToMessageId = replyingTo.id;
 
         socket.emit('sendMessage', payload);
         setInput('');
-        setMediaUrl('');
-        setMediaType('');
-        setShowMediaFields(false);
+        setPendingFile(null);
         setReplyingTo(null);
     };
 
-    const textOrMediaReady =
-        Boolean(input.trim()) ||
-        (Boolean(mediaUrl.trim()) && Boolean(mediaType));
-    const canSubmit = editingId ? Boolean(input.trim()) : textOrMediaReady;
+    const canSubmit = editingId
+        ? Boolean(input.trim())
+        : Boolean(input.trim()) || Boolean(pendingFile);
 
     if (loading) {
         return (
@@ -222,13 +279,15 @@ export function ChatWindow({ chatId }: { chatId: string }) {
     }
 
     return (
-        <div className="flex h-screen max-h-screen flex-col bg-background">
+        <div className={embedded ? 'flex h-full flex-col bg-background' : 'flex h-screen max-h-screen flex-col bg-background'}>
             <div className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background p-4">
-                <Link href="/chat">
-                    <Button variant="ghost" size="icon" className="-ml-2">
-                        <ChevronLeft />
-                    </Button>
-                </Link>
+                {!embedded && (
+                    <Link href="/chat">
+                        <Button variant="ghost" size="icon" className="-ml-2">
+                            <ChevronLeft />
+                        </Button>
+                    </Link>
+                )}
                 <div className="relative h-10 w-10 overflow-hidden rounded-full bg-muted">
                     {partner?.avatar ? (
                         <Image
@@ -249,9 +308,14 @@ export function ChatWindow({ chatId }: { chatId: string }) {
                             ? `${partner.firstName} ${partner.lastName}`
                             : 'Chat'}
                     </div>
-                    <div className="text-[10px] font-black uppercase tracking-widest text-primary opacity-60">
-                        Online
-                    </div>
+                    {property && (
+                        <Link
+                            href={`/properties/${property.id}`}
+                            className="text-[10px] font-black uppercase tracking-widest text-primary opacity-60 hover:opacity-100 hover:underline"
+                        >
+                            {property.title}
+                        </Link>
+                    )}
                 </div>
             </div>
 
@@ -265,95 +329,103 @@ export function ChatWindow({ chatId }: { chatId: string }) {
                         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                 )}
-                {messages.map((msg) => (
-                    <div
-                        key={msg.id}
-                        className={cn(
-                            'flex flex-col',
-                            msg.senderId === user?.id ? 'items-end' : 'items-start',
+                {messages.map((msg, i) => (
+                    <div key={msg.id}>
+                        {i === firstUnreadIdx && firstUnreadIdx !== -1 && (
+                            <div className="my-2 flex items-center gap-3 text-xs text-muted-foreground">
+                                <div className="flex-1 border-t border-dashed" />
+                                <span className="shrink-0 font-medium">Unread messages</span>
+                                <div className="flex-1 border-t border-dashed" />
+                            </div>
                         )}
-                    >
                         <div
                             className={cn(
-                                'max-w-[80%] space-y-1 rounded-2xl px-4 py-2 text-sm shadow-sm',
-                                msg.senderId === user?.id
-                                    ? 'rounded-tr-none bg-primary text-primary-foreground'
-                                    : 'rounded-tl-none border bg-white text-foreground',
+                                'flex flex-col',
+                                msg.senderId === user?.id ? 'items-end' : 'items-start',
                             )}
                         >
-                            {msg.replyToMessage && (
-                                <div
-                                    className={cn(
-                                        'mb-1 border-l-2 pl-2 text-xs opacity-90',
+                            <div
+                                className={cn(
+                                    'max-w-[80%]',
+                                    !(msg.mediaUrl && !msg.content && !msg.replyToMessage) && [
+                                        'space-y-1 rounded-2xl px-4 py-2 text-sm shadow-sm',
                                         msg.senderId === user?.id
-                                            ? 'border-primary-foreground/50'
-                                            : 'border-primary/40',
-                                    )}
-                                >
-                                    <div className="font-medium">
-                                        {msg.replyToMessage.sender.firstName}{' '}
-                                        {msg.replyToMessage.sender.lastName}
-                                    </div>
-                                    <div className="truncate opacity-80">
-                                        {msg.replyToMessage.content ||
-                                            '[attachment]'}
-                                    </div>
-                                </div>
-                            )}
-                            {msg.content ? <div>{msg.content}</div> : null}
-                            {msg.mediaUrl && msg.mediaType ? (
-                                <MessageAttachment
-                                    mediaUrl={msg.mediaUrl}
-                                    mediaType={msg.mediaType}
-                                    variant={
-                                        msg.senderId === user?.id ? 'self' : 'other'
-                                    }
-                                />
-                            ) : null}
-                            {msg.editedAt && (
-                                <div
-                                    className={cn(
-                                        'text-[10px] opacity-70',
-                                        msg.senderId === user?.id
-                                            ? 'text-primary-foreground/80'
-                                            : 'text-muted-foreground',
-                                    )}
-                                >
-                                    edited
-                                </div>
-                            )}
-                        </div>
-                        <div className="mt-1 flex items-center gap-2 px-1">
-                            <span className="text-[10px] text-muted-foreground">
-                                {new Date(msg.createdAt).toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                })}
-                            </span>
-                            <button
-                                type="button"
-                                className="text-[10px] font-medium text-primary hover:underline"
-                                onClick={() => setReplyingTo(msg)}
-                            >
-                                <CornerUpLeft className="mr-0.5 inline h-3 w-3" />
-                                Reply
-                            </button>
-                            {msg.senderId === user?.id &&
-                                msg.content &&
-                                msg.content.trim().length > 0 && (
-                                    <button
-                                        type="button"
-                                        className="text-[10px] font-medium text-primary hover:underline"
-                                        onClick={() => {
-                                            setEditingId(msg.id);
-                                            setInput(msg.content || '');
-                                            setReplyingTo(null);
-                                        }}
-                                    >
-                                        <Pencil className="mr-0.5 inline h-3 w-3" />
-                                        Edit
-                                    </button>
+                                            ? 'rounded-tr-none bg-primary text-primary-foreground'
+                                            : 'rounded-tl-none border bg-white text-foreground',
+                                    ],
                                 )}
+                            >
+                                {msg.replyToMessage && (
+                                    <div
+                                        className={cn(
+                                            'mb-1 border-l-2 pl-2 text-xs opacity-90',
+                                            msg.senderId === user?.id
+                                                ? 'border-primary-foreground/50'
+                                                : 'border-primary/40',
+                                        )}
+                                    >
+                                        <div className="font-medium">
+                                            {msg.replyToMessage.sender.firstName}{' '}
+                                            {msg.replyToMessage.sender.lastName}
+                                        </div>
+                                        <div className="truncate opacity-80">
+                                            {msg.replyToMessage.content || '[attachment]'}
+                                        </div>
+                                    </div>
+                                )}
+                                {msg.content ? <div>{msg.content}</div> : null}
+                                {msg.mediaUrl && msg.mediaType ? (
+                                    <MessageAttachment
+                                        mediaUrl={msg.mediaUrl}
+                                        mediaType={msg.mediaType}
+                                        variant={msg.senderId === user?.id ? 'self' : 'other'}
+                                    />
+                                ) : null}
+                                {msg.editedAt && (
+                                    <div
+                                        className={cn(
+                                            'text-[10px] opacity-70',
+                                            msg.senderId === user?.id
+                                                ? 'text-primary-foreground/80'
+                                                : 'text-muted-foreground',
+                                        )}
+                                    >
+                                        edited
+                                    </div>
+                                )}
+                            </div>
+                            <div className="mt-1 flex items-center gap-2 px-1">
+                                <span className="text-[10px] text-muted-foreground">
+                                    {new Date(msg.createdAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                    })}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="text-[10px] font-medium text-primary hover:underline"
+                                    onClick={() => setReplyingTo(msg)}
+                                >
+                                    <CornerUpLeft className="mr-0.5 inline h-3 w-3" />
+                                    Reply
+                                </button>
+                                {msg.senderId === user?.id &&
+                                    msg.content &&
+                                    msg.content.trim().length > 0 && (
+                                        <button
+                                            type="button"
+                                            className="text-[10px] font-medium text-primary hover:underline"
+                                            onClick={() => {
+                                                setEditingId(msg.id);
+                                                setInput(msg.content || '');
+                                                setReplyingTo(null);
+                                            }}
+                                        >
+                                            <Pencil className="mr-0.5 inline h-3 w-3" />
+                                            Edit
+                                        </button>
+                                    )}
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -382,60 +454,63 @@ export function ChatWindow({ chatId }: { chatId: string }) {
                         mode
                     </div>
                 )}
-                {!editingId && (
-                    <div className="mb-2 flex flex-col gap-2">
+                {pendingFile && !editingId && (
+                    <div className="mb-2 flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-xs">
+                        <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                            {pendingFile.name}
+                        </span>
                         <button
                             type="button"
-                            className="w-fit text-left text-xs text-primary hover:underline"
-                            onClick={() => setShowMediaFields((v) => !v)}
+                            className="shrink-0 cursor-pointer text-primary"
+                            onClick={() => setPendingFile(null)}
                         >
-                            {showMediaFields ? 'Hide media attachment' : 'Attach media (URL)'}
+                            Remove
                         </button>
-                        {showMediaFields && (
-                            <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-2 sm:flex-row sm:items-center">
-                                <input
-                                    value={mediaUrl}
-                                    onChange={(e) => setMediaUrl(e.target.value)}
-                                    className="min-w-0 flex-1 rounded-lg border bg-background px-2 py-1.5 text-xs"
-                                    placeholder="https://… (after upload or CDN)"
-                                />
-                                <select
-                                    value={mediaType}
-                                    onChange={(e) =>
-                                        setMediaType(
-                                            e.target.value as (typeof MEDIA_TYPES)[number] | '',
-                                        )
-                                    }
-                                    className="rounded-lg border bg-background px-2 py-1.5 text-xs"
-                                >
-                                    <option value="">Media type</option>
-                                    {MEDIA_TYPES.map((t) => (
-                                        <option key={t} value={t}>
-                                            {t}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
                     </div>
                 )}
-                <form onSubmit={sendMessage} className="flex gap-2">
+                <form onSubmit={sendMessage} className="flex items-center gap-2">
+                    {!editingId && (
+                        <>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                className="hidden"
+                                accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) setPendingFile(file);
+                                    e.target.value = '';
+                                }}
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-12 w-12 shrink-0 cursor-pointer rounded-2xl"
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <Paperclip size={20} />
+                            </Button>
+                        </>
+                    )}
                     <input
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         className="flex-grow rounded-2xl border bg-muted p-3 transition-all focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder={
-                            editingId ? 'Edit message…' : 'Type a message…'
-                        }
+                        placeholder={editingId ? 'Edit message…' : 'Type a message…'}
                         autoFocus
                     />
                     <Button
                         type="submit"
                         size="icon"
-                        disabled={!canSubmit}
-                        className="h-12 w-12 shrink-0 rounded-2xl shadow-lg"
+                        disabled={!canSubmit || uploading}
+                        className="h-12 w-12 shrink-0 cursor-pointer rounded-2xl shadow-lg"
                     >
-                        <Send size={20} />
+                        {uploading ? (
+                            <Loader2 size={20} className="animate-spin" />
+                        ) : (
+                            <Send size={20} />
+                        )}
                     </Button>
                 </form>
             </div>

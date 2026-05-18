@@ -1,9 +1,10 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { use } from 'react';
-import { ChatWindow } from '@/components/chat/ChatWindow';
-
-export default function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = use(params);
-    return <ChatWindow chatId={id} />;
+export default async function ConversationPage({
+    params,
+}: {
+    params: Promise<{ id: string }>;
+}) {
+    const { id } = await params;
+    redirect(`/chat?id=${id}`);
 }
