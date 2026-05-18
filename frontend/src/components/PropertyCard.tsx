@@ -32,6 +32,7 @@ export interface PropertyCardProps {
     hideBedBath?: boolean;
     currency?: string;
     ownerId?: string;
+    isHighlighted?: boolean;
 }
 
 export function PropertyCard({
@@ -54,6 +55,7 @@ export function PropertyCard({
     hideBedBath = false,
     currency = "USD",
     ownerId,
+    isHighlighted = false,
 }: PropertyCardProps) {
     const { isAuthenticated, user } = useAuth();
     const { isFavorited, toggleFavorite } = useFavorites();
@@ -89,8 +91,10 @@ export function PropertyCard({
 
     const isRent = status?.toLowerCase().includes("rent") || status === "FOR_RENT";
 
-    const cardClassName =
-        "group block bg-transparent border border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 h-full bg-white";
+    const cardClassName = cn(
+        "group block bg-transparent border border-slate-200 shadow-sm rounded-2xl overflow-hidden transition-all duration-300 h-full bg-white",
+        isHighlighted ? "shadow-xl" : "hover:shadow-xl",
+    );
 
     const inner = (
         <>
@@ -99,7 +103,7 @@ export function PropertyCard({
                     src={image || "/placeholder.svg"}
                     alt={title}
                     fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    className={cn("object-cover group-hover:scale-105 transition-transform duration-500", isHighlighted && "scale-105")}
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 />
                 <div className="absolute top-3 left-3 bg-[#FDF6F0] px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-[#1A1A1A] shadow-sm z-10 border border-[#F5E6D8]">
