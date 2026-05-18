@@ -99,7 +99,7 @@ export class ChatService {
         ? { archivedAt: { not: null } }
         : { archivedAt: null };
 
-    return this.prisma.conversation.findMany({
+    const conversations = await this.prisma.conversation.findMany({
       where: {
         participants: {
           some: {
@@ -131,6 +131,55 @@ export class ChatService {
             title: true,
           },
         },
+      },
+    });
+
+    if (conversations.length === 0) return [];
+
+    const ids = conversations.map((c) => c.id);
+    const unreadRows = await this.prisma.$queryRaw<
+      { conversation_id: string; unread_count: bigint }[]
+    >`
+      SELECT
+        m.conversation_id::text AS conversation_id,
+        COUNT(m.id)             AS unread_count
+      FROM messages m
+      JOIN conversation_participants cp
+        ON  cp.conversation_id = m.conversation_id
+        AND cp.user_id::text   = ${userId}
+      WHERE
+            m.conversation_id::text = ANY(${ids})
+        AND m.sender_id::text      != ${userId}
+        AND (cp.last_read_at IS NULL OR m.created_at > cp.last_read_at)
+      GROUP BY m.conversation_id
+    `;
+
+    const unreadMap = new Map(
+      unreadRows.map((r) => [r.conversation_id, Number(r.unread_count)]),
+    );
+
+    return conversations.map((conv) => ({
+      ...conv,
+      unreadCount: unreadMap.get(conv.id) ?? 0,
+    }));
+  }
+
+  async markConversationRead(userId: string, conversationId: string) {
+    await this.ensureParticipant(userId, conversationId);
+
+    const latest = await this.prisma.message.findFirst({
+      where: { conversationId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { id: true },
+    });
+
+    if (!latest) return;
+
+    await this.prisma.conversationParticipant.update({
+      where: { userId_conversationId: { userId, conversationId } },
+      data: {
+        lastReadMessageId: latest.id,
+        lastReadAt: new Date(),
       },
     });
   }
@@ -246,14 +295,20 @@ export class ChatService {
 
       const preview = previewFromMessage(msg.content, msg.mediaUrl);
 
-      await tx.conversation.update({
-        where: { id: conversationId },
-        data: {
-          updatedAt: new Date(),
-          lastMessageAt: msg.createdAt,
-          lastMessagePreview: preview || null,
-        },
-      });
+      await Promise.all([
+        tx.conversation.update({
+          where: { id: conversationId },
+          data: {
+            updatedAt: new Date(),
+            lastMessageAt: msg.createdAt,
+            lastMessagePreview: preview || null,
+          },
+        }),
+        tx.conversationParticipant.update({
+          where: { userId_conversationId: { userId: senderId, conversationId } },
+          data: { lastReadMessageId: msg.id, lastReadAt: new Date() },
+        }),
+      ]);
 
       return msg;
     });

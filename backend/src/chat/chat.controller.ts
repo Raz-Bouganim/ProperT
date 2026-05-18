@@ -68,6 +68,15 @@ export class ChatController {
     return this.chatService.editMessage(messageId, user.userId, body.content);
   }
 
+  @Patch('conversations/:id/read')
+  async markConversationRead(
+    @CurrentUser() user: JwtAuthUser,
+    @Param('id') id: string,
+  ) {
+    await this.chatService.markConversationRead(user.userId, id);
+    return { ok: true };
+  }
+
   @Post('conversations')
   async getOrCreateConversation(
     @CurrentUser() user: JwtAuthUser,
