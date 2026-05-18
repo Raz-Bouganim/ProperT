@@ -53,6 +53,10 @@ export class PropertiesController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('sort') sort?: string,
+    @Query('minSqft') minSqft?: string,
+    @Query('maxSqft') maxSqft?: string,
+    @Query('maxLeaseDuration') maxLeaseDuration?: string,
+    @Query('amenities') amenities?: string,
   ) {
     const minPriceNum = minPrice ? parseFloat(minPrice) : undefined;
     const maxPriceNum = maxPrice ? parseFloat(maxPrice) : undefined;
@@ -60,6 +64,10 @@ export class PropertiesController {
     const bathsNum = baths ? parseInt(baths, 10) : undefined;
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 9;
+    const minSqftNum = minSqft ? parseFloat(minSqft) : undefined;
+    const maxSqftNum = maxSqft ? parseFloat(maxSqft) : undefined;
+    const maxLeaseDurationNum = maxLeaseDuration ? parseInt(maxLeaseDuration, 10) : undefined;
+    const amenityList = amenities ? amenities.split(',').filter(Boolean) : undefined;
 
     if (minPriceNum !== undefined && !isFinite(minPriceNum)) throw new BadRequestException('minPrice must be a number');
     if (maxPriceNum !== undefined && !isFinite(maxPriceNum)) throw new BadRequestException('maxPrice must be a number');
@@ -67,6 +75,8 @@ export class PropertiesController {
     if (bathsNum !== undefined && !Number.isInteger(bathsNum)) throw new BadRequestException('baths must be an integer');
     if (minPriceNum !== undefined && maxPriceNum !== undefined && minPriceNum > maxPriceNum)
       throw new BadRequestException('minPrice must be ≤ maxPrice');
+    if (minSqftNum !== undefined && maxSqftNum !== undefined && minSqftNum > maxSqftNum)
+      throw new BadRequestException('minSqft must be ≤ maxSqft');
 
     const sharedFilters = {
       minPrice: minPriceNum,
@@ -78,6 +88,10 @@ export class PropertiesController {
       page: pageNum,
       limit: limitNum,
       sort,
+      minSqft: minSqftNum,
+      maxSqft: maxSqftNum,
+      maxLeaseDuration: maxLeaseDurationNum,
+      amenities: amenityList,
     };
 
     // Bounding-box search: GET /properties?minLat=...&minLng=...&maxLat=...&maxLng=...

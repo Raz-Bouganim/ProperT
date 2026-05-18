@@ -57,6 +57,10 @@ function SearchPageContent() {
     const beds = searchParams.get("beds");
     const baths = searchParams.get("baths");
     const propertyType = searchParams.get("propertyType");
+    const minSqft = searchParams.get("minSqft");
+    const maxSqft = searchParams.get("maxSqft");
+    const maxLeaseDuration = searchParams.get("maxLeaseDuration");
+    const amenities = searchParams.get("amenities");
     const page = parseInt(searchParams.get("page") || "1");
     const sort = searchParams.get("sort") || "newest";
 
@@ -89,6 +93,10 @@ function SearchPageContent() {
             if (baths) url += `&baths=${baths}`;
             if (propertyType) url += `&propertyType=${propertyType}`;
             if (status) url += `&status=${status}`;
+            if (minSqft) url += `&minSqft=${minSqft}`;
+            if (maxSqft) url += `&maxSqft=${maxSqft}`;
+            if (maxLeaseDuration) url += `&maxLeaseDuration=${maxLeaseDuration}`;
+            if (amenities) url += `&amenities=${encodeURIComponent(amenities)}`;
             if (sort && sort !== "newest") url += `&sort=${sort}`;
 
             const res = await api.get(url, { signal: controller.signal });
@@ -102,7 +110,7 @@ function SearchPageContent() {
         } finally {
             setLoading(false);
         }
-    }, [lat, lng, radius, minPrice, maxPrice, beds, baths, propertyType, status, page, showMap, mapBounds, sort]);
+    }, [lat, lng, radius, minPrice, maxPrice, beds, baths, propertyType, status, minSqft, maxSqft, maxLeaseDuration, amenities, page, showMap, mapBounds, sort]);
 
     useEffect(() => {
         fetchProperties();
@@ -138,6 +146,19 @@ function SearchPageContent() {
         updateParam("baths");
         updateParam("propertyType");
         updateParam("status");
+        updateParam("minSqft");
+        updateParam("maxSqft");
+        updateParam("maxLeaseDuration");
+
+        // amenities is an array — serialize as comma-separated
+        if ("amenities" in newFilters) {
+            const a = newFilters.amenities;
+            if (a && Array.isArray(a) && a.length > 0) {
+                params.set("amenities", a.join(","));
+            } else {
+                params.delete("amenities");
+            }
+        }
 
         params.set("page", "1");
         router.push(`/search?${params.toString()}`);
@@ -178,6 +199,10 @@ function SearchPageContent() {
         beds: searchParams.get("beds"),
         baths: searchParams.get("baths"),
         propertyType: searchParams.get("propertyType"),
+        minSqft: searchParams.get("minSqft"),
+        maxSqft: searchParams.get("maxSqft"),
+        maxLeaseDuration: searchParams.get("maxLeaseDuration"),
+        amenities: searchParams.get("amenities"),
     }), [searchParams]);
 
     return (

@@ -1,10 +1,19 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { MapPin, ChevronDown, SlidersHorizontal, Loader2 } from "lucide-react";
 import type { SearchFilterInitial, SearchFilterPatch } from "@/types/search-filters";
 import { FilterModal } from "./FilterModal";
 import api from "@/lib/api";
+
+const PRICE_MAX = 5_000_000;
+const PRICE_STEP = 10_000;
+
+function fmtPrice(n: number): string {
+    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
+    if (n >= 1_000) return `$${Math.round(n / 1_000)}k`;
+    return `$${n}`;
+}
 
 interface GeoSuggestion {
     display_name: string;
@@ -33,11 +42,55 @@ export function FilterBar({
     const inputRef = useRef<HTMLInputElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
 
-    const [status, setStatus] = useState<"FOR_SALE" | "FOR_RENT">(
-        initialFilters.status === "FOR_RENT" ? "FOR_RENT" : "FOR_SALE",
+    const [status, setStatus] = useState<"FOR_SALE" | "FOR_RENT" | null>(
+        initialFilters.status === "FOR_RENT" ? "FOR_RENT"
+        : initialFilters.status === "FOR_SALE" ? "FOR_SALE"
+        : null,
     );
     const [propertyType, setPropertyType] = useState<string | null>(initialFilters.propertyType || null);
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+    // Price slider state
+    const [localMinPrice, setLocalMinPrice] = useState<number>(
+        initialFilters.minPrice ? Number(initialFilters.minPrice) : 0,
+    );
+    const [localMaxPrice, setLocalMaxPrice] = useState<number>(
+        initialFilters.maxPrice ? Number(initialFilters.maxPrice) : PRICE_MAX,
+    );
+
+    const priceLabel = useMemo(() => {
+        if (localMinPrice === 0 && localMaxPrice === PRICE_MAX) return "Price";
+        if (localMinPrice === 0) return `Under ${fmtPrice(localMaxPrice)}`;
+        if (localMaxPrice === PRICE_MAX) return `${fmtPrice(localMinPrice)}+`;
+        return `${fmtPrice(localMinPrice)} – ${fmtPrice(localMaxPrice)}`;
+    }, [localMinPrice, localMaxPrice]);
+
+    const applyPriceFilter = useCallback(() => {
+        onFilterChange({
+            minPrice: localMinPrice > 0 ? localMinPrice : null,
+            maxPrice: localMaxPrice < PRICE_MAX ? localMaxPrice : null,
+        });
+    }, [localMinPrice, localMaxPrice, onFilterChange]);
+
+    const handleMinSlider = (val: number) => {
+        setLocalMinPrice(Math.min(val, localMaxPrice - PRICE_STEP));
+    };
+    const handleMaxSlider = (val: number) => {
+        setLocalMaxPrice(Math.max(val, localMinPrice + PRICE_STEP));
+    };
+    const handleMinInput = (raw: string) => {
+        const n = raw === "" ? 0 : Math.max(0, parseInt(raw, 10) || 0);
+        setLocalMinPrice(Math.min(n, localMaxPrice - PRICE_STEP));
+    };
+    const handleMaxInput = (raw: string) => {
+        const n = raw === "" ? PRICE_MAX : Math.min(PRICE_MAX, parseInt(raw, 10) || PRICE_MAX);
+        setLocalMaxPrice(Math.max(n, localMinPrice + PRICE_STEP));
+    };
+    const clearPrice = () => {
+        setLocalMinPrice(0);
+        setLocalMaxPrice(PRICE_MAX);
+        onFilterChange({ minPrice: null, maxPrice: null });
+    };
 
     // All-filters modal state
     const [modalOpen, setModalOpen] = useState(false);
@@ -47,21 +100,18 @@ export function FilterBar({
     const [modalBaths, setModalBaths] = useState<number | null>(
         initialFilters.baths ? parseInt(initialFilters.baths, 10) : null,
     );
-    const [modalMinPrice, setModalMinPrice] = useState<number | null>(
-        initialFilters.minPrice ? Number(initialFilters.minPrice) : null,
+    const [modalMinSqft, setModalMinSqft] = useState<number | null>(
+        initialFilters.minSqft ? Number(initialFilters.minSqft) : null,
     );
-    const [modalMaxPrice, setModalMaxPrice] = useState<number | null>(
-        initialFilters.maxPrice ? Number(initialFilters.maxPrice) : null,
+    const [modalMaxSqft, setModalMaxSqft] = useState<number | null>(
+        initialFilters.maxSqft ? Number(initialFilters.maxSqft) : null,
     );
-    const [priceLabel, setPriceLabel] = useState<string>(() => {
-        const minN = initialFilters.minPrice ? parseFloat(initialFilters.minPrice) : null;
-        const maxN = initialFilters.maxPrice ? parseFloat(initialFilters.maxPrice) : null;
-        if (!minN && !maxN) return "Price";
-        const fmt = (n: number) => n >= 1_000_000 ? `$${n / 1_000_000}M` : `$${n / 1_000}k`;
-        if (!minN) return `Under ${fmt(maxN!)}`;
-        if (!maxN) return `${fmt(minN)}+`;
-        return `${fmt(minN)} – ${fmt(maxN)}`;
-    });
+    const [modalLeaseDuration, setModalLeaseDuration] = useState<number | null>(
+        initialFilters.maxLeaseDuration ? Number(initialFilters.maxLeaseDuration) : null,
+    );
+    const [modalAmenities, setModalAmenities] = useState<string[]>(
+        initialFilters.amenities ? initialFilters.amenities.split(",").filter(Boolean) : [],
+    );
 
     // Close suggestions when clicking outside
     useEffect(() => {
@@ -107,40 +157,72 @@ export function FilterBar({
         onLocationSelect?.(lat, lon, s.display_name);
     };
 
-    const handleFilterUpdate = (
-        key: "status" | "price" | "propertyType",
-        value: "FOR_SALE" | "FOR_RENT" | { min?: number; max?: number; label?: string } | null | string,
-    ) => {
-        const newFilters: SearchFilterPatch = {};
-        if (key === "status") {
-            setStatus(value as "FOR_SALE" | "FOR_RENT");
-            newFilters.status = value as "FOR_SALE" | "FOR_RENT";
-        } else if (key === "price") {
-            const pr = value as { min?: number; max?: number; label?: string } | null;
-            newFilters.minPrice = pr?.min ?? null;
-            newFilters.maxPrice = pr?.max ?? null;
-            setPriceLabel(pr?.label ?? "Price");
-        } else if (key === "propertyType") {
-            setPropertyType(value as string | null);
-            newFilters.propertyType = value as string | null;
+    const handleStatusChange = (newStatus: "FOR_SALE" | "FOR_RENT" | null) => {
+        setStatus(newStatus);
+        const newFilters: SearchFilterPatch = { status: newStatus };
+        if (newStatus !== "FOR_RENT" && modalLeaseDuration !== null) {
+            setModalLeaseDuration(null);
+            newFilters.maxLeaseDuration = null;
         }
         onFilterChange(newFilters);
         setActiveDropdown(null);
     };
 
-    const handleModalApply = (filters: { beds: number | null; baths: number | null; minPrice: number | null; maxPrice: number | null }) => {
-        setModalBeds(filters.beds);
-        setModalBaths(filters.baths);
-        setModalMinPrice(filters.minPrice);
-        setModalMaxPrice(filters.maxPrice);
-        onFilterChange({ beds: filters.beds, baths: filters.baths, minPrice: filters.minPrice, maxPrice: filters.maxPrice });
+    const handlePropertyTypeChange = (type: string | null) => {
+        setPropertyType(type);
+        const newFilters: SearchFilterPatch = { propertyType: type };
+        if (type === "OFFICE") {
+            setModalBeds(null);
+            setModalBaths(null);
+            newFilters.beds = null;
+            newFilters.baths = null;
+        }
+        onFilterChange(newFilters);
+        setActiveDropdown(null);
     };
 
-    const hasModalFilters = modalBeds !== null || modalBaths !== null || modalMinPrice !== null || modalMaxPrice !== null;
+    const handleModalApply = (filters: {
+        beds: number | null;
+        baths: number | null;
+        minSqft: number | null;
+        maxSqft: number | null;
+        maxLeaseDuration: number | null;
+        amenities: string[];
+    }) => {
+        setModalBeds(filters.beds);
+        setModalBaths(filters.baths);
+        setModalMinSqft(filters.minSqft);
+        setModalMaxSqft(filters.maxSqft);
+        setModalLeaseDuration(filters.maxLeaseDuration);
+        setModalAmenities(filters.amenities);
+        onFilterChange({
+            beds: filters.beds,
+            baths: filters.baths,
+            minSqft: filters.minSqft,
+            maxSqft: filters.maxSqft,
+            maxLeaseDuration: filters.maxLeaseDuration,
+            amenities: filters.amenities.length ? filters.amenities : null,
+        });
+    };
+
+    const activeModalFilterCount = [
+        modalBeds !== null,
+        modalBaths !== null,
+        modalMinSqft !== null || modalMaxSqft !== null,
+        modalLeaseDuration !== null,
+        modalAmenities.length > 0,
+    ].filter(Boolean).length;
+
+    const hasModalFilters = activeModalFilterCount > 0;
 
     const toggleDropdown = (name: string) => {
         setActiveDropdown(activeDropdown === name ? null : name);
     };
+
+    const minPct = (localMinPrice / PRICE_MAX) * 100;
+    const maxPct = (localMaxPrice / PRICE_MAX) * 100;
+    // When min is near the top, bring it to front so it can still be dragged left
+    const minOnTop = localMinPrice >= PRICE_MAX - PRICE_STEP;
 
     return (
         <>
@@ -185,38 +267,137 @@ export function FilterBar({
                         </div>
 
                         {/* Status Filter */}
-                        <div className="bg-slate-100 p-1 rounded-lg flex items-center shrink-0">
+                        <div className="relative shrink-0">
                             <button
-                                onClick={() => handleFilterUpdate("status", "FOR_SALE")}
-                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all cursor-pointer ${status === "FOR_SALE" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                                onClick={() => toggleDropdown("status")}
+                                className={`flex items-center justify-between w-36 px-4 py-2.5 border rounded-lg text-sm font-medium transition-all shadow-sm cursor-pointer ${status !== null ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"}`}
                             >
-                                For Sale
+                                <span className="truncate">
+                                    {status === "FOR_SALE" ? "For Sale" : status === "FOR_RENT" ? "For Rent" : "Buy / Rent"}
+                                </span>
+                                <ChevronDown className="w-4 h-4 opacity-60 shrink-0 ml-2" />
                             </button>
-                            <button
-                                onClick={() => handleFilterUpdate("status", "FOR_RENT")}
-                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all cursor-pointer ${status === "FOR_RENT" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-                            >
-                                For Rent
-                            </button>
+                            {activeDropdown === "status" && (
+                                <div className="absolute top-full mt-2 left-0 w-40 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50">
+                                    <div className="space-y-1">
+                                        {([
+                                            { value: null,       label: "All" },
+                                            { value: "FOR_SALE", label: "For Sale" },
+                                            { value: "FOR_RENT", label: "For Rent" },
+                                        ] as const).map(({ value, label }) => (
+                                            <button
+                                                key={label}
+                                                onClick={() => handleStatusChange(value)}
+                                                className={`w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm cursor-pointer ${status === value ? "bg-slate-50 font-bold text-primary" : ""}`}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Price Filter */}
                         <div className="relative shrink-0">
                             <button
                                 onClick={() => toggleDropdown("price")}
-                                className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-all shadow-sm cursor-pointer ${priceLabel !== "Price" ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"}`}
+                                className={`flex items-center justify-between w-40 px-4 py-2.5 border rounded-lg text-sm font-medium transition-all shadow-sm cursor-pointer ${priceLabel !== "Price" ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"}`}
                             >
-                                <span>{priceLabel}</span>
-                                <ChevronDown className="w-4 h-4 opacity-60" />
+                                <span className="truncate">{priceLabel}</span>
+                                <ChevronDown className="w-4 h-4 opacity-60 shrink-0 ml-2" />
                             </button>
+
                             {activeDropdown === "price" && (
-                                <div className="absolute top-full mt-2 left-0 w-64 bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-50">
-                                    <div className="space-y-1">
-                                        <button onClick={() => handleFilterUpdate("price", null)} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm cursor-pointer">Any Price</button>
-                                        <button onClick={() => handleFilterUpdate("price", { max: 500000, label: "Under $500k" })} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm cursor-pointer">Under $500k</button>
-                                        <button onClick={() => handleFilterUpdate("price", { min: 500000, max: 1000000, label: "$500k – $1M" })} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm cursor-pointer">$500k – $1M</button>
-                                        <button onClick={() => handleFilterUpdate("price", { min: 1000000, max: 2000000, label: "$1M – $2M" })} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm cursor-pointer">$1M – $2M</button>
-                                        <button onClick={() => handleFilterUpdate("price", { min: 2000000, label: "$2M+" })} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm cursor-pointer">$2M+</button>
+                                <div className="absolute top-full mt-2 left-0 w-72 bg-white rounded-xl shadow-xl border border-slate-100 p-5 z-50">
+                                    {/* Min / Max inputs */}
+                                    <div className="flex gap-3 mb-6">
+                                        <div className="flex-1">
+                                            <p className="text-xs font-medium text-slate-500 mb-1.5">Min price</p>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                                <input
+                                                    type="number"
+                                                    value={localMinPrice === 0 ? "" : localMinPrice}
+                                                    placeholder="0"
+                                                    min={0}
+                                                    max={PRICE_MAX}
+                                                    step={PRICE_STEP}
+                                                    onChange={(e) => handleMinInput(e.target.value)}
+                                                    onBlur={applyPriceFilter}
+                                                    onKeyDown={(e) => e.key === "Enter" && applyPriceFilter()}
+                                                    className="w-full pl-6 pr-2 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-xs font-medium text-slate-500 mb-1.5">Max price</p>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                                <input
+                                                    type="number"
+                                                    value={localMaxPrice === PRICE_MAX ? "" : localMaxPrice}
+                                                    placeholder="Any"
+                                                    min={0}
+                                                    max={PRICE_MAX}
+                                                    step={PRICE_STEP}
+                                                    onChange={(e) => handleMaxInput(e.target.value)}
+                                                    onBlur={applyPriceFilter}
+                                                    onKeyDown={(e) => e.key === "Enter" && applyPriceFilter()}
+                                                    className="w-full pl-6 pr-2 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Dual-range slider */}
+                                    <div className="relative h-6 mx-1">
+                                        {/* Track background */}
+                                        <div className="absolute top-1/2 -translate-y-1/2 w-full h-1.5 bg-slate-200 rounded-full" />
+                                        {/* Filled range */}
+                                        <div
+                                            className="absolute top-1/2 -translate-y-1/2 h-1.5 bg-slate-900 rounded-full"
+                                            style={{ left: `${minPct}%`, width: `${maxPct - minPct}%` }}
+                                        />
+                                        {/* Min thumb */}
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={PRICE_MAX}
+                                            step={PRICE_STEP}
+                                            value={localMinPrice}
+                                            onChange={(e) => handleMinSlider(Number(e.target.value))}
+                                            onMouseUp={applyPriceFilter}
+                                            onTouchEnd={applyPriceFilter}
+                                            className={`price-range-input${minOnTop ? " price-range-input--on-top" : ""}`}
+                                        />
+                                        {/* Max thumb */}
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={PRICE_MAX}
+                                            step={PRICE_STEP}
+                                            value={localMaxPrice}
+                                            onChange={(e) => handleMaxSlider(Number(e.target.value))}
+                                            onMouseUp={applyPriceFilter}
+                                            onTouchEnd={applyPriceFilter}
+                                            className={`price-range-input${!minOnTop ? " price-range-input--on-top" : ""}`}
+                                        />
+                                    </div>
+
+                                    {/* Range labels + clear */}
+                                    <div className="flex justify-between items-center mt-4">
+                                        <span className="text-xs text-slate-400">$0</span>
+                                        {(localMinPrice > 0 || localMaxPrice < PRICE_MAX) && (
+                                            <button
+                                                type="button"
+                                                onClick={clearPrice}
+                                                className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800 cursor-pointer"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                        <span className="text-xs text-slate-400">$5M+</span>
                                     </div>
                                 </div>
                             )}
@@ -226,10 +407,10 @@ export function FilterBar({
                         <div className="relative shrink-0">
                             <button
                                 onClick={() => toggleDropdown("propertyType")}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm cursor-pointer"
+                                className={`flex items-center justify-between w-36 px-4 py-2.5 border rounded-lg text-sm font-medium transition-all shadow-sm cursor-pointer ${propertyType !== null ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"}`}
                             >
-                                <span>{propertyType ? propertyType.charAt(0) + propertyType.slice(1).toLowerCase() : "Type"}</span>
-                                <ChevronDown className="w-4 h-4 text-slate-400" />
+                                <span className="truncate">{propertyType ? propertyType.charAt(0) + propertyType.slice(1).toLowerCase() : "Type"}</span>
+                                <ChevronDown className="w-4 h-4 opacity-60 shrink-0 ml-2" />
                             </button>
                             {activeDropdown === "propertyType" && (
                                 <div className="absolute top-full mt-2 left-0 w-48 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50">
@@ -237,34 +418,36 @@ export function FilterBar({
                                         {["APARTMENT", "HOUSE", "OFFICE"].map((t) => (
                                             <button
                                                 key={t}
-                                                onClick={() => handleFilterUpdate("propertyType", t)}
+                                                onClick={() => handlePropertyTypeChange(t)}
                                                 className={`w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm cursor-pointer ${propertyType === t ? "bg-slate-50 font-bold text-primary" : ""}`}
                                             >
                                                 {t.charAt(0) + t.slice(1).toLowerCase()}
                                             </button>
                                         ))}
-                                        <button onClick={() => handleFilterUpdate("propertyType", null)} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm border-t mt-1 pt-2 cursor-pointer">Any Type</button>
+                                        <button onClick={() => handlePropertyTypeChange(null)} className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm border-t mt-1 pt-2 cursor-pointer">Any Type</button>
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* All Filters Button */}
+                        {/* More Filters Button */}
                         <button
                             onClick={() => setModalOpen(true)}
-                            className={`hidden lg:flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-all shadow-sm cursor-pointer shrink-0 ${
+                            className={`hidden lg:flex items-center justify-between w-40 px-4 py-2.5 border rounded-lg text-sm font-medium transition-all shadow-sm cursor-pointer shrink-0 ${
                                 hasModalFilters
                                     ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800"
                                     : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
                             }`}
                         >
-                            All Filters
-                            <SlidersHorizontal className="w-4 h-4" />
-                            {hasModalFilters && (
-                                <span className="ml-1 bg-white text-slate-900 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black">
-                                    {[modalBeds !== null, modalBaths !== null, modalMinPrice !== null, modalMaxPrice !== null].filter(Boolean).length}
-                                </span>
-                            )}
+                            <span className="truncate">More Filters</span>
+                            <div className="flex items-center gap-1 shrink-0 ml-2">
+                                <SlidersHorizontal className="w-4 h-4" />
+                                {hasModalFilters && (
+                                    <span className="bg-white text-slate-900 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black">
+                                        {activeModalFilterCount}
+                                    </span>
+                                )}
+                            </div>
                         </button>
                     </div>
                 </div>
@@ -273,8 +456,17 @@ export function FilterBar({
             <FilterModal
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
-                initialFilters={{ beds: modalBeds, baths: modalBaths, minPrice: modalMinPrice, maxPrice: modalMaxPrice }}
+                initialFilters={{
+                    beds: modalBeds,
+                    baths: modalBaths,
+                    minSqft: modalMinSqft,
+                    maxSqft: modalMaxSqft,
+                    maxLeaseDuration: modalLeaseDuration,
+                    amenities: modalAmenities,
+                }}
                 onApply={handleModalApply}
+                propertyType={propertyType}
+                status={status}
             />
         </>
     );

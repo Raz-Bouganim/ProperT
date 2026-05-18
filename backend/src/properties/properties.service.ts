@@ -297,6 +297,10 @@ export class PropertiesService {
       page?: number;
       limit?: number;
       sort?: string;
+      minSqft?: number;
+      maxSqft?: number;
+      maxLeaseDuration?: number;
+      amenities?: string[];
     },
   ) {
     const radiusInMeters = radiusInKm * 1000;
@@ -342,6 +346,19 @@ export class PropertiesService {
       if (validType !== undefined) where.type = validType;
       const validStatus = validatePropertyStatus(filters.status);
       if (validStatus !== undefined) where.status = validStatus;
+      if (filters.minSqft !== undefined || filters.maxSqft !== undefined) {
+        where.sqft = {};
+        if (filters.minSqft !== undefined) (where.sqft as Prisma.FloatFilter).gte = filters.minSqft;
+        if (filters.maxSqft !== undefined) (where.sqft as Prisma.FloatFilter).lte = filters.maxSqft;
+      }
+      if (filters.maxLeaseDuration !== undefined) {
+        where.leaseDurationMonths = { lte: filters.maxLeaseDuration };
+      }
+      if (filters.amenities?.length) {
+        where.AND = filters.amenities
+          .filter((a) => (Object.values(AmenityType) as string[]).includes(a))
+          .map((a) => ({ amenities: { some: { amenity: a as AmenityType } } }));
+      }
     }
 
     const [totalCount, properties] = await Promise.all([
@@ -376,6 +393,10 @@ export class PropertiesService {
       page?: number;
       limit?: number;
       sort?: string;
+      minSqft?: number;
+      maxSqft?: number;
+      maxLeaseDuration?: number;
+      amenities?: string[];
     },
   ) {
     const page = filters?.page || 1;
@@ -417,6 +438,19 @@ export class PropertiesService {
       if (validType !== undefined) where.type = validType;
       const validStatus = validatePropertyStatus(filters.status);
       if (validStatus !== undefined) where.status = validStatus;
+      if (filters.minSqft !== undefined || filters.maxSqft !== undefined) {
+        where.sqft = {};
+        if (filters.minSqft !== undefined) (where.sqft as Prisma.FloatFilter).gte = filters.minSqft;
+        if (filters.maxSqft !== undefined) (where.sqft as Prisma.FloatFilter).lte = filters.maxSqft;
+      }
+      if (filters.maxLeaseDuration !== undefined) {
+        where.leaseDurationMonths = { lte: filters.maxLeaseDuration };
+      }
+      if (filters.amenities?.length) {
+        where.AND = filters.amenities
+          .filter((a) => (Object.values(AmenityType) as string[]).includes(a))
+          .map((a) => ({ amenities: { some: { amenity: a as AmenityType } } }));
+      }
     }
 
     const [totalCount, properties] = await Promise.all([
