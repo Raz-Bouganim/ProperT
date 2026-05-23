@@ -1,0 +1,4 @@
+-- AlterEnum
+ALTER TYPE "AmenityType" ADD VALUE 'SECURITY';
+ALTER TYPE "AmenityType" ADD VALUE 'HEATING';
+ALTER TYPE "AmenityType" ADD VALUE 'WIFI';

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { FileWithPreview, UploadError } from '../types/media';
-import { API_ENDPOINTS } from '../constants/apiEndpoints';
 import { revokeObjectURL } from '../utils/imageCleanup';
+import api from '@/lib/api';
 
 export const useMediaUpload = () => {
     const [images, setImages] = useState<FileWithPreview[]>([]);
@@ -52,31 +52,33 @@ export const useMediaUpload = () => {
         const errors: UploadError[] = [];
 
         try {
-            for (const img of images) {
-                try {
-                    const res = await fetch(API_ENDPOINTS.presignedUrl(), {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ fileName: img.name, contentType: img.type }),
-                    });
+            const results = await Promise.allSettled(
+                images.map(async (img) => {
+                    const { data: { url, publicUrl } } = await api.post<{ url: string; publicUrl: string }>(
+                        '/media/presigned-url',
+                        { fileName: img.name, contentType: img.type },
+                    );
 
-                    if (!res.ok) {
-                        throw new Error("Failed to get presigned URL");
-                    }
-
-                    const { url, publicUrl } = await res.json();
-
-                    await fetch(url, {
+                    const res = await fetch(url, {
                         method: "PUT",
                         body: img,
                         headers: { "Content-Type": img.type },
                     });
 
-                    uploadedUrls.push(publicUrl);
-                } catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : "Upload failed";
-                    errors.push({ file: img.name, message: errorMessage });
-                    console.error(`Failed to upload ${img.name}:`, error);
+                    if (!res.ok) throw new Error(`S3 upload failed (${res.status})`);
+
+                    return publicUrl;
+                })
+            );
+
+            for (let i = 0; i < results.length; i++) {
+                const result = results[i];
+                if (result.status === 'fulfilled') {
+                    uploadedUrls.push(result.value);
+                } else {
+                    const message = result.reason instanceof Error ? result.reason.message : 'Upload failed';
+                    errors.push({ file: images[i].name, message });
+                    console.error(`Failed to upload ${images[i].name}:`, result.reason);
                 }
             }
 

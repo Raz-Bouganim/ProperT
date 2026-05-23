@@ -188,6 +188,11 @@ export function PropertyForm() {
         try {
             const imageUrls = await uploadImages();
 
+            if (imageUrls.length === 0) {
+                toast.error("Image upload failed. Check your connection and try again.");
+                return;
+            }
+
             const { sqft, beds, baths, transactionType, state, zipCode, street: _street, houseNumber: _houseNumber, ...rest } = values;
             void _street;
             void _houseNumber;
