@@ -11,6 +11,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { S3StorageAdapter } from '../media/s3-storage.adapter';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,6 +30,8 @@ import { publicUrlToObjectKey } from './property-image.util';
 import { makeUniqueSlugCandidate, slugifyTitle } from './property-slug.util';
 import { mapPropertyPublicResponse } from './property-public.mapper';
 
+const MAX_SLUG_ATTEMPTS = 12;
+
 /** Form sends kebab-case ids from `frontend/.../constants/amenities.ts`; DB uses Prisma enum. */
 const FRONTEND_FEATURE_TO_AMENITY: Record<string, AmenityType> = {
   'swimming-pool': AmenityType.SWIMMING_POOL,
@@ -36,9 +40,15 @@ const FRONTEND_FEATURE_TO_AMENITY: Record<string, AmenityType> = {
   garden: AmenityType.GARDEN,
   balcony: AmenityType.BALCONY,
   elevator: AmenityType.ELEVATOR,
+  security: AmenityType.SECURITY,
   'air-conditioning': AmenityType.AIR_CONDITIONING,
+  heating: AmenityType.HEATING,
   laundry: AmenityType.WASHER_DRYER,
   dishwasher: AmenityType.DISHWASHER,
+  wifi: AmenityType.WIFI,
+  fireplace: AmenityType.FIREPLACE,
+  'pet-friendly': AmenityType.PET_FRIENDLY,
+  furnished: AmenityType.FURNISHED,
 };
 
 function resolveAmenityTypes(raw: string[] | undefined): AmenityType[] {
@@ -136,11 +146,13 @@ export class PropertiesService {
   constructor(
     private prisma: PrismaService,
     private propertyAuthorization: PropertyAuthorizationService,
+    private configService: ConfigService,
+    private s3Adapter: S3StorageAdapter,
   ) {}
 
   private async allocateUniqueSlug(title: string): Promise<string> {
     const base = slugifyTitle(title);
-    for (let attempt = 0; attempt < 12; attempt++) {
+    for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
       const candidate = attempt === 0 ? base : makeUniqueSlugCandidate(base);
       const clash = await this.prisma.property.findUnique({
         where: { slug: candidate },
@@ -204,65 +216,73 @@ export class PropertiesService {
     const slug = await this.allocateUniqueSlug(createPropertyDto.title);
     const publishedAt =
       willPublish && isLiveMarketStatus(intent) ? new Date() : null;
+    const bucketName = this.configService.getOrThrow<string>('S3_BUCKET_NAME');
+    const imageKeys = images?.map(url => publicUrlToObjectKey(url, bucketName)) ?? [];
 
-    const row = await this.prisma.property.create({
-      data: {
-        slug,
-        title: createPropertyDto.title,
-        description: createPropertyDto.description,
-        price: effectivePrice.toString(),
-        sqft: effectiveSqft,
-        negotiable: createPropertyDto.negotiable,
-        bedrooms:
-          preparedBedrooms !== undefined
-            ? preparedBedrooms
-            : (createPropertyDto.bedrooms ?? null),
-        bathrooms:
-          preparedBathrooms !== undefined
-            ? preparedBathrooms
-            : (createPropertyDto.bathrooms ?? null),
-        type: createPropertyDto.type,
-        status: intent,
-        addressLine: createPropertyDto.addressLine.trim(),
-        city: createPropertyDto.city,
-        country: createPropertyDto.country,
-        region: createPropertyDto.region?.trim() || null,
-        postalCode: createPropertyDto.postalCode?.trim() || null,
-        latitude: createPropertyDto.latitude,
-        longitude: createPropertyDto.longitude,
-        virtualTourUrl: createPropertyDto.virtualTourUrl,
-        floorPlanUrl: createPropertyDto.floorPlanUrl,
-        currency: createPropertyDto.currency,
-        yearBuilt: createPropertyDto.yearBuilt,
-        timeZone: createPropertyDto.timeZone?.trim() || undefined,
-        availableFrom: preparedAvailableFrom,
-        leaseDurationMonths: leaseMonths,
-        publishedAt,
-        availabilities:
-          mappedAvailabilities && mappedAvailabilities.length > 0
-            ? { create: mappedAvailabilities }
-            : undefined,
-        images:
-          images && images.length > 0
-            ? {
-                create: images.map((url, index) => ({
-                  url,
-                  key: publicUrlToObjectKey(url),
-                  altText: 'Property image',
-                  isPrimary: index === 0,
-                  sortOrder: index,
-                })),
-              }
-            : undefined,
-        amenities:
-          amenityTypes.length > 0
-            ? { create: amenityTypes.map((amenity) => ({ amenity })) }
-            : undefined,
-        owner: { connect: { id: ownerId } },
-      },
-    });
-
-    return this.findOne(row.id, ownerId);
+    try {
+      const row = await this.prisma.property.create({
+        data: {
+          slug,
+          title: createPropertyDto.title,
+          description: createPropertyDto.description,
+          price: effectivePrice.toString(),
+          sqft: effectiveSqft,
+          negotiable: createPropertyDto.negotiable,
+          bedrooms:
+            preparedBedrooms !== undefined
+              ? preparedBedrooms
+              : (createPropertyDto.bedrooms ?? null),
+          bathrooms:
+            preparedBathrooms !== undefined
+              ? preparedBathrooms
+              : (createPropertyDto.bathrooms ?? null),
+          type: createPropertyDto.type,
+          status: intent,
+          addressLine: createPropertyDto.addressLine.trim(),
+          city: createPropertyDto.city,
+          country: createPropertyDto.country,
+          region: createPropertyDto.region?.trim() || null,
+          postalCode: createPropertyDto.postalCode?.trim() || null,
+          latitude: createPropertyDto.latitude,
+          longitude: createPropertyDto.longitude,
+          virtualTourUrl: createPropertyDto.virtualTourUrl,
+          floorPlanUrl: createPropertyDto.floorPlanUrl,
+          currency: createPropertyDto.currency,
+          yearBuilt: createPropertyDto.yearBuilt,
+          timeZone: createPropertyDto.timeZone?.trim() || undefined,
+          availableFrom: preparedAvailableFrom,
+          leaseDurationMonths: leaseMonths,
+          publishedAt,
+          availabilities:
+            mappedAvailabilities && mappedAvailabilities.length > 0
+              ? { create: mappedAvailabilities }
+              : undefined,
+          images:
+            images && images.length > 0
+              ? {
+                  create: images.map((url, index) => ({
+                    url,
+                    key: publicUrlToObjectKey(url, bucketName),
+                    altText: 'Property image',
+                    isPrimary: index === 0,
+                    sortOrder: index,
+                  })),
+                }
+              : undefined,
+          amenities:
+            amenityTypes.length > 0
+              ? { create: amenityTypes.map((amenity) => ({ amenity })) }
+              : undefined,
+          owner: { connect: { id: ownerId } },
+        },
+      });
+      return this.findOne(row.id, ownerId);
+    } catch (dbError) {
+      if (imageKeys.length > 0) {
+        await Promise.allSettled(imageKeys.map(key => this.s3Adapter.deleteObject(key)));
+      }
+      throw dbError;
+    }
   }
 
   findAll(ownerId?: string) {
