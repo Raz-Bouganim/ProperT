@@ -112,6 +112,7 @@ export function PropertyCard({
                 {!isOwner && <button
                     onClick={(e) => {
                         e.preventDefault();
+                        e.stopPropagation();
                         if (preview) return;
                         if (!isAuthenticated) {
                             toast.error("Please log in to save favorites");
