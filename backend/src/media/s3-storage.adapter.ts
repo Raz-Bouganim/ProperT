@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
+  GetObjectCommand,
   PutObjectCommand,
   DeleteObjectCommand,
   HeadBucketCommand,
@@ -56,6 +57,25 @@ export class S3StorageAdapter implements OnModuleInit {
       : `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${key}`;
 
     return { presignedUrl, publicUrl };
+  }
+
+  async getObject(key: string): Promise<Buffer> {
+    const { Body } = await this.s3Client.send(
+      new GetObjectCommand({ Bucket: this.bucketName, Key: key }),
+    );
+    if (!Body) throw new Error(`Empty body for S3 key: ${key}`);
+    return Buffer.from(await Body.transformToByteArray());
+  }
+
+  async putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+    await this.s3Client.send(
+      new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+      }),
+    );
   }
 
   async deleteObject(key: string): Promise<void> {
