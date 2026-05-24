@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Search, MapPin, Home as HomeIcon, ArrowRight } from "lucide-react";
+import { Search, MapPin, Home as HomeIcon, ArrowRight, Loader2 } from "lucide-react";
+import api from "@/lib/api";
+
+interface GeoSuggestion {
+  display_name: string;
+  lat: string;
+  lon: string;
+}
 
 interface HeroSectionProps {
   isAuthenticated: boolean;
@@ -16,11 +23,68 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
   const [mode, setMode] = useState<"buy" | "rent">("buy");
   const [location, setLocation] = useState("");
   const [propertyType, setPropertyType] = useState("All Types");
+  const [suggestions, setSuggestions] = useState<GeoSuggestion[]>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const geoDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        !inputRef.current?.contains(e.target as Node) &&
+        !suggestionsRef.current?.contains(e.target as Node)
+      ) {
+        setSuggestionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const fetchSuggestions = useCallback(async (q: string) => {
+    if (q.length < 2) { setSuggestions([]); setSuggestionsOpen(false); return; }
+    setGeoLoading(true);
+    try {
+      const res = await api.get<GeoSuggestion[]>(`/geo/search?q=${encodeURIComponent(q)}`);
+      setSuggestions(res.data.slice(0, 5));
+      setSuggestionsOpen(res.data.length > 0);
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setGeoLoading(false);
+    }
+  }, []);
+
+  const handleLocationInput = (value: string) => {
+    setLocation(value);
+    setSelectedCoords(null);
+    clearTimeout(geoDebounce.current);
+    geoDebounce.current = setTimeout(() => fetchSuggestions(value), 300);
+  };
+
+  const handleSuggestionClick = (s: GeoSuggestion) => {
+    const lat = parseFloat(s.lat);
+    const lng = parseFloat(s.lon);
+    if (!isFinite(lat) || !isFinite(lng)) return;
+    setLocation(s.display_name);
+    setSelectedCoords({ lat, lng });
+    setSuggestionsOpen(false);
+    setSuggestions([]);
+  };
 
   const handleSearch = () => {
     const params = new URLSearchParams();
     if (location) params.set("location", location);
-    if (propertyType !== "All Types") params.set("type", propertyType);
+    if (selectedCoords) {
+      params.set("lat", selectedCoords.lat.toString());
+      params.set("lng", selectedCoords.lng.toString());
+      params.set("radius", "10");
+    }
+    if (propertyType !== "All Types") params.set("propertyType", propertyType);
     if (mode === "rent") params.set("status", "FOR_RENT");
     router.push(`/search?${params.toString()}`);
   };
@@ -40,17 +104,6 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
       </div>
 
       <div className="relative z-10 w-full max-w-5xl mx-auto px-6 flex flex-col items-center text-center">
-        {/* Live badge */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55 }}
-          className="mb-6 inline-flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-5 py-2"
-        >
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-white/90 text-sm font-semibold tracking-wide">500+ Properties Live Now</span>
-        </motion.div>
-
         {/* Headline */}
         <motion.h1
           initial={{ opacity: 0, y: 28 }}
@@ -101,18 +154,45 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
 
           {/* Fields row */}
           <div className="flex flex-col md:flex-row gap-2">
-            <div className="flex-1 flex items-center gap-3 bg-white rounded-2xl px-4 py-3.5">
-              <MapPin className="text-primary w-5 h-5 flex-shrink-0" />
-              <div className="flex flex-col items-start w-full">
-                <span className="text-[9px] uppercase font-black text-slate-400 tracking-[0.18em]">Location</span>
-                <input
-                  className="bg-transparent border-none p-0 text-sm font-bold text-slate-900 placeholder:text-slate-400 w-full outline-none"
-                  placeholder="City or neighborhood..."
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                />
+            {/* Location field with suggestions */}
+            <div className="flex-1 relative">
+              <div className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3.5">
+                {geoLoading
+                  ? <Loader2 className="text-primary w-5 h-5 flex-shrink-0 animate-spin" />
+                  : <MapPin className="text-primary w-5 h-5 flex-shrink-0" />
+                }
+                <div className="flex flex-col items-start w-full">
+                  <span className="text-[9px] uppercase font-black text-slate-400 tracking-[0.18em]">Location</span>
+                  <input
+                    ref={inputRef}
+                    className="bg-transparent border-none p-0 text-sm font-bold text-slate-900 placeholder:text-slate-400 w-full outline-none"
+                    placeholder="City or neighborhood..."
+                    value={location}
+                    onChange={(e) => handleLocationInput(e.target.value)}
+                    onFocus={() => suggestions.length > 0 && setSuggestionsOpen(true)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  />
+                </div>
               </div>
+
+              {suggestionsOpen && suggestions.length > 0 && (
+                <div
+                  ref={suggestionsRef}
+                  className="absolute top-full mt-1 left-0 right-0 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 overflow-hidden"
+                >
+                  {suggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleSuggestionClick(s)}
+                      className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 flex items-start gap-2 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
+                    >
+                      <MapPin className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
+                      <span className="line-clamp-1">{s.display_name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3.5 md:min-w-[180px]">
@@ -142,24 +222,6 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
           </div>
         </motion.div>
 
-        {/* Quick stats */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.55 }}
-          className="flex items-center divide-x divide-white/20 mt-10 rounded-2xl overflow-hidden bg-white/5 backdrop-blur-sm border border-white/10"
-        >
-          {[
-            { value: "500+", label: "Active Listings" },
-            { value: "1-Click", label: "Tour Booking" },
-            { value: "Instant", label: "Owner Chat" },
-          ].map((stat) => (
-            <div key={stat.label} className="px-8 py-4 text-center">
-              <div className="text-white font-black text-xl">{stat.value}</div>
-              <div className="text-white/50 text-xs font-medium mt-0.5">{stat.label}</div>
-            </div>
-          ))}
-        </motion.div>
       </div>
 
       {/* Scroll cue */}

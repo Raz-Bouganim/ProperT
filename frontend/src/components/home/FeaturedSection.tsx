@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { MapPin, Bed, Bath, Square, Calendar, MessageSquare, Heart, ArrowRight, Home as HomeIcon } from "lucide-react";
+import { MapPin, Bed, Bath, Square, Heart, ArrowRight, Home as HomeIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { toast } from "sonner";
@@ -49,16 +49,6 @@ function PremiumCard({
     void toggleFavorite(listing.id);
   };
 
-  const handleSchedule = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    router.push(`${href}?book=true`);
-  };
-
-  const handleChat = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!isAuthenticated) { router.push(`/auth?redirect=${encodeURIComponent(href)}`); return; }
-    router.push(`/chat`);
-  };
 
   return (
     <motion.article
@@ -91,7 +81,7 @@ function PremiumCard({
           <button
             onClick={handleFavorite}
             className={cn(
-              "absolute top-4 right-4 w-9 h-9 flex items-center justify-center backdrop-blur-md rounded-full transition-all shadow-sm z-10 cursor-pointer",
+              "absolute top-4 right-4 w-9 h-9 flex items-center justify-center backdrop-blur-md rounded-full transition-all shadow-sm z-20 cursor-pointer",
               favorited ? "bg-white text-red-500" : "bg-black/20 text-white hover:bg-white hover:text-red-500"
             )}
           >
@@ -99,25 +89,6 @@ function PremiumCard({
           </button>
         )}
 
-        {/* Hover overlay with quick-action buttons */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 flex flex-col justify-end p-4">
-          <div className="flex gap-2 translate-y-3 group-hover:translate-y-0 transition-transform duration-300">
-            <button
-              onClick={handleSchedule}
-              className="flex-1 bg-white text-slate-900 rounded-xl py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              Schedule Tour
-            </button>
-            <button
-              onClick={handleChat}
-              className="flex-1 bg-primary text-white rounded-xl py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              Chat Owner
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Details */}

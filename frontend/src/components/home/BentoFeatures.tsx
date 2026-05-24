@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import { PlayCircle, MessageSquare, Smartphone, Upload, Calendar, SlidersHorizontal } from "lucide-react";
+import { PlayCircle, MessageSquare, Upload, Calendar, SlidersHorizontal } from "lucide-react";
 
 const EASE = [0.4, 0, 0.2, 1] as [number, number, number, number];
 
@@ -94,33 +94,28 @@ export function BentoFeatures() {
             </div>
           </motion.div>
 
-          {/* No App Needed */}
+          {/* Advanced Search */}
           <motion.div
             {...show(2)}
             whileHover={{ scale: 1.02 }}
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-7 flex-1 group cursor-default min-h-[140px]"
+            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-rose-50 to-pink-50 border border-rose-100 p-7 flex-1 group cursor-default min-h-[140px]"
           >
             <div className="flex items-start gap-4">
-              <div className="w-11 h-11 bg-emerald-500 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300">
-                <Smartphone className="w-5 h-5 text-white" />
+              <div className="w-11 h-11 bg-rose-500 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                <SlidersHorizontal className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-black text-slate-900 mb-1">No App Needed</h3>
+                <h3 className="text-lg font-black text-slate-900 mb-1">Advanced Search</h3>
                 <p className="text-slate-500 text-sm leading-relaxed">
-                  Lightning-fast on any mobile browser. Browse, tour, and chat anywhere.
+                  Filter by location, price, type, and more to find your perfect match.
                 </p>
               </div>
-            </div>
-            <div className="absolute -bottom-1 right-5 flex items-end gap-1 opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none">
-              {[20, 32, 44, 32].map((h, idx) => (
-                <div key={idx} className="w-2 rounded-full bg-emerald-400" style={{ height: `${h}px` }} />
-              ))}
             </div>
           </motion.div>
         </div>
       </div>
 
-      {/* Bottom row — three equal cards */}
+      {/* Bottom row — two equal cards */}
       <div className="grid grid-cols-12 gap-4">
         {([
           {
@@ -139,14 +134,6 @@ export function BentoFeatures() {
             desc: "Book a physical tour instantly with a single tap.",
             rotate: "group-hover:-rotate-3",
           },
-          {
-            icon: SlidersHorizontal,
-            iconBg: "bg-rose-500",
-            cardBg: "from-rose-50 to-pink-50 border-rose-100",
-            title: "Advanced Search",
-            desc: "Filter by location, price, type, and more to find your match.",
-            rotate: "group-hover:rotate-3",
-          },
         ] as const).map((card, i) => {
           const Icon = card.icon;
           return (
@@ -154,7 +141,7 @@ export function BentoFeatures() {
               key={card.title}
               {...show(3 + i)}
               whileHover={{ scale: 1.02 }}
-              className={`col-span-12 md:col-span-4 relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.cardBg} border p-7 group cursor-default min-h-[130px]`}
+              className={`col-span-12 md:col-span-6 relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.cardBg} border p-7 group cursor-default min-h-[130px]`}
             >
               <div className="flex items-start gap-4">
                 <div className={`w-11 h-11 ${card.iconBg} rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 ${card.rotate} transition-all duration-300`}>

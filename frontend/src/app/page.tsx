@@ -6,7 +6,6 @@ import { Footer } from "@/components/layout/Footer";
 import api from "@/lib/api";
 import { type PropertyListingPreview } from "@/types/property-listing";
 import { HeroSection } from "@/components/home/HeroSection";
-import { CategoryMarquee } from "@/components/home/CategoryMarquee";
 import { BentoFeatures } from "@/components/home/BentoFeatures";
 import { HowItWorks } from "@/components/home/HowItWorks";
 import { FeaturedSection } from "@/components/home/FeaturedSection";
@@ -20,7 +19,7 @@ export default function Home() {
     async function fetchFeatured() {
       try {
         const res = await api.get("/properties");
-        setFeaturedListings(res.data.slice(0, 6));
+        setFeaturedListings(res.data.slice(0, 3));
       } catch {
         // silent
       } finally {
@@ -33,7 +32,6 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <HeroSection isAuthenticated={isAuthenticated} />
-      <CategoryMarquee />
       <BentoFeatures />
       <HowItWorks />
       <FeaturedSection listings={featuredListings} loading={loading} isAuthenticated={isAuthenticated} />

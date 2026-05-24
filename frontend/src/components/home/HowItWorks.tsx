@@ -9,7 +9,7 @@ const steps = [
     number: "01",
     icon: UserPlus,
     title: "Create Account",
-    desc: "Sign up free in under 60 seconds — no credit card needed.",
+    desc: "Sign up free in under 60 seconds.",
     color: "bg-primary",
     light: "bg-primary/10 text-primary",
   },
@@ -17,7 +17,7 @@ const steps = [
     number: "02",
     icon: Search,
     title: "Browse & Filter",
-    desc: "Search by location, type, price and view media-rich listings.",
+    desc: "Search by location, type, price, and explore results on an interactive map.",
     color: "bg-violet-500",
     light: "bg-violet-100 text-violet-600",
   },
@@ -25,7 +25,7 @@ const steps = [
     number: "03",
     icon: PlayCircle,
     title: "Virtual Tour",
-    desc: "Explore the property remotely with HD video and 3D walkthroughs.",
+    desc: "Explore the property remotely with an immersive 3D walkthrough.",
     color: "bg-emerald-500",
     light: "bg-emerald-100 text-emerald-600",
   },
@@ -52,7 +52,7 @@ export function HowItWorks() {
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
-    <section ref={ref} className="py-24 bg-slate-950 overflow-hidden">
+    <section ref={ref} className="py-24 bg-slate-100 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
         {/* Header */}
         <div className="text-center mb-16">
@@ -67,7 +67,7 @@ export function HowItWorks() {
             initial={{ opacity: 0, y: 18 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ delay: 0.08 }}
-            className="text-4xl md:text-5xl font-black text-white tracking-tight"
+            className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight"
           >
             From search to keys — in minutes
           </motion.h2>
@@ -76,7 +76,7 @@ export function HowItWorks() {
         {/* Steps grid */}
         <div className="relative">
           {/* Connector line (desktop only) */}
-          <div className="hidden md:block absolute top-10 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent" />
+          <div className="hidden md:block absolute top-10 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-4">
             {steps.map((step, i) => {
@@ -95,21 +95,21 @@ export function HowItWorks() {
                       <Icon className="w-8 h-8 text-white" />
                     </div>
                     {/* Step number badge */}
-                    <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
-                      <span className="text-[9px] font-black text-slate-400">{step.number}</span>
+                    <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white border border-slate-300 flex items-center justify-center">
+                      <span className="text-[9px] font-black text-slate-500">{step.number}</span>
                     </div>
                   </div>
 
-                  <h3 className="text-base font-black text-white mb-2 group-hover:text-primary transition-colors">
+                  <h3 className="text-base font-black text-slate-900 mb-2 group-hover:text-primary transition-colors">
                     {step.title}
                   </h3>
-                  <p className="text-slate-500 text-sm leading-relaxed max-w-[180px]">
+                  <p className="text-slate-600 text-sm leading-relaxed max-w-[180px]">
                     {step.desc}
                   </p>
 
                   {/* Mobile connector */}
                   {i < steps.length - 1 && (
-                    <div className="md:hidden w-px h-8 bg-slate-700 mt-6 mx-auto" />
+                    <div className="md:hidden w-px h-8 bg-slate-300 mt-6 mx-auto" />
                   )}
                 </motion.div>
               );
