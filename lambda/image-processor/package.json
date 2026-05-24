@@ -1,0 +1,20 @@
+{
+  "name": "image-processor",
+  "version": "1.0.0",
+  "description": "AWS Lambda: compress and thumbnail property images on S3 upload",
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "package": "npm run build && cp -r node_modules dist/ && (cd dist && zip -r ../function.zip .)",
+    "package:clean": "rm -rf dist function.zip && npm ci --omit=dev && npm run package"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.986.0",
+    "sharp": "^0.34.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.149",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}
