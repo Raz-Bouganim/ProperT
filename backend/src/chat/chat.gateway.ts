@@ -5,6 +5,7 @@ import {
   WebSocketServer,
   ConnectedSocket,
   OnGatewayConnection,
+  OnGatewayDisconnect,
   WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
@@ -47,7 +48,7 @@ function parseMediaType(raw: unknown): MediaType | undefined {
     origin: '*',
   },
 })
-export class ChatGateway implements OnGatewayConnection {
+export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(ChatGateway.name);
 
   constructor(
@@ -78,6 +79,16 @@ export class ChatGateway implements OnGatewayConnection {
       this.logger.debug('WebSocket connect rejected: invalid token');
       client.disconnect(true);
     }
+  }
+
+  handleDisconnect(client: Socket) {
+    const userId = (client.data as SocketData).userId;
+    if (!userId) return;
+    client.rooms.forEach((room) => {
+      if (room !== client.id) {
+        client.to(room).emit('partnerOffline', { userId });
+      }
+    });
   }
 
   @SubscribeMessage('sendMessage')
@@ -166,6 +177,7 @@ export class ChatGateway implements OnGatewayConnection {
       throw e;
     }
     void client.join(conversationId);
+    client.to(conversationId).emit('partnerOnline', { userId });
     return { event: 'joined', room: conversationId };
   }
 }

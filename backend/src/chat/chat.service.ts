@@ -386,6 +386,11 @@ export class ChatService {
           select: {
             id: true,
             title: true,
+            images: {
+              where: { isPrimary: true },
+              select: { url: true },
+              take: 1,
+            },
           },
         },
       },
