@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { CacheHeaderInterceptor } from './redis/cache-header.interceptor';
 import { ConfigModule } from '@nestjs/config';
 import * as Joi from 'joi';
 import { AppController } from './app.controller';
@@ -13,6 +15,7 @@ import { AvailabilityModule } from './availability/availability.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { GeoModule } from './geo/geo.module';
 import { FavoritesModule } from './favorites/favorites.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -22,6 +25,7 @@ import { FavoritesModule } from './favorites/favorites.module';
         DATABASE_URL: Joi.string().required(),
         JWT_SECRET: Joi.string().min(16).required(),
         FRONTEND_URL: Joi.string().uri().optional(),
+        REDIS_URL: Joi.string().required(),
         // MinIO
         S3_ENDPOINT: Joi.string().optional(),
         AWS_ACCESS_KEY_ID: Joi.string().optional(),
@@ -36,6 +40,7 @@ import { FavoritesModule } from './favorites/favorites.module';
         AUTH0_DB_CONNECTION: Joi.string().optional(),
       }),
     }),
+    RedisModule,
     PrismaModule,
     AuthModule,
     ChatModule,
@@ -48,6 +53,9 @@ import { FavoritesModule } from './favorites/favorites.module';
     FavoritesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_INTERCEPTOR, useClass: CacheHeaderInterceptor },
+  ],
 })
 export class AppModule {}

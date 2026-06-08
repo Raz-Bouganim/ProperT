@@ -14,6 +14,8 @@ import type { SearchFilterPatch } from "@/types/search-filters";
 import type { MapBounds } from "@/components/Map";
 
 const MIN_ZOOM = 14;
+const PAGE_LIMIT_GRID = 9;
+const PAGE_LIMIT_WITH_MAP = 8;
 
 const SORT_OPTIONS = [
     { value: "newest", label: "Newest" },
@@ -78,7 +80,7 @@ function SearchPageContent() {
         abortControllerRef.current = controller;
 
         setLoading(true);
-        const limit = showMap ? 8 : 9;
+        const limit = showMap ? PAGE_LIMIT_WITH_MAP : PAGE_LIMIT_GRID;
         try {
             let url: string;
             // Use bbox only when map is open, bounds are known, and zoom is sufficient
@@ -305,10 +307,11 @@ function SearchPageContent() {
                             </div>
                         ) : properties.length > 0 ? (
                             <div className={`grid gap-8 transition-opacity duration-200 ${loading ? "opacity-50 pointer-events-none" : "opacity-100"} ${viewMode === "grid" ? (showMap ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3") : "grid-cols-1"}`}>
-                                {properties.map((property) => (
+                                {properties.map((property, idx) => (
                                     <PropertyCard
                                         key={property.id}
                                         id={property.id}
+                                        priority={idx === 0 && page === 1}
                                         detailsHref={`/properties/${property.slug || property.id}?from=search&returnTo=${encodeURIComponent(returnTo)}`}
                                         title={property.title || "Untitled Property"}
                                         address={property.addressLine ?? property.address ?? ""}
@@ -344,7 +347,7 @@ function SearchPageContent() {
                             <div className="mt-16 flex justify-center">
                                 <Pagination
                                     currentPage={page}
-                                    totalPages={Math.ceil(totalCount / (showMap ? 8 : 9))}
+                                    totalPages={Math.ceil(totalCount / (showMap ? PAGE_LIMIT_WITH_MAP : PAGE_LIMIT_GRID))}
                                     onPageChange={handlePageChange}
                                 />
                             </div>
