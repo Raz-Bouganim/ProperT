@@ -29,6 +29,12 @@ import { PropertyStrategyFactory } from './strategies/property-strategy.factory'
 import { publicUrlToObjectKey } from './property-image.util';
 import { makeUniqueSlugCandidate, slugifyTitle } from './property-slug.util';
 import { mapPropertyPublicResponse } from './property-public.mapper';
+import { CacheService } from '../redis/cache.service';
+import { createHash } from 'crypto';
+
+const FEATURED_CACHE_KEY = 'properties:featured';
+const FEATURED_TTL = 300; // 5 minutes
+const SEARCH_TTL = 60; // 60 seconds
 
 const MAX_SLUG_ATTEMPTS = 12;
 
@@ -148,7 +154,74 @@ export class PropertiesService {
     private propertyAuthorization: PropertyAuthorizationService,
     private configService: ConfigService,
     private s3Adapter: S3StorageAdapter,
+    private cache: CacheService,
   ) {}
+
+  private buildSearchCacheKey(params: Record<string, unknown>): string {
+    const normalized = Object.fromEntries(
+      Object.keys(params)
+        .sort()
+        .map((k) => {
+          const v = params[k];
+          return [k, Array.isArray(v) ? [...(v as unknown[])].sort() : v];
+        }),
+    );
+    const hash = createHash('sha1')
+      .update(JSON.stringify(normalized))
+      .digest('hex');
+    return `properties:search:${hash}`;
+  }
+
+  private applySearchFilters(
+    where: Prisma.PropertyWhereInput,
+    filters: {
+      minPrice?: number;
+      maxPrice?: number;
+      beds?: number;
+      baths?: number;
+      propertyType?: string;
+      status?: string;
+      minSqft?: number;
+      maxSqft?: number;
+      maxLeaseDuration?: number;
+      amenities?: string[];
+    },
+  ): void {
+    if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+      const price: Prisma.DecimalFilter = {};
+      if (filters.minPrice !== undefined) price.gte = filters.minPrice;
+      if (filters.maxPrice !== undefined) price.lte = filters.maxPrice;
+      where.price = price;
+    }
+    if (filters.beds !== undefined) where.bedrooms = { gte: filters.beds };
+    if (filters.baths !== undefined) where.bathrooms = { gte: filters.baths };
+    const validType = validatePropertyType(filters.propertyType);
+    if (validType !== undefined) where.type = validType;
+    const validStatus = validatePropertyStatus(filters.status);
+    if (validStatus !== undefined) where.status = validStatus;
+    if (filters.minSqft !== undefined || filters.maxSqft !== undefined) {
+      where.sqft = {};
+      if (filters.minSqft !== undefined)
+        (where.sqft as Prisma.FloatFilter).gte = filters.minSqft;
+      if (filters.maxSqft !== undefined)
+        (where.sqft as Prisma.FloatFilter).lte = filters.maxSqft;
+    }
+    if (filters.maxLeaseDuration !== undefined) {
+      where.leaseDurationMonths = { lte: filters.maxLeaseDuration };
+    }
+    if (filters.amenities?.length) {
+      where.AND = filters.amenities
+        .filter((a) => (Object.values(AmenityType) as string[]).includes(a))
+        .map((a) => ({ amenities: { some: { amenity: a as AmenityType } } }));
+    }
+  }
+
+  private async invalidatePropertyCaches(): Promise<void> {
+    await Promise.all([
+      this.cache.del(FEATURED_CACHE_KEY),
+      this.cache.invalidatePattern('properties:search:*'),
+    ]);
+  }
 
   private async allocateUniqueSlug(title: string): Promise<string> {
     const base = slugifyTitle(title);
@@ -217,7 +290,8 @@ export class PropertiesService {
     const publishedAt =
       willPublish && isLiveMarketStatus(intent) ? new Date() : null;
     const bucketName = this.configService.getOrThrow<string>('S3_BUCKET_NAME');
-    const imageKeys = images?.map(url => publicUrlToObjectKey(url, bucketName)) ?? [];
+    const imageKeys =
+      images?.map((url) => publicUrlToObjectKey(url, bucketName)) ?? [];
 
     try {
       const row = await this.prisma.property.create({
@@ -276,16 +350,20 @@ export class PropertiesService {
           owner: { connect: { id: ownerId } },
         },
       });
-      return this.findOne(row.id, ownerId);
+      const created = await this.findOne(row.id, ownerId);
+      await this.invalidatePropertyCaches();
+      return created;
     } catch (dbError) {
       if (imageKeys.length > 0) {
-        await Promise.allSettled(imageKeys.map(key => this.s3Adapter.deleteObject(key)));
+        await Promise.allSettled(
+          imageKeys.map((key) => this.s3Adapter.deleteObject(key)),
+        );
       }
       throw dbError;
     }
   }
 
-  findAll(ownerId?: string) {
+  async findAll(ownerId?: string) {
     const base = { deletedAt: null };
     const where = ownerId
       ? { ...base, ownerId }
@@ -294,13 +372,28 @@ export class PropertiesService {
           publishedAt: { not: null },
           status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT] },
         };
-    return this.prisma.property
-      .findMany({
-        where,
-        include: { owner: true, images: true },
-        orderBy: { createdAt: 'desc' },
-      })
-      .then((rows) => rows.map(mapPropertyPublicResponse));
+
+    // Only cache the public featured listing (no ownerId filter)
+    if (!ownerId) {
+      const cached =
+        await this.cache.get<ReturnType<typeof mapPropertyPublicResponse>[]>(
+          FEATURED_CACHE_KEY,
+        );
+      if (cached) return cached;
+    }
+
+    const rows = await this.prisma.property.findMany({
+      where,
+      include: { owner: true, images: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const result = rows.map(mapPropertyPublicResponse);
+
+    if (!ownerId) {
+      await this.cache.set(FEATURED_CACHE_KEY, result, FEATURED_TTL);
+    }
+
+    return result;
   }
 
   async findAllWithinRadius(
@@ -323,14 +416,28 @@ export class PropertiesService {
       amenities?: string[];
     },
   ) {
+    const cacheKey = this.buildSearchCacheKey({
+      lat,
+      lng,
+      radiusInKm,
+      ...filters,
+    });
+    const cached = await this.cache.get<{
+      properties: unknown[];
+      totalCount: number;
+    }>(cacheKey);
+    if (cached) return cached;
+
     const radiusInMeters = radiusInKm * 1000;
     const page = filters?.page || 1;
     const limit = filters?.limit || 9;
     const skip = (page - 1) * limit;
     const orderBy =
-      filters?.sort === 'price_asc' ? { price: 'asc' as const } :
-      filters?.sort === 'price_desc' ? { price: 'desc' as const } :
-      { createdAt: 'desc' as const };
+      filters?.sort === 'price_asc'
+        ? { price: 'asc' as const }
+        : filters?.sort === 'price_desc'
+          ? { price: 'desc' as const }
+          : { createdAt: 'desc' as const };
 
     const rawProperties = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT id FROM "properties"
@@ -353,33 +460,7 @@ export class PropertiesService {
       status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT] },
     };
 
-    if (filters) {
-      if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-        const price: Prisma.DecimalFilter = {};
-        if (filters.minPrice !== undefined) price.gte = filters.minPrice;
-        if (filters.maxPrice !== undefined) price.lte = filters.maxPrice;
-        where.price = price;
-      }
-      if (filters.beds !== undefined) where.bedrooms = { gte: filters.beds };
-      if (filters.baths !== undefined) where.bathrooms = { gte: filters.baths };
-      const validType = validatePropertyType(filters.propertyType);
-      if (validType !== undefined) where.type = validType;
-      const validStatus = validatePropertyStatus(filters.status);
-      if (validStatus !== undefined) where.status = validStatus;
-      if (filters.minSqft !== undefined || filters.maxSqft !== undefined) {
-        where.sqft = {};
-        if (filters.minSqft !== undefined) (where.sqft as Prisma.FloatFilter).gte = filters.minSqft;
-        if (filters.maxSqft !== undefined) (where.sqft as Prisma.FloatFilter).lte = filters.maxSqft;
-      }
-      if (filters.maxLeaseDuration !== undefined) {
-        where.leaseDurationMonths = { lte: filters.maxLeaseDuration };
-      }
-      if (filters.amenities?.length) {
-        where.AND = filters.amenities
-          .filter((a) => (Object.values(AmenityType) as string[]).includes(a))
-          .map((a) => ({ amenities: { some: { amenity: a as AmenityType } } }));
-      }
-    }
+    if (filters) this.applySearchFilters(where, filters);
 
     const [totalCount, properties] = await Promise.all([
       this.prisma.property.count({ where }),
@@ -392,10 +473,12 @@ export class PropertiesService {
       }),
     ]);
 
-    return {
+    const result = {
       properties: properties.map(mapPropertyPublicResponse),
       totalCount,
     };
+    await this.cache.set(cacheKey, result, SEARCH_TTL);
+    return result;
   }
 
   async findAllWithinBounds(
@@ -419,13 +502,28 @@ export class PropertiesService {
       amenities?: string[];
     },
   ) {
+    const cacheKey = this.buildSearchCacheKey({
+      minLat,
+      minLng,
+      maxLat,
+      maxLng,
+      ...filters,
+    });
+    const cached = await this.cache.get<{
+      properties: unknown[];
+      totalCount: number;
+    }>(cacheKey);
+    if (cached) return cached;
+
     const page = filters?.page || 1;
     const limit = filters?.limit || 9;
     const skip = (page - 1) * limit;
     const orderBy =
-      filters?.sort === 'price_asc' ? { price: 'asc' as const } :
-      filters?.sort === 'price_desc' ? { price: 'desc' as const } :
-      { createdAt: 'desc' as const };
+      filters?.sort === 'price_asc'
+        ? { price: 'asc' as const }
+        : filters?.sort === 'price_desc'
+          ? { price: 'desc' as const }
+          : { createdAt: 'desc' as const };
 
     // && is the bounding-box overlap operator — hits the GiST index on location
     const rawProperties = await this.prisma.$queryRaw<{ id: string }[]>`
@@ -445,33 +543,7 @@ export class PropertiesService {
       status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT] },
     };
 
-    if (filters) {
-      if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-        const price: Prisma.DecimalFilter = {};
-        if (filters.minPrice !== undefined) price.gte = filters.minPrice;
-        if (filters.maxPrice !== undefined) price.lte = filters.maxPrice;
-        where.price = price;
-      }
-      if (filters.beds !== undefined) where.bedrooms = { gte: filters.beds };
-      if (filters.baths !== undefined) where.bathrooms = { gte: filters.baths };
-      const validType = validatePropertyType(filters.propertyType);
-      if (validType !== undefined) where.type = validType;
-      const validStatus = validatePropertyStatus(filters.status);
-      if (validStatus !== undefined) where.status = validStatus;
-      if (filters.minSqft !== undefined || filters.maxSqft !== undefined) {
-        where.sqft = {};
-        if (filters.minSqft !== undefined) (where.sqft as Prisma.FloatFilter).gte = filters.minSqft;
-        if (filters.maxSqft !== undefined) (where.sqft as Prisma.FloatFilter).lte = filters.maxSqft;
-      }
-      if (filters.maxLeaseDuration !== undefined) {
-        where.leaseDurationMonths = { lte: filters.maxLeaseDuration };
-      }
-      if (filters.amenities?.length) {
-        where.AND = filters.amenities
-          .filter((a) => (Object.values(AmenityType) as string[]).includes(a))
-          .map((a) => ({ amenities: { some: { amenity: a as AmenityType } } }));
-      }
-    }
+    if (filters) this.applySearchFilters(where, filters);
 
     const [totalCount, properties] = await Promise.all([
       this.prisma.property.count({ where }),
@@ -484,10 +556,12 @@ export class PropertiesService {
       }),
     ]);
 
-    return {
+    const result = {
       properties: properties.map(mapPropertyPublicResponse),
       totalCount,
     };
+    await this.cache.set(cacheKey, result, SEARCH_TTL);
+    return result;
   }
 
   /**
@@ -684,7 +758,9 @@ export class PropertiesService {
       }
     }
 
-    return this.findOne(id, userId);
+    const result = await this.findOne(id, userId);
+    await this.invalidatePropertyCaches();
+    return result;
   }
 
   async remove(userId: string, id: string) {
@@ -707,6 +783,7 @@ export class PropertiesService {
     if (!property) {
       throw new NotFoundException('Property not found');
     }
+    await this.invalidatePropertyCaches();
     return mapPropertyPublicResponse(property);
   }
 }

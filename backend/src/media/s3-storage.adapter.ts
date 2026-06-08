@@ -141,7 +141,6 @@ export class S3StorageAdapter implements OnModuleInit {
       this.logger.error(`Failed to set bucket policy: ${msg}`);
     }
 
-    // Allow browser-side presigned PUT uploads from any origin (MinIO local dev).
     try {
       await this.s3Client.send(
         new PutBucketCorsCommand({
@@ -149,8 +148,8 @@ export class S3StorageAdapter implements OnModuleInit {
           CORSConfiguration: {
             CORSRules: [
               {
-                AllowedOrigins: ['*'],
-                AllowedMethods: ['GET', 'PUT', 'HEAD', 'DELETE', 'POST'],
+                AllowedOrigins: [this.configService.get<string>('FRONTEND_URL', '*')],
+                AllowedMethods: ['GET', 'PUT', 'HEAD'],
                 AllowedHeaders: ['*'],
                 ExposeHeaders: ['ETag'],
                 MaxAgeSeconds: 3600,

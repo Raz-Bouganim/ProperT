@@ -8,6 +8,13 @@ import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { toast } from "sonner";
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+    USD: "$",
+    EUR: "€",
+    GBP: "£",
+    ILS: "₪",
+};
+
 export interface PropertyCardProps {
     id: string;
     title: string;
@@ -33,6 +40,7 @@ export interface PropertyCardProps {
     currency?: string;
     ownerId?: string;
     isHighlighted?: boolean;
+    priority?: boolean;
 }
 
 export function PropertyCard({
@@ -56,21 +64,14 @@ export function PropertyCard({
     currency = "USD",
     ownerId,
     isHighlighted = false,
+    priority = false,
 }: PropertyCardProps) {
     const { isAuthenticated, user } = useAuth();
     const { isFavorited, toggleFavorite } = useFavorites();
     const isOwner = !!ownerId && ownerId === user?.id;
     const favorited = isFavorited(id);
 
-    const getCurrencySymbol = (currencyCode: string) => {
-        const symbols: Record<string, string> = {
-            USD: "$",
-            EUR: "€",
-            GBP: "£",
-            ILS: "₪"
-        };
-        return symbols[currencyCode] || "$";
-    };
+    const getCurrencySymbol = (currencyCode: string) => CURRENCY_SYMBOLS[currencyCode] ?? "$";
     if (isLoading) {
         return (
             <div className="rounded-2xl bg-transparent overflow-hidden shadow-sm animate-pulse">
@@ -103,6 +104,7 @@ export function PropertyCard({
                     src={image || "/placeholder.svg"}
                     alt={title}
                     fill
+                    priority={priority}
                     className={cn("object-cover group-hover:scale-105 transition-transform duration-500", isHighlighted && "scale-105")}
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 />
