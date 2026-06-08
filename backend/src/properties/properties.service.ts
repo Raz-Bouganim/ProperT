@@ -34,7 +34,7 @@ import { createHash } from 'crypto';
 
 const FEATURED_CACHE_KEY = 'properties:featured';
 const FEATURED_TTL = 300; // 5 minutes
-const SEARCH_TTL = 60;    // 60 seconds
+const SEARCH_TTL = 60; // 60 seconds
 
 const MAX_SLUG_ATTEMPTS = 12;
 
@@ -159,12 +159,16 @@ export class PropertiesService {
 
   private buildSearchCacheKey(params: Record<string, unknown>): string {
     const normalized = Object.fromEntries(
-      Object.keys(params).sort().map(k => {
-        const v = params[k];
-        return [k, Array.isArray(v) ? [...v].sort() : v];
-      }),
+      Object.keys(params)
+        .sort()
+        .map((k) => {
+          const v = params[k];
+          return [k, Array.isArray(v) ? [...(v as unknown[])].sort() : v];
+        }),
     );
-    const hash = createHash('sha1').update(JSON.stringify(normalized)).digest('hex');
+    const hash = createHash('sha1')
+      .update(JSON.stringify(normalized))
+      .digest('hex');
     return `properties:search:${hash}`;
   }
 
@@ -197,8 +201,10 @@ export class PropertiesService {
     if (validStatus !== undefined) where.status = validStatus;
     if (filters.minSqft !== undefined || filters.maxSqft !== undefined) {
       where.sqft = {};
-      if (filters.minSqft !== undefined) (where.sqft as Prisma.FloatFilter).gte = filters.minSqft;
-      if (filters.maxSqft !== undefined) (where.sqft as Prisma.FloatFilter).lte = filters.maxSqft;
+      if (filters.minSqft !== undefined)
+        (where.sqft as Prisma.FloatFilter).gte = filters.minSqft;
+      if (filters.maxSqft !== undefined)
+        (where.sqft as Prisma.FloatFilter).lte = filters.maxSqft;
     }
     if (filters.maxLeaseDuration !== undefined) {
       where.leaseDurationMonths = { lte: filters.maxLeaseDuration };
@@ -284,7 +290,8 @@ export class PropertiesService {
     const publishedAt =
       willPublish && isLiveMarketStatus(intent) ? new Date() : null;
     const bucketName = this.configService.getOrThrow<string>('S3_BUCKET_NAME');
-    const imageKeys = images?.map(url => publicUrlToObjectKey(url, bucketName)) ?? [];
+    const imageKeys =
+      images?.map((url) => publicUrlToObjectKey(url, bucketName)) ?? [];
 
     try {
       const row = await this.prisma.property.create({
@@ -348,7 +355,9 @@ export class PropertiesService {
       return created;
     } catch (dbError) {
       if (imageKeys.length > 0) {
-        await Promise.allSettled(imageKeys.map(key => this.s3Adapter.deleteObject(key)));
+        await Promise.allSettled(
+          imageKeys.map((key) => this.s3Adapter.deleteObject(key)),
+        );
       }
       throw dbError;
     }
@@ -366,7 +375,10 @@ export class PropertiesService {
 
     // Only cache the public featured listing (no ownerId filter)
     if (!ownerId) {
-      const cached = await this.cache.get<ReturnType<typeof mapPropertyPublicResponse>[]>(FEATURED_CACHE_KEY);
+      const cached =
+        await this.cache.get<ReturnType<typeof mapPropertyPublicResponse>[]>(
+          FEATURED_CACHE_KEY,
+        );
       if (cached) return cached;
     }
 
@@ -404,8 +416,16 @@ export class PropertiesService {
       amenities?: string[];
     },
   ) {
-    const cacheKey = this.buildSearchCacheKey({ lat, lng, radiusInKm, ...filters });
-    const cached = await this.cache.get<{ properties: unknown[]; totalCount: number }>(cacheKey);
+    const cacheKey = this.buildSearchCacheKey({
+      lat,
+      lng,
+      radiusInKm,
+      ...filters,
+    });
+    const cached = await this.cache.get<{
+      properties: unknown[];
+      totalCount: number;
+    }>(cacheKey);
     if (cached) return cached;
 
     const radiusInMeters = radiusInKm * 1000;
@@ -413,9 +433,11 @@ export class PropertiesService {
     const limit = filters?.limit || 9;
     const skip = (page - 1) * limit;
     const orderBy =
-      filters?.sort === 'price_asc' ? { price: 'asc' as const } :
-      filters?.sort === 'price_desc' ? { price: 'desc' as const } :
-      { createdAt: 'desc' as const };
+      filters?.sort === 'price_asc'
+        ? { price: 'asc' as const }
+        : filters?.sort === 'price_desc'
+          ? { price: 'desc' as const }
+          : { createdAt: 'desc' as const };
 
     const rawProperties = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT id FROM "properties"
@@ -480,17 +502,28 @@ export class PropertiesService {
       amenities?: string[];
     },
   ) {
-    const cacheKey = this.buildSearchCacheKey({ minLat, minLng, maxLat, maxLng, ...filters });
-    const cached = await this.cache.get<{ properties: unknown[]; totalCount: number }>(cacheKey);
+    const cacheKey = this.buildSearchCacheKey({
+      minLat,
+      minLng,
+      maxLat,
+      maxLng,
+      ...filters,
+    });
+    const cached = await this.cache.get<{
+      properties: unknown[];
+      totalCount: number;
+    }>(cacheKey);
     if (cached) return cached;
 
     const page = filters?.page || 1;
     const limit = filters?.limit || 9;
     const skip = (page - 1) * limit;
     const orderBy =
-      filters?.sort === 'price_asc' ? { price: 'asc' as const } :
-      filters?.sort === 'price_desc' ? { price: 'desc' as const } :
-      { createdAt: 'desc' as const };
+      filters?.sort === 'price_asc'
+        ? { price: 'asc' as const }
+        : filters?.sort === 'price_desc'
+          ? { price: 'desc' as const }
+          : { createdAt: 'desc' as const };
 
     // && is the bounding-box overlap operator — hits the GiST index on location
     const rawProperties = await this.prisma.$queryRaw<{ id: string }[]>`
