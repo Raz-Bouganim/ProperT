@@ -3,7 +3,6 @@ import { PreparedListingData } from './property-listing.strategy';
 import { BasePropertyStrategy } from './base.strategy';
 
 export class OfficeForSaleStrategy extends BasePropertyStrategy {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected validateTypeAndStatusRules(_dto: CreatePropertyDto): void {}
 
   prepareData(

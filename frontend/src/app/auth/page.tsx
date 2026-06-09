@@ -106,14 +106,16 @@ function AuthPageContent() {
     return (
         <div className="flex min-h-screen bg-[#f6f6f8] relative">
             {/* Left Side - Hero Section */}
-            <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-[#1754cf] h-screen sticky top-0">
-                <Image
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVGyKMT0fyBfT4z-son5GzfQ45JnVwzYaq8J_DRRiwLRZrE1J0ekENFk0fpY3XqmQtHsqzoVOyXkAuLvSqp1sxNj_XPfq13LKE6WQIuObsfILOnkxQrFwE6iEH3MrEmqbv8_zDXG4CPEesVHModChzSJTzzTYZwT5rPLrit7rh-JyT9R6IEuXnn249vyLeeZ0_ZSN4-jZP8Qnap2XQj_ecSo6Xws4c50yyF1cND57Q7fwOhCrA2UZ5ivLDnszYFKwmejusow3QUTo"
-                    alt="Modern luxury residential glass architecture during sunset"
-                    fill
-                    className="object-cover opacity-80"
-                    priority
-                />
+            <div className="hidden lg:flex lg:w-1/2 overflow-hidden bg-[#1754cf] h-screen sticky top-0">
+                <div className="absolute inset-0">
+                    <Image
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVGyKMT0fyBfT4z-son5GzfQ45JnVwzYaq8J_DRRiwLRZrE1J0ekENFk0fpY3XqmQtHsqzoVOyXkAuLvSqp1sxNj_XPfq13LKE6WQIuObsfILOnkxQrFwE6iEH3MrEmqbv8_zDXG4CPEesVHModChzSJTzzTYZwT5rPLrit7rh-JyT9R6IEuXnn249vyLeeZ0_ZSN4-jZP8Qnap2XQj_ecSo6Xws4c50yyF1cND57Q7fwOhCrA2UZ5ivLDnszYFKwmejusow3QUTo"
+                        alt="Modern luxury residential glass architecture during sunset"
+                        fill
+                        className="object-cover opacity-80"
+                        priority
+                    />
+                </div>
                 <div className="absolute inset-0 z-10 bg-gradient-to-t from-[#1754cf]/80 to-transparent" />
 
                 <div className="relative z-20 flex flex-col justify-between h-full p-12 text-white w-full">

@@ -56,7 +56,9 @@ export class BookingsService {
     }
 
     if (property.ownerId === createBookingDto.seekerId) {
-      throw new ForbiddenException('You cannot book a viewing for your own property');
+      throw new ForbiddenException(
+        'You cannot book a viewing for your own property',
+      );
     }
 
     await this.availability.assertBookableWindow(
@@ -134,7 +136,9 @@ export class BookingsService {
   async findAllByUser(userId: string, role: 'SEEKER' | 'OWNER') {
     const base = {
       include: {
-        property: { include: { images: { orderBy: { sortOrder: 'asc' as const } } } },
+        property: {
+          include: { images: { orderBy: { sortOrder: 'asc' as const } } },
+        },
         ...(role === 'OWNER'
           ? {
               seeker: {
@@ -251,7 +255,9 @@ export class BookingsService {
           noteHistory: line('SEEKER', `Rescheduled: ${noteText}`),
         },
         include: {
-          property: { include: { images: { orderBy: { sortOrder: 'asc' as const } } } },
+          property: {
+            include: { images: { orderBy: { sortOrder: 'asc' as const } } },
+          },
           seeker: { select: { firstName: true, lastName: true, email: true } },
         },
       });
@@ -274,7 +280,9 @@ export class BookingsService {
         ),
       },
       include: {
-        property: { include: { images: { orderBy: { sortOrder: 'asc' as const } } } },
+        property: {
+          include: { images: { orderBy: { sortOrder: 'asc' as const } } },
+        },
         seeker: { select: { firstName: true, lastName: true, email: true } },
       },
     });

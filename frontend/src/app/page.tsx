@@ -16,17 +16,35 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchFeatured() {
-      try {
-        const res = await api.get("/properties");
-        setFeaturedListings(res.data.slice(0, 3));
-      } catch {
-        // silent
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchFeatured();
+    let cancelled = false;
+
+    // Fetch immediately — don't wait for geo permission check
+    api
+      .get("/properties/featured")
+      .then((res) => { if (!cancelled) setFeaturedListings(res.data); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    // If geo was already granted, silently refetch with coords (no permission prompt)
+    (async () => {
+      if (typeof navigator === "undefined" || !navigator.permissions) return;
+      const perm = await navigator.permissions.query({ name: "geolocation" });
+      if (perm.state !== "granted") return;
+      const coords = await new Promise<GeolocationCoordinates | null>((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve(pos.coords),
+          () => resolve(null),
+          { timeout: 3000 },
+        );
+      });
+      if (!coords || cancelled) return;
+      const res = await api.get("/properties/featured", {
+        params: { lat: coords.latitude, lng: coords.longitude },
+      });
+      if (!cancelled) setFeaturedListings(res.data);
+    })().catch(() => {});
+
+    return () => { cancelled = true; };
   }, []);
 
   return (

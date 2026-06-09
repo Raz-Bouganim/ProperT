@@ -69,6 +69,8 @@ function PremiumCard({
           fill
           className="object-cover group-hover:scale-107 transition-transform duration-700"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          loading="eager"
+          priority={index === 0}
         />
 
         {/* Status badge */}

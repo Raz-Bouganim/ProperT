@@ -11,10 +11,13 @@ import { REDIS_CLIENT } from './redis.constants';
       provide: REDIS_CLIENT,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        return new Redis(config.get<string>('REDIS_URL', 'redis://localhost:6379'), {
-          maxRetriesPerRequest: null,
-          enableOfflineQueue: false,
-        });
+        return new Redis(
+          config.get<string>('REDIS_URL', 'redis://localhost:6379'),
+          {
+            maxRetriesPerRequest: null,
+            enableOfflineQueue: false,
+          },
+        );
       },
     },
     CacheService,

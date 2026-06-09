@@ -1,4 +1,9 @@
-import { Inject, Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from './redis.constants';
 import { cacheHitStore } from './cache-context';
@@ -54,7 +59,13 @@ export class CacheService implements OnApplicationShutdown {
     try {
       let cursor = '0';
       do {
-        const [next, batch] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        const [next, batch] = await this.redis.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          100,
+        );
         cursor = next;
         for (let i = 0; i < batch.length; i += BATCH_SIZE) {
           const chunk = batch.slice(i, i + BATCH_SIZE);
@@ -62,7 +73,9 @@ export class CacheService implements OnApplicationShutdown {
         }
       } while (cursor !== '0');
     } catch (err) {
-      this.logger.warn(`Cache invalidatePattern failed for "${pattern}": ${err}`);
+      this.logger.warn(
+        `Cache invalidatePattern failed for "${pattern}": ${err}`,
+      );
     }
   }
 }

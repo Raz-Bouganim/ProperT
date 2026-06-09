@@ -9,6 +9,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -29,12 +30,35 @@ import { PropertyStrategyFactory } from './strategies/property-strategy.factory'
 import { publicUrlToObjectKey } from './property-image.util';
 import { makeUniqueSlugCandidate, slugifyTitle } from './property-slug.util';
 import { mapPropertyPublicResponse } from './property-public.mapper';
+import {
+  PROPERTY_CARD_SELECT,
+  PropertyCardDto,
+  mapToPropertyCard,
+} from './property-card.mapper';
 import { CacheService } from '../redis/cache.service';
 import { createHash } from 'crypto';
 
-const FEATURED_CACHE_KEY = 'properties:featured';
-const FEATURED_TTL = 300; // 5 minutes
+const ALL_CARDS_CACHE_KEY = 'properties:all_cards';
+const ALL_CARDS_TTL = 300; // 5 minutes
+const FEATURED_USER_CACHE_TTL = 300; // 5 minutes — per-user, per-location featured key
 const SEARCH_TTL = 60; // 60 seconds
+
+function haversineKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 const MAX_SLUG_ATTEMPTS = 12;
 
@@ -149,6 +173,8 @@ function publishCheckDtoFromRecord(
 
 @Injectable()
 export class PropertiesService {
+  private readonly logger = new Logger(PropertiesService.name);
+
   constructor(
     private prisma: PrismaService,
     private propertyAuthorization: PropertyAuthorizationService,
@@ -218,7 +244,8 @@ export class PropertiesService {
 
   private async invalidatePropertyCaches(): Promise<void> {
     await Promise.all([
-      this.cache.del(FEATURED_CACHE_KEY),
+      this.cache.del(ALL_CARDS_CACHE_KEY),
+      this.cache.invalidatePattern('properties:featured:*'),
       this.cache.invalidatePattern('properties:search:*'),
     ]);
   }
@@ -363,6 +390,130 @@ export class PropertiesService {
     }
   }
 
+  async findFeatured(
+    userId?: string,
+    lat?: number,
+    lng?: number,
+  ): Promise<PropertyCardDto[]> {
+    const cacheKey = `properties:featured:${userId ?? 'anon'}:${lat?.toFixed(2) ?? ''}:${lng?.toFixed(2) ?? ''}`;
+    const cached = await this.cache.get<PropertyCardDto[]>(cacheKey);
+    if (cached) return cached;
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const publishedFilter = {
+      deletedAt: null,
+      publishedAt: { not: null },
+      status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT] },
+    };
+
+    // 1. Fetch candidate pool (20 most recent) with an explicit select
+    const candidates = await this.prisma.property.findMany({
+      where: publishedFilter,
+      select: {
+        id: true,
+        slug: true,
+        ownerId: true,
+        title: true,
+        addressLine: true,
+        latitude: true,
+        longitude: true,
+        price: true,
+        currency: true,
+        bedrooms: true,
+        bathrooms: true,
+        sqft: true,
+        type: true,
+        status: true,
+        publishedAt: true,
+        leaseDurationMonths: true,
+        createdAt: true,
+        images: {
+          select: { url: true, isPrimary: true, sortOrder: true },
+          orderBy: [
+            { isPrimary: 'desc' as const },
+            { sortOrder: 'asc' as const },
+          ],
+          take: 1,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    if (candidates.length === 0) return [];
+
+    const ids = candidates.map((c) => c.id);
+
+    // 2. Get weekly view counts + favorite counts in parallel
+    const [viewGroups, favGroups, recentFavs] = await Promise.all([
+      this.prisma.propertyView.groupBy({
+        by: ['propertyId'],
+        where: { propertyId: { in: ids }, viewedAt: { gte: sevenDaysAgo } },
+        _count: { id: true },
+      }),
+      this.prisma.favorite.groupBy({
+        by: ['propertyId'],
+        where: { propertyId: { in: ids } },
+        _count: { propertyId: true },
+      }),
+      // Infer rent/sale preference from signed-in user's last 10 favorites
+      userId
+        ? this.prisma.favorite.findMany({
+            where: { userId },
+            select: { property: { select: { status: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+          })
+        : Promise.resolve([] as { property: { status: PropertyStatus } }[]),
+    ]);
+
+    const weeklyViewMap = new Map(
+      viewGroups.map((g) => [g.propertyId, g._count.id]),
+    );
+    const favMap = new Map(
+      favGroups.map((g) => [g.propertyId, g._count.propertyId]),
+    );
+
+    let preferredStatus: PropertyStatus | null = null;
+    if (userId && recentFavs.length > 0) {
+      const rentCount = recentFavs.filter(
+        (f) => f.property.status === PropertyStatus.FOR_RENT,
+      ).length;
+      const saleCount = recentFavs.filter(
+        (f) => f.property.status === PropertyStatus.FOR_SALE,
+      ).length;
+      if (rentCount > saleCount) preferredStatus = PropertyStatus.FOR_RENT;
+      else if (saleCount > rentCount) preferredStatus = PropertyStatus.FOR_SALE;
+    }
+
+    // 3. Score and pick top 3
+    const scored = candidates.map((p) => {
+      const weeklyViews = weeklyViewMap.get(p.id) ?? 0;
+      const favCount = favMap.get(p.id) ?? 0;
+      const ageInDays = (Date.now() - p.createdAt.getTime()) / 86_400_000;
+      const recencyScore = 1 / (ageInDays + 2);
+      const geoScore =
+        lat != null && lng != null && p.latitude != null && p.longitude != null
+          ? 1 / (haversineKm(lat, lng, p.latitude, p.longitude) + 1)
+          : 1;
+      const prefScore =
+        preferredStatus != null && p.status === preferredStatus ? 1.5 : 1.0;
+      const score =
+        (weeklyViews + favCount * 2) * recencyScore * geoScore * prefScore;
+      return { p, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+
+    const result = scored.slice(0, 3).map(({ p }) => {
+      const { createdAt: _c, ...rest } = p;
+      return mapToPropertyCard(rest);
+    });
+
+    await this.cache.set(cacheKey, result, FEATURED_USER_CACHE_TTL);
+    return result;
+  }
+
   async findAll(ownerId?: string) {
     const base = { deletedAt: null };
     const where = ownerId
@@ -373,24 +524,21 @@ export class PropertiesService {
           status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT] },
         };
 
-    // Only cache the public featured listing (no ownerId filter)
     if (!ownerId) {
       const cached =
-        await this.cache.get<ReturnType<typeof mapPropertyPublicResponse>[]>(
-          FEATURED_CACHE_KEY,
-        );
+        await this.cache.get<PropertyCardDto[]>(ALL_CARDS_CACHE_KEY);
       if (cached) return cached;
     }
 
     const rows = await this.prisma.property.findMany({
       where,
-      include: { owner: true, images: true },
+      select: PROPERTY_CARD_SELECT,
       orderBy: { createdAt: 'desc' },
     });
-    const result = rows.map(mapPropertyPublicResponse);
+    const result = rows.map(mapToPropertyCard);
 
     if (!ownerId) {
-      await this.cache.set(FEATURED_CACHE_KEY, result, FEATURED_TTL);
+      await this.cache.set(ALL_CARDS_CACHE_KEY, result, ALL_CARDS_TTL);
     }
 
     return result;
@@ -466,7 +614,7 @@ export class PropertiesService {
       this.prisma.property.count({ where }),
       this.prisma.property.findMany({
         where,
-        include: { owner: true, images: true },
+        select: PROPERTY_CARD_SELECT,
         skip,
         take: limit,
         orderBy,
@@ -474,7 +622,7 @@ export class PropertiesService {
     ]);
 
     const result = {
-      properties: properties.map(mapPropertyPublicResponse),
+      properties: properties.map(mapToPropertyCard),
       totalCount,
     };
     await this.cache.set(cacheKey, result, SEARCH_TTL);
@@ -549,7 +697,7 @@ export class PropertiesService {
       this.prisma.property.count({ where }),
       this.prisma.property.findMany({
         where,
-        include: { owner: true, images: true },
+        select: PROPERTY_CARD_SELECT,
         skip,
         take: limit,
         orderBy,
@@ -557,7 +705,7 @@ export class PropertiesService {
     ]);
 
     const result = {
-      properties: properties.map(mapPropertyPublicResponse),
+      properties: properties.map(mapToPropertyCard),
       totalCount,
     };
     await this.cache.set(cacheKey, result, SEARCH_TTL);
@@ -587,7 +735,25 @@ export class PropertiesService {
         throw new NotFoundException('Property not found');
       }
     }
+    // Track the view asynchronously — don't block the response
+    this.trackView(property.id, requesterUserId ?? undefined);
     return mapPropertyPublicResponse(property);
+  }
+
+  private trackView(propertyId: string, userId?: string): void {
+    Promise.all([
+      this.prisma.property.update({
+        where: { id: propertyId },
+        data: { views: { increment: 1 } },
+      }),
+      this.prisma.propertyView.create({
+        data: { propertyId, userId: userId ?? null },
+      }),
+    ]).catch((err: unknown) => {
+      this.logger.warn(
+        `Failed to track view for property ${propertyId}: ${String(err)}`,
+      );
+    });
   }
 
   async update(

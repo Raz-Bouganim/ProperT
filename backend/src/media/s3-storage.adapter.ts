@@ -8,7 +8,6 @@ import {
   HeadBucketCommand,
   CreateBucketCommand,
   PutBucketPolicyCommand,
-  PutBucketCorsCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -29,9 +28,16 @@ export class S3StorageAdapter implements OnModuleInit {
       region: this.region,
       credentials: {
         accessKeyId: this.configService.getOrThrow<string>('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: this.configService.getOrThrow<string>('AWS_SECRET_ACCESS_KEY'),
+        secretAccessKey: this.configService.getOrThrow<string>(
+          'AWS_SECRET_ACCESS_KEY',
+        ),
       },
-      ...(this.endpoint ? { endpoint: this.endpoint, forcePathStyle: true } : {}),
+      // MinIO doesn't support the default checksum headers added by SDK v3.590+
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
+      ...(this.endpoint
+        ? { endpoint: this.endpoint, forcePathStyle: true }
+        : {}),
     });
   }
 
@@ -50,7 +56,9 @@ export class S3StorageAdapter implements OnModuleInit {
       ContentType: contentType,
     });
 
-    const presignedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
+    const presignedUrl = await getSignedUrl(this.s3Client, command, {
+      expiresIn,
+    });
 
     const publicUrl = this.endpoint
       ? `${this.endpoint}/${this.bucketName}/${key}`
@@ -67,7 +75,11 @@ export class S3StorageAdapter implements OnModuleInit {
     return Buffer.from(await Body.transformToByteArray());
   }
 
-  async putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+  async putObject(
+    key: string,
+    body: Buffer,
+    contentType: string,
+  ): Promise<void> {
     await this.s3Client.send(
       new PutObjectCommand({
         Bucket: this.bucketName,
@@ -102,16 +114,25 @@ export class S3StorageAdapter implements OnModuleInit {
     }
 
     try {
-      await this.s3Client.send(new HeadBucketCommand({ Bucket: this.bucketName }));
+      await this.s3Client.send(
+        new HeadBucketCommand({ Bucket: this.bucketName }),
+      );
       this.logger.log(`Bucket "${this.bucketName}" already exists.`);
     } catch {
       this.logger.log(`Bucket "${this.bucketName}" not found, creating...`);
       try {
-        await this.s3Client.send(new CreateBucketCommand({ Bucket: this.bucketName }));
+        await this.s3Client.send(
+          new CreateBucketCommand({ Bucket: this.bucketName }),
+        );
         this.logger.log(`Bucket "${this.bucketName}" created.`);
       } catch (createError: unknown) {
-        const msg = createError instanceof Error ? createError.message : String(createError);
-        this.logger.error(`Failed to create bucket "${this.bucketName}": ${msg}`);
+        const msg =
+          createError instanceof Error
+            ? createError.message
+            : String(createError);
+        this.logger.error(
+          `Failed to create bucket "${this.bucketName}": ${msg}`,
+        );
         return;
       }
     }
@@ -135,33 +156,15 @@ export class S3StorageAdapter implements OnModuleInit {
           Policy: JSON.stringify(policy),
         }),
       );
-      this.logger.log(`Public read policy applied to bucket "${this.bucketName}".`);
-    } catch (policyError: unknown) {
-      const msg = policyError instanceof Error ? policyError.message : String(policyError);
-      this.logger.error(`Failed to set bucket policy: ${msg}`);
-    }
-
-    try {
-      await this.s3Client.send(
-        new PutBucketCorsCommand({
-          Bucket: this.bucketName,
-          CORSConfiguration: {
-            CORSRules: [
-              {
-                AllowedOrigins: [this.configService.get<string>('FRONTEND_URL', '*')],
-                AllowedMethods: ['GET', 'PUT', 'HEAD'],
-                AllowedHeaders: ['*'],
-                ExposeHeaders: ['ETag'],
-                MaxAgeSeconds: 3600,
-              },
-            ],
-          },
-        }),
+      this.logger.log(
+        `Public read policy applied to bucket "${this.bucketName}".`,
       );
-      this.logger.log(`CORS policy applied to bucket "${this.bucketName}".`);
-    } catch (corsError: unknown) {
-      const msg = corsError instanceof Error ? corsError.message : String(corsError);
-      this.logger.error(`Failed to set bucket CORS: ${msg}`);
+    } catch (policyError: unknown) {
+      const msg =
+        policyError instanceof Error
+          ? policyError.message
+          : String(policyError);
+      this.logger.error(`Failed to set bucket policy: ${msg}`);
     }
   }
 }

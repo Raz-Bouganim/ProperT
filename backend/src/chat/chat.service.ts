@@ -305,7 +305,9 @@ export class ChatService {
           },
         }),
         tx.conversationParticipant.update({
-          where: { userId_conversationId: { userId: senderId, conversationId } },
+          where: {
+            userId_conversationId: { userId: senderId, conversationId },
+          },
           data: { lastReadMessageId: msg.id, lastReadAt: new Date() },
         }),
       ]);
