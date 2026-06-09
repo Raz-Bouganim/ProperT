@@ -136,7 +136,16 @@ export class ChatService {
 
     if (conversations.length === 0) return [];
 
-    const ids = conversations.map((c) => c.id);
+    // Extract the current user's lastReadAt per conversation from data already loaded above,
+    // so the unread-count query needs no JOIN back to conversation_participants.
+    const convIds: string[] = [];
+    const lastReadAts: (Date | null)[] = [];
+    for (const conv of conversations) {
+      const me = conv.participants.find((p) => p.userId === userId);
+      convIds.push(conv.id);
+      lastReadAts.push(me?.lastReadAt ?? null);
+    }
+
     const unreadRows = await this.prisma.$queryRaw<
       { conversation_id: string; unread_count: bigint }[]
     >`
@@ -144,13 +153,14 @@ export class ChatService {
         m.conversation_id::text AS conversation_id,
         COUNT(m.id)             AS unread_count
       FROM messages m
-      JOIN conversation_participants cp
-        ON  cp.conversation_id = m.conversation_id
-        AND cp.user_id::text   = ${userId}
+      JOIN (
+        SELECT
+          UNNEST(${convIds}::uuid[])        AS conversation_id,
+          UNNEST(${lastReadAts}::timestamptz[]) AS last_read_at
+      ) AS thresholds ON thresholds.conversation_id = m.conversation_id
       WHERE
-            m.conversation_id::text = ANY(${ids})
-        AND m.sender_id::text      != ${userId}
-        AND (cp.last_read_at IS NULL OR m.created_at > cp.last_read_at)
+            m.sender_id::text != ${userId}
+        AND (thresholds.last_read_at IS NULL OR m.created_at > thresholds.last_read_at)
       GROUP BY m.conversation_id
     `;
 

@@ -283,6 +283,7 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@index([replyToMessageId])
+  @@index([senderId])
   @@map("messages")
 }
 
