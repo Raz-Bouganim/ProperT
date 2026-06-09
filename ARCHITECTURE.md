@@ -25,7 +25,7 @@ Canonical technical specification: stack, **software architecture**, **database*
 
 ## 1. Executive summary
 
-ProperT is a property marketplace: **Auth0** identity, **NestJS** API, **Next.js** frontend, **PostgreSQL + PostGIS**, **Redis** (cache / Socket.IO scale-out), **S3-compatible** storage.
+ProperT is a property marketplace: **Auth0** identity, **NestJS** API, **Next.js** frontend, **PostgreSQL + PostGIS**, **Redis** (cache / Socket.IO scale-out), **S3-compatible** storage, and an **AWS Lambda** image processor.
 
 | Concern | Approach |
 |---------|----------|
@@ -34,7 +34,12 @@ ProperT is a property marketplace: **Auth0** identity, **NestJS** API, **Next.js
 | **Bookings** | Table **`bookings`**; overlap prevented in DB for active statuses; statuses include `COMPLETED`, `LAPSED`; **`note_history`** audit trail |
 | **Availability** | Table **`property_availabilities`**; slots computed in listing **time zone** (30-minute steps) |
 | **Chat** | Tables **`conversations`**, **`conversation_participants`**, **`messages`**; Socket.IO with **JWT-derived sender**; pagination, archive, edit/reply |
-| **Search / geo** | PostGIS radius + filters; optional **`search_vector`** FTS on **`properties`** (see §5) |
+| **Favorites** | Table **`favorites`**; seeker-only toggle; property must be published |
+| **Property views** | Table **`property_views`**; tracked per detail-page request (anon + auth); weekly view count drives featured scoring |
+| **Search / geo** | PostGIS radius + bounding-box filters; multi-field filter; Redis cached results (60 s) |
+| **Featured** | Top 3 listings scored by recency, 7-day views, favorites, geo proximity, user preference; Redis cached 5 min |
+| **Images** | Direct browser → S3 via presigned PUT; Lambda (or MinIO webhook locally) produces thumbnail (400 px WebP) and optimized (1500 px WebP) |
+| **Geocoding** | Nominatim forward + reverse geocoding |
 
 **Authorization:** No role enums — data-driven (`ownerId`, seeker, conversation membership).
 
@@ -62,8 +67,9 @@ graph TB
     BOOK["BookingsModule"]
     AVAIL["AvailabilityModule"]
     CHAT["ChatModule\nREST + ChatGateway"]
+    FAV["FavoritesModule"]
     MEDIA["MediaModule\npresigned S3"]
-    GEO["GeoModule"]
+    GEO["GeoModule\nNominatim"]
     PRISMA["PrismaService"]
   end
 
@@ -73,33 +79,68 @@ graph TB
     S3[("MinIO / S3")]
   end
 
+  subgraph Serverless["Serverless"]
+    LAMBDA["Lambda\nimage-processor\nsharp · WebP"]
+  end
+
   subgraph IdP["Identity"]
     AUTH0["Auth0"]
+  end
+
+  subgraph External["External"]
+    NOM["Nominatim\ngeocoding"]
   end
 
   UI --> LB
   SIO --> LB
   LB --> API
-  UI --> S3
+  UI -->|presigned PUT| S3
   AUTH --> AUTH0
   API --> PG
   API --> REDIS
   CHAT --> REDIS
   MEDIA --> S3
+  S3 -->|PutObject event| LAMBDA
+  LAMBDA -->|thumbnail + optimized| S3
+  GEO --> NOM
 ```
 
-### 2.2 — Backend modules (conceptual)
+### 2.2 — Backend modules
 
 | Module | Responsibility |
 |--------|----------------|
 | **AuthModule** | OAuth code exchange, JWT issuance, Auth0 profile upsert |
-| **UsersModule** | User CRUD / public profile |
-| **PropertiesModule** | Listings CRUD, public catalog, geo search, soft delete |
-| **BookingsModule** | Create/update bookings, role-based status + notes |
-| **AvailabilityModule** | Owner schedule CRUD, **open slots** API for a calendar day |
-| **ChatModule** | Conversations, messages (REST pagination + WS fan-out), archive |
-| **MediaModule** | Presigned PUT URLs for uploads |
-| **GeoModule** | Geocoding helpers (if enabled) |
+| **UsersModule** | User CRUD, public profile, role inference |
+| **PropertiesModule** | Listings CRUD, public catalog, geo search, soft delete, view tracking, featured scoring |
+| **BookingsModule** | Create/update bookings, role-based status transitions, note history |
+| **AvailabilityModule** | Owner schedule CRUD, open-slot API for a calendar day (in listing TZ) |
+| **ChatModule** | Conversations + messages (REST pagination + WS fan-out), archive, edit/reply |
+| **FavoritesModule** | Toggle + list favorited properties (seeker-only) |
+| **MediaModule** | Presigned PUT URLs for uploads; MinIO webhook (local dev image processing) |
+| **GeoModule** | Nominatim forward search + reverse geocoding |
+| **PrismaModule** (global) | Database access via Prisma Client |
+| **RedisModule** (global) | Cache get/set/invalidate; Socket.IO Redis adapter |
+
+### 2.3 — Frontend routes (Next.js App Router)
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Home: hero, featured listings, how-it-works |
+| `/auth` | Login / register (Auth0 social + email/password) |
+| `/auth/callback` | Auth0 OAuth code exchange |
+| `/search` | Property search with filters, map view (Leaflet), pagination |
+| `/properties/[id]` | Property detail; UUID redirects to canonical slug URL |
+| `/properties/create` | 4-step listing creation wizard |
+| `/dashboard` | User tabs: bookings (seeker), saved homes, incoming requests (owner), my listings |
+| `/chat` | Conversation inbox with sidebar + embedded chat |
+| `/chat/[id]` | Full-page conversation view |
+
+**Two chat components — do not confuse:**
+
+| Component | Use |
+|-----------|-----|
+| `components/ChatWindow.tsx` | Popover widget on property detail page; minimal feature set |
+| `components/chat/ChatWindow.tsx` | Full-page chat at `/chat/[id]`; file uploads, partner online status, full event set |
 
 ---
 
@@ -108,17 +149,19 @@ graph TB
 | ID | Area | Target / note |
 |----|------|----------------|
 | NF-1 | Throughput | Scale API horizontally; Redis adapter for Socket.IO when multi-instance |
-| NF-2 | Search | Sub-second cached where Redis FTS cache is enabled |
-| NF-3 | Media | Direct browser → S3 via presign; API does not stream large bodies |
+| NF-2 | Search | Sub-second for cached queries (60 s TTL); Redis `X-Cache` header on all property endpoints |
+| NF-3 | Media | Direct browser → S3 via presign; API does not stream large bodies; Lambda processes originals asynchronously |
 | NF-4 | Security | JWT on REST; WS verifies JWT on connection; **never trust client `senderId`** |
 | NF-5 | Bookings | DB exclusion constraint for overlapping **PENDING/CONFIRMED** windows |
-| NF-6 | Data | Soft-delete listings; **RESTRICT** deleting `properties` if **conversations** reference them |
+| NF-6 | Data integrity | Soft-delete listings; **RESTRICT** deleting `properties` if **conversations** reference them |
+| NF-7 | Images | Lambda generates `thumbnails/{key}` (400 px WebP) and `optimized/{key}` (1500 px WebP) per upload; skips derivative keys |
+| NF-8 | Analytics | `property_views` tracks every detail-page visit; 7-day window aggregated for featured scoring; no separate analytics store |
 
 ---
 
 ## 4. Database — Prisma schema
 
-The following is the **full** `schema.prisma` models and enums as of this document (sync from repo if needed).
+The following is the full `schema.prisma` as of this document (sync from repo if needed — `schema.prisma` is authoritative).
 
 ```prisma
 generator client {
@@ -162,13 +205,16 @@ enum AmenityType {
   PARKING
   ELEVATOR
   BALCONY
+  SECURITY
   AIR_CONDITIONING
+  HEATING
   GARDEN
   FIREPLACE
   PET_FRIENDLY
   FURNISHED
   WASHER_DRYER
   DISHWASHER
+  WIFI
 }
 
 enum MediaType {
@@ -195,6 +241,8 @@ model User {
 
   properties       Property[]
   bookings         Booking[]
+  favorites        Favorite[]
+  viewLogs         PropertyView[]
   sentMessages              Message[]
   conversationParticipants  ConversationParticipant[]
   seekerConversations       Conversation[] @relation("ConversationSeeker")
@@ -252,10 +300,16 @@ model Property {
   bookings      Booking[]
   availabilities PropertyAvailability[]
   conversations Conversation[]
+  favorites     Favorite[]
+  viewLogs      PropertyView[]
 
   @@map("properties")
   @@index([price])
   @@index([ownerId])
+  @@index([city])
+  @@index([status, price])
+  @@index([bedrooms])
+  @@index([bathrooms])
 }
 
 model PropertyImage {
@@ -395,7 +449,34 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@index([replyToMessageId])
+  @@index([senderId])
   @@map("messages")
+}
+
+model Favorite {
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  propertyId String   @map("property_id")
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@id([userId, propertyId])
+  @@index([userId])
+  @@index([propertyId])
+  @@map("favorites")
+}
+
+model PropertyView {
+  id         String   @id @default(uuid())
+  propertyId String   @map("property_id")
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId     String?  @map("user_id")
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  viewedAt   DateTime @default(now()) @map("viewed_at")
+
+  @@index([propertyId, viewedAt])
+  @@index([userId, viewedAt])
+  @@map("property_views")
 }
 ```
 
@@ -403,7 +484,7 @@ model Message {
 
 ## 5. Database — PostgreSQL additions
 
-These are applied via migrations (not all expressed in Prisma). Typical items:
+Applied via migrations (not all expressible in Prisma):
 
 ```sql
 -- Extension for booking range exclusion
@@ -420,14 +501,14 @@ ALTER TABLE "bookings" ADD CONSTRAINT booking_no_overlap
 
 -- Geo + FTS on listings (table "properties")
 -- - geography(Point,4326) generated column `location` + GiST index
--- - tsvector `search_vector` + GIN index
+-- - tsvector `search_vector` + GIN index (title, description, address, city)
 -- - CHECK currency ~ '^[A-Z]{3}$'
 
 -- One primary image per property (partial unique index on PropertyImage)
+CREATE UNIQUE INDEX ON "PropertyImage" (property_id) WHERE is_primary = true;
 
--- Availability: exactly one of (day_of_week, date) — CHECK constraints on property_availabilities
-
--- Messages: content OR media required — CHECK on messages
+-- Availability: exactly one of (day_of_week, date) — CHECK on property_availabilities
+-- Message: content OR media required — CHECK on messages
 ```
 
 Exact DDL lives under **`backend/prisma/migrations/`**.
@@ -552,15 +633,32 @@ erDiagram
     datetime created_at
   }
 
+  FAVORITE {
+    uuid user_id PK_FK
+    uuid property_id PK_FK
+    datetime created_at
+  }
+
+  PROPERTY_VIEW {
+    uuid id PK
+    uuid property_id FK
+    uuid user_id FK
+    datetime viewed_at
+  }
+
   USER ||--o{ PROPERTY : owns
   USER ||--o{ BOOKING : seeks
   USER ||--o{ MESSAGE : sends
   USER ||--o{ CONVERSATION_PARTICIPANT : participates
+  USER ||--o{ FAVORITE : saves
+  USER ||--o{ PROPERTY_VIEW : generates
   PROPERTY ||--o{ PROPERTY_IMAGE : has
   PROPERTY ||--o{ PROPERTY_AMENITY : has
   PROPERTY ||--o{ PROPERTY_AVAILABILITY : has
   PROPERTY ||--o{ BOOKING : receives
   PROPERTY ||--o{ CONVERSATION : context
+  PROPERTY ||--o{ FAVORITE : saved-in
+  PROPERTY ||--o{ PROPERTY_VIEW : tracked-in
   CONVERSATION ||--o{ CONVERSATION_PARTICIPANT : members
   CONVERSATION ||--o{ MESSAGE : contains
   MESSAGE ||--o{ CONVERSATION_PARTICIPANT : last_read
@@ -581,13 +679,13 @@ sequenceDiagram
   participant DB as PostgreSQL
 
   User->>FE: Login / Register
-  FE->>Auth0: Redirect Universal Login
+  FE->>Auth0: Redirect to Universal Login
   Auth0-->>FE: Redirect with code
-  FE->>API: POST /auth/oauth/exchange (or equivalent)
-  API->>Auth0: Exchange code for tokens
+  FE->>API: POST /auth/oauth/exchange { code, redirectUri }
+  API->>Auth0: Exchange code for access token
   API->>Auth0: GET /userinfo
   API->>DB: Upsert User (externalId = sub)
-  API-->>FE: JWT (cookie / client storage per app config)
+  API-->>FE: ProperT JWT (sub = internal userId)
 ```
 
 ### 7.2 — Chat (REST thread + Socket.IO)
@@ -598,8 +696,9 @@ sequenceDiagram
   participant API as REST API
   participant GW as ChatGateway
   participant DB as PostgreSQL
+  participant REDIS as Redis
 
-  Seeker->>API: POST /chat/conversations (propertyId, ownerId)
+  Seeker->>API: POST /chat/conversations { propertyId, ownerId }
   API->>DB: getOrCreate conversation + participants
   API-->>Seeker: conversation id
 
@@ -607,10 +706,13 @@ sequenceDiagram
   GW->>GW: verify JWT → userId
   Seeker->>GW: joinRoom(conversationId)
   GW->>DB: ensure participant
+  GW->>REDIS: subscribe to room channel
 
-  Seeker->>GW: sendMessage (content / optional media / optional replyTo)
-  GW->>DB: insert Message; update conversation last_message_*
-  GW-->>Seeker: broadcast newMessage to room
+  Seeker->>GW: sendMessage { conversationId, content, mediaUrl?, mediaType?, replyToMessageId? }
+  GW->>DB: insert Message; update conversation lastMessageAt + lastMessagePreview (transaction)
+  GW->>REDIS: broadcast newMessage to room
+  REDIS-->>GW: fan-out to all connected instances
+  GW-->>Seeker: newMessage event to room
 ```
 
 ### 7.3 — Booking (slot + overlap)
@@ -622,13 +724,14 @@ sequenceDiagram
   participant AV as AvailabilityService
   participant DB as PostgreSQL
 
-  Seeker->>API: POST /bookings (propertyId, start, end ISO)
+  Seeker->>API: POST /bookings { propertyId, startTime, endTime }
   API->>AV: assertBookableWindow (duration, open slot, no overlap)
-  AV->>DB: load property TZ, slots, blocking bookings
+  AV->>DB: load property TZ, availability rules, blocking bookings
+  AV-->>API: valid or throw 400
   API->>DB: INSERT booking PENDING
-  alt Overlap or invalid slot
-    DB-->>API: exclusion / validation error
-    API-->>Seeker: 400
+  alt Overlap conflict (DB constraint)
+    DB-->>API: exclusion constraint violation
+    API-->>Seeker: 409
   else OK
     API-->>Seeker: 201 booking
   end
@@ -640,45 +743,94 @@ sequenceDiagram
 sequenceDiagram
   participant Client
   participant API as Properties API
+  participant REDIS as Redis
   participant DB as PostgreSQL
 
   Client->>API: GET /properties?lat&lng&radius&filters
-  API->>DB: ids within ST_DWithin(location, ...) + published + status + not deleted
-  API->>DB: load rows + includes
-  API-->>Client: properties + totalCount
+  API->>REDIS: get(properties:search:{hash})
+  alt Cache hit
+    REDIS-->>API: cached result
+    API-->>Client: properties + totalCount (X-Cache: HIT)
+  else Cache miss
+    API->>DB: ST_DWithin(location, point, radius) + published + status + filters
+    DB-->>API: rows + count
+    API->>REDIS: set(key, result, 60s)
+    API-->>Client: properties + totalCount (X-Cache: MISS)
+  end
 ```
 
-### 7.5 — Listing create / publish (conceptual)
+### 7.5 — Listing create / publish
 
 ```mermaid
 sequenceDiagram
   participant Owner
+  participant FE as Next.js
   participant API as Properties API
+  participant S3 as S3 / MinIO
   participant DB as PostgreSQL
 
-  Owner->>API: POST /properties (publish false → draft)
-  API->>DB: INSERT property published_at null
-  Owner->>API: PATCH /properties/:id (publish true)
-  API->>DB: validate; set published_at
+  Owner->>FE: Fill 4-step create form
+  FE->>API: POST /media/presigned-url { fileName, contentType }
+  API->>S3: generate presigned PUT URL (1 h)
+  API-->>FE: { url, key, publicUrl }
+  FE->>S3: PUT image directly (presigned URL)
+  FE->>API: POST /properties { title, price, images: [key], publish: false }
+  API->>DB: INSERT property published_at = null (draft)
+  API-->>FE: property id
+
+  Owner->>API: PATCH /properties/:id { publishedAt: now }
+  API->>DB: set published_at, validate
+  API->>REDIS: invalidate properties:* cache
+  API-->>Owner: published property
+```
+
+### 7.6 — Image upload and Lambda processing
+
+```mermaid
+sequenceDiagram
+  participant Browser
+  participant API as NestJS API
+  participant S3 as S3 / MinIO
+  participant LAMBDA as Lambda (or MinIO webhook)
+
+  Browser->>API: POST /media/presigned-url { fileName, contentType, fileSize }
+  API-->>Browser: { url (presigned PUT), key, publicUrl }
+  Browser->>S3: PUT original image (presigned URL)
+  S3-->>LAMBDA: PutObject event (trigger)
+  LAMBDA->>S3: GetObject original
+  LAMBDA->>LAMBDA: sharp → resize 400px WebP (q80) = thumbnail
+  LAMBDA->>LAMBDA: sharp → resize 1500px WebP (q80) = optimized
+  LAMBDA->>S3: PutObject thumbnails/{key}
+  LAMBDA->>S3: PutObject optimized/{key}
+
+  Note over LAMBDA,S3: Keys starting with thumbnails/ or optimized/ are skipped to avoid loops
 ```
 
 ---
 
 ## 8. API overview
 
-Representative routes (see Nest controllers for full list):
+| Area | Routes |
+|------|--------|
+| **Auth** | `POST /auth/login`, `POST /auth/register`, `POST /auth/oauth/exchange`, `POST /auth/refresh` |
+| **Users** | `GET /users/me`, `GET /users/:id` |
+| **Properties** | `POST /properties`, `GET /properties` (geo/filter search), `GET /properties/featured`, `GET /properties/mine`, `GET /properties/:id`, `PATCH /properties/:id`, `DELETE /properties/:id` |
+| **Bookings** | `POST /bookings`, `GET /bookings/mine`, `PATCH /bookings/:id` |
+| **Availability** | `POST /properties/:id/availability`, `GET /properties/:id/availability`, `GET /properties/:id/availability/slots` |
+| **Chat** | `POST /chat/conversations`, `GET /chat/conversations`, `GET /chat/conversations/:id`, `PATCH /chat/conversations/:id` (archive), `PATCH /chat/conversations/:id/read`, `GET /chat/messages/:conversationId`, `PATCH /chat/messages/:messageId` |
+| **Favorites** | `POST /favorites/:propertyId` (toggle), `GET /favorites` |
+| **Media** | `POST /media/presigned-url`, `POST /media/s3-webhook` (local dev only) |
+| **Geo** | `GET /geo/search`, `GET /geo/reverse` |
 
-| Area | Examples |
-|------|-----------|
-| Auth | OAuth exchange, refresh |
-| Users | Profile |
-| Properties | CRUD, `GET /properties` geo search, `GET /properties/mine`, `PATCH` publish |
-| Bookings | `POST`, `GET .../mine`, `PATCH` with note + transitions |
-| Availability | `GET/PUT .../properties/:id/availability`, slots query |
-| Chat | `GET /chat/conversations?folder=`, `GET /chat/messages/:conversationId?cursor`, `PATCH` archive, `PATCH` edit message |
-| Media | Presign upload |
+**WebSocket events (ChatGateway):**
 
-WebSocket events: **`joinRoom`**, **`sendMessage`** (server uses JWT user, not body `senderId`).
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `joinRoom` | Client → Server | Join a conversation room; triggers `partnerOnline` to others |
+| `sendMessage` | Client → Server | Persist message, broadcast `newMessage` to room |
+| `newMessage` | Server → Clients | New message broadcast to conversation room |
+| `partnerOnline` | Server → Clients | Emitted to room when a participant connects |
+| `partnerOffline` | Server → Clients | Emitted to rooms when a participant disconnects |
 
 ---
 
@@ -686,23 +838,38 @@ WebSocket events: **`joinRoom`**, **`sendMessage`** (server uses JWT user, not b
 
 | Component | Use |
 |-----------|-----|
-| **PostgreSQL + PostGIS** | Primary store, GiST geo, GIST exclusion on bookings, optional FTS |
-| **Redis** | Socket.IO adapter, throttling, optional search cache TTL ~60s |
-| **S3 / MinIO** | Media; presigned PUT |
+| **PostgreSQL + PostGIS** | Primary store; GiST geo index; GIST exclusion constraint on bookings; tsvector FTS on properties |
+| **Redis** | Socket.IO multi-instance adapter; search/featured/all-cards cache with TTL and pattern invalidation |
+| **S3 / MinIO** | Media storage; presigned PUT for direct browser uploads |
+| **AWS Lambda** | Async image processor: triggered by S3 PutObject, outputs thumbnail + optimized WebP |
+| **Auth0** | Identity provider; Universal Login; social connections (Google, Apple) |
+| **Nominatim** | Open-source geocoding for address → coordinates and reverse |
 
-Environment variables: see **`.env.example`** (never commit secrets).
+**Docker Compose (local dev):**
+
+| Service | Image | Host port |
+|---------|-------|-----------|
+| `postgres` | `postgis/postgis:16-3.4-alpine` | 5433 |
+| `redis` | `redis:alpine` | 6379 |
+| `minio` | `minio/minio` | 9000 (API), 9001 (console) |
+
+Environment variables: see **`backend/.env.example`** (never commit secrets).
 
 ---
 
 ## 10. Product conventions
 
-1. **Discovery (public):** `published_at IS NOT NULL`, status in `FOR_SALE` / `FOR_RENT`, `deleted_at IS NULL`. **Draft** detail URLs require auth as participant (owner) where enforced.
-2. **Off-market:** `CLOSED` or soft-delete; exclude from browse per query rules.
-3. **Time zones:** Listing **`time_zone`** is authoritative for availability slots and booking window validation; UI should align date pickers where implemented.
-4. **Chat archive:** Per-user **`archived_at`** on **`conversation_participants`** — history retained.
-5. **Virtual tours:** Embed URL only (`virtualTourUrl`), not uploaded 360° video pipelines.
-6. **No `.ics` / external calendar export** unless product adds it later.
+1. **Discovery (public):** `published_at IS NOT NULL`, status in `FOR_SALE` / `FOR_RENT`, `deleted_at IS NULL`. Draft detail URLs require auth as the owner.
+2. **Off-market:** `CLOSED` = off-market (visible to owner); soft-delete (`deleted_at`) = fully removed from browse.
+3. **Time zones:** Listing **`time_zone`** is authoritative for availability slots and booking window validation; UI aligns date pickers to listing TZ.
+4. **Chat archive:** Per-user **`archived_at`** on **`conversation_participants`** — history retained, conversation hidden from inbox.
+5. **Chat sender:** Server always uses JWT-derived `userId` as sender — client-supplied `senderId` is never trusted.
+6. **Favorites:** Seeker cannot favorite their own listing; property must be published (`published_at IS NOT NULL`).
+7. **Images:** Uploaded originals are stored as-is in S3; Lambda asynchronously writes `thumbnails/{key}` and `optimized/{key}` as WebP. UI should prefer `optimized/` for display and `thumbnails/` for thumbnails when available.
+8. **Property views:** Every detail-page GET writes a `property_views` row (userId nullable for anonymous visitors). This data feeds featured scoring; it is not exposed directly to users.
+9. **Virtual tours:** Embed URL only (`virtualTourUrl`) — no self-hosted 360° video pipelines.
+10. **Cache headers:** `X-Cache: HIT` or `MISS` is set on all property endpoint responses by the global `CacheHeaderInterceptor`.
 
 ---
 
-*Document revision: 2026-05-04 — includes full Prisma schema snapshot and flow diagrams.*
+*Document revision: 2026-06-09 — full schema sync including Favorite, PropertyView, updated AmenityType, updated indexes, Lambda flow, Favorites and Geo modules.*
