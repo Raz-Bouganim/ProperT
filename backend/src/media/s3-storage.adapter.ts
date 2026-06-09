@@ -31,6 +31,9 @@ export class S3StorageAdapter implements OnModuleInit {
         accessKeyId: this.configService.getOrThrow<string>('AWS_ACCESS_KEY_ID'),
         secretAccessKey: this.configService.getOrThrow<string>('AWS_SECRET_ACCESS_KEY'),
       },
+      // MinIO doesn't support the default checksum headers added by SDK v3.590+
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
       ...(this.endpoint ? { endpoint: this.endpoint, forcePathStyle: true } : {}),
     });
   }
@@ -148,7 +151,7 @@ export class S3StorageAdapter implements OnModuleInit {
           CORSConfiguration: {
             CORSRules: [
               {
-                AllowedOrigins: [this.configService.get<string>('FRONTEND_URL', '*')],
+                AllowedOrigins: [this.configService.getOrThrow<string>('FRONTEND_URL')],
                 AllowedMethods: ['GET', 'PUT', 'HEAD'],
                 AllowedHeaders: ['*'],
                 ExposeHeaders: ['ETag'],

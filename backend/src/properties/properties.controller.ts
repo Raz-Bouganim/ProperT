@@ -127,6 +127,22 @@ export class PropertiesController {
   }
 
   @UseGuards(OptionalJwtAuthGuard)
+  @Get('featured')
+  findFeatured(
+    @CurrentUser() user: JwtAuthUser | undefined,
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+  ) {
+    const latN = lat ? parseFloat(lat) : undefined;
+    const lngN = lng ? parseFloat(lng) : undefined;
+    return this.propertiesService.findFeatured(
+      user?.userId,
+      latN !== undefined && isFinite(latN) ? latN : undefined,
+      lngN !== undefined && isFinite(lngN) ? lngN : undefined,
+    );
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   findOne(@CurrentUser() user: JwtAuthUser | undefined, @Param('id') id: string) {
     return this.propertiesService.findOne(id, user?.userId);
