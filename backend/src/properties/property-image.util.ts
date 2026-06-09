@@ -7,7 +7,10 @@
  * (https://{bucket}.s3…/{key}) the bucket is in the hostname, so the raw pathname
  * already equals the key — no stripping is needed.
  */
-export function publicUrlToObjectKey(url: string, bucketNameToStrip?: string): string {
+export function publicUrlToObjectKey(
+  url: string,
+  bucketNameToStrip?: string,
+): string {
   try {
     const u = new URL(url);
     let path = u.pathname.replace(/^\//, '');

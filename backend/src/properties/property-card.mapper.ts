@@ -1,7 +1,10 @@
 import { Prisma } from '@prisma/client';
 import { formatLeaseDurationLabel } from './property-lease.util';
 
-export type PropertyCardDto = Omit<CardRow, 'leaseDurationMonths' | 'images'> & {
+export type PropertyCardDto = Omit<
+  CardRow,
+  'leaseDurationMonths' | 'images'
+> & {
   coverImageUrl: string | null;
   leaseDurationLabel: string | null;
 };
@@ -25,15 +28,14 @@ export const PROPERTY_CARD_SELECT = {
   leaseDurationMonths: true,
   images: {
     select: { url: true, isPrimary: true, sortOrder: true },
-    orderBy: [
-      { isPrimary: 'desc' as const },
-      { sortOrder: 'asc' as const },
-    ],
+    orderBy: [{ isPrimary: 'desc' as const }, { sortOrder: 'asc' as const }],
     take: 1,
   },
 } satisfies Prisma.PropertySelect;
 
-type CardRow = Prisma.PropertyGetPayload<{ select: typeof PROPERTY_CARD_SELECT }>;
+type CardRow = Prisma.PropertyGetPayload<{
+  select: typeof PROPERTY_CARD_SELECT;
+}>;
 
 export function mapToPropertyCard(row: CardRow): PropertyCardDto {
   const coverImageUrl = row.images[0]?.url ?? null;

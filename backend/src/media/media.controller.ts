@@ -45,10 +45,15 @@ export class MediaController {
   ) {
     const records = body.Records ?? [];
     await Promise.allSettled(
-      records.map(({ s3: { object: { key } } }) =>
-        this.mediaProcessorService.processUploadedImage(
-          decodeURIComponent(key.replace(/\+/g, ' ')),
-        ),
+      records.map(
+        ({
+          s3: {
+            object: { key },
+          },
+        }) =>
+          this.mediaProcessorService.processUploadedImage(
+            decodeURIComponent(key.replace(/\+/g, ' ')),
+          ),
       ),
     );
     return { ok: true };

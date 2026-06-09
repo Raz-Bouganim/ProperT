@@ -21,7 +21,10 @@ export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
   @Post()
-  create(@CurrentUser() user: JwtAuthUser, @Body() createBookingDto: CreateBookingDto) {
+  create(
+    @CurrentUser() user: JwtAuthUser,
+    @Body() createBookingDto: CreateBookingDto,
+  ) {
     const data = {
       ...createBookingDto,
       seekerId: user.userId,
@@ -32,7 +35,10 @@ export class BookingsController {
   }
 
   @Get('mine')
-  findAll(@CurrentUser() user: JwtAuthUser, @Query('role') role: 'SEEKER' | 'OWNER') {
+  findAll(
+    @CurrentUser() user: JwtAuthUser,
+    @Query('role') role: 'SEEKER' | 'OWNER',
+  ) {
     return this.bookingsService.findAllByUser(user.userId, role);
   }
 

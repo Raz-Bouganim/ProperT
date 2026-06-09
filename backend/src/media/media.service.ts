@@ -30,9 +30,15 @@ export class MediaService {
 
   constructor(private s3Adapter: S3StorageAdapter) {}
 
-  async getPresignedUrl(fileName: string, contentType: string, fileSize?: number) {
+  async getPresignedUrl(
+    fileName: string,
+    contentType: string,
+    fileSize?: number,
+  ) {
     if (!ALLOWED_MIME_TYPES.has(contentType)) {
-      throw new BadRequestException(`File type '${contentType}' is not allowed`);
+      throw new BadRequestException(
+        `File type '${contentType}' is not allowed`,
+      );
     }
     if (fileSize !== undefined && fileSize > MAX_FILE_BYTES) {
       throw new BadRequestException('File exceeds the 100 MB size limit');
@@ -42,11 +48,8 @@ export class MediaService {
     const key = `${uuidv4()}-${safeName}`;
 
     try {
-      const { presignedUrl, publicUrl } = await this.s3Adapter.generatePresignedPutUrl(
-        key,
-        contentType,
-        3600,
-      );
+      const { presignedUrl, publicUrl } =
+        await this.s3Adapter.generatePresignedPutUrl(key, contentType, 3600);
       return { url: presignedUrl, key, publicUrl };
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);

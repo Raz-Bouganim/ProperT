@@ -25,7 +25,9 @@ export class AuthService {
   }
 
   async issueAppTokens(user: User) {
-    const publicUser = await this.usersService.findOnePublic(user.id) ?? this.usersService.toPublic(user);
+    const publicUser =
+      (await this.usersService.findOnePublic(user.id)) ??
+      this.usersService.toPublic(user);
     const payload = { email: publicUser.email, sub: publicUser.id };
     return {
       access_token: this.jwtService.sign(payload),
@@ -113,7 +115,10 @@ export class AuthService {
         redirectUri,
       );
     } catch (e) {
-      if (e instanceof UnauthorizedException || e instanceof BadRequestException) {
+      if (
+        e instanceof UnauthorizedException ||
+        e instanceof BadRequestException
+      ) {
         throw new BadRequestException(AUTH_USER_MESSAGES.oauthExchangeFailed);
       }
       throw e;

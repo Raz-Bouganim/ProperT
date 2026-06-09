@@ -28,7 +28,10 @@ export class ChatController {
     @CurrentUser() user: JwtAuthUser,
     @Query() query: ConversationsQueryDto,
   ) {
-    return this.chatService.getConversations(user.userId, query.folder ?? 'inbox');
+    return this.chatService.getConversations(
+      user.userId,
+      query.folder ?? 'inbox',
+    );
   }
 
   @Get('conversations/:id')
@@ -56,7 +59,12 @@ export class ChatController {
     @Query() query: MessagesQueryDto,
   ) {
     const limit = query.limit ?? MAX_MESSAGE_PAGE_SIZE;
-    return this.chatService.getMessagesPage(user.userId, conversationId, limit, query.cursor);
+    return this.chatService.getMessagesPage(
+      user.userId,
+      conversationId,
+      limit,
+      query.cursor,
+    );
   }
 
   @Patch('messages/:messageId')
@@ -82,6 +90,10 @@ export class ChatController {
     @CurrentUser() user: JwtAuthUser,
     @Body() body: CreateConversationDto,
   ) {
-    return this.chatService.getOrCreateConversation(body.propertyId, user.userId, body.ownerId);
+    return this.chatService.getOrCreateConversation(
+      body.propertyId,
+      user.userId,
+      body.ownerId,
+    );
   }
 }

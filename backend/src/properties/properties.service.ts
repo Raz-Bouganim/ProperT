@@ -43,7 +43,12 @@ const ALL_CARDS_TTL = 300; // 5 minutes
 const FEATURED_USER_CACHE_TTL = 300; // 5 minutes — per-user, per-location featured key
 const SEARCH_TTL = 60; // 60 seconds
 
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+function haversineKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -385,7 +390,11 @@ export class PropertiesService {
     }
   }
 
-  async findFeatured(userId?: string, lat?: number, lng?: number): Promise<PropertyCardDto[]> {
+  async findFeatured(
+    userId?: string,
+    lat?: number,
+    lng?: number,
+  ): Promise<PropertyCardDto[]> {
     const cacheKey = `properties:featured:${userId ?? 'anon'}:${lat?.toFixed(2) ?? ''}:${lng?.toFixed(2) ?? ''}`;
     const cached = await this.cache.get<PropertyCardDto[]>(cacheKey);
     if (cached) return cached;
@@ -420,7 +429,10 @@ export class PropertiesService {
         createdAt: true,
         images: {
           select: { url: true, isPrimary: true, sortOrder: true },
-          orderBy: [{ isPrimary: 'desc' as const }, { sortOrder: 'asc' as const }],
+          orderBy: [
+            { isPrimary: 'desc' as const },
+            { sortOrder: 'asc' as const },
+          ],
           take: 1,
         },
       },
@@ -455,8 +467,12 @@ export class PropertiesService {
         : Promise.resolve([] as { property: { status: PropertyStatus } }[]),
     ]);
 
-    const weeklyViewMap = new Map(viewGroups.map((g) => [g.propertyId, g._count.id]));
-    const favMap = new Map(favGroups.map((g) => [g.propertyId, g._count.propertyId]));
+    const weeklyViewMap = new Map(
+      viewGroups.map((g) => [g.propertyId, g._count.id]),
+    );
+    const favMap = new Map(
+      favGroups.map((g) => [g.propertyId, g._count.propertyId]),
+    );
 
     let preferredStatus: PropertyStatus | null = null;
     if (userId && recentFavs.length > 0) {
@@ -482,7 +498,8 @@ export class PropertiesService {
           : 1;
       const prefScore =
         preferredStatus != null && p.status === preferredStatus ? 1.5 : 1.0;
-      const score = (weeklyViews + favCount * 2) * recencyScore * geoScore * prefScore;
+      const score =
+        (weeklyViews + favCount * 2) * recencyScore * geoScore * prefScore;
       return { p, score };
     });
 
@@ -508,7 +525,8 @@ export class PropertiesService {
         };
 
     if (!ownerId) {
-      const cached = await this.cache.get<PropertyCardDto[]>(ALL_CARDS_CACHE_KEY);
+      const cached =
+        await this.cache.get<PropertyCardDto[]>(ALL_CARDS_CACHE_KEY);
       if (cached) return cached;
     }
 
@@ -732,7 +750,9 @@ export class PropertiesService {
         data: { propertyId, userId: userId ?? null },
       }),
     ]).catch((err: unknown) => {
-      this.logger.warn(`Failed to track view for property ${propertyId}: ${err}`);
+      this.logger.warn(
+        `Failed to track view for property ${propertyId}: ${String(err)}`,
+      );
     });
   }
 

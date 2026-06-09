@@ -66,16 +66,32 @@ export class PropertiesController {
     const limitNum = limit ? parseInt(limit, 10) : 9;
     const minSqftNum = minSqft ? parseFloat(minSqft) : undefined;
     const maxSqftNum = maxSqft ? parseFloat(maxSqft) : undefined;
-    const maxLeaseDurationNum = maxLeaseDuration ? parseInt(maxLeaseDuration, 10) : undefined;
-    const amenityList = amenities ? amenities.split(',').filter(Boolean) : undefined;
+    const maxLeaseDurationNum = maxLeaseDuration
+      ? parseInt(maxLeaseDuration, 10)
+      : undefined;
+    const amenityList = amenities
+      ? amenities.split(',').filter(Boolean)
+      : undefined;
 
-    if (minPriceNum !== undefined && !isFinite(minPriceNum)) throw new BadRequestException('minPrice must be a number');
-    if (maxPriceNum !== undefined && !isFinite(maxPriceNum)) throw new BadRequestException('maxPrice must be a number');
-    if (bedsNum !== undefined && !Number.isInteger(bedsNum)) throw new BadRequestException('beds must be an integer');
-    if (bathsNum !== undefined && !Number.isInteger(bathsNum)) throw new BadRequestException('baths must be an integer');
-    if (minPriceNum !== undefined && maxPriceNum !== undefined && minPriceNum > maxPriceNum)
+    if (minPriceNum !== undefined && !isFinite(minPriceNum))
+      throw new BadRequestException('minPrice must be a number');
+    if (maxPriceNum !== undefined && !isFinite(maxPriceNum))
+      throw new BadRequestException('maxPrice must be a number');
+    if (bedsNum !== undefined && !Number.isInteger(bedsNum))
+      throw new BadRequestException('beds must be an integer');
+    if (bathsNum !== undefined && !Number.isInteger(bathsNum))
+      throw new BadRequestException('baths must be an integer');
+    if (
+      minPriceNum !== undefined &&
+      maxPriceNum !== undefined &&
+      minPriceNum > maxPriceNum
+    )
       throw new BadRequestException('minPrice must be ≤ maxPrice');
-    if (minSqftNum !== undefined && maxSqftNum !== undefined && minSqftNum > maxSqftNum)
+    if (
+      minSqftNum !== undefined &&
+      maxSqftNum !== undefined &&
+      minSqftNum > maxSqftNum
+    )
       throw new BadRequestException('minSqft must be ≤ maxSqft');
 
     const sharedFilters = {
@@ -97,16 +113,35 @@ export class PropertiesController {
     // Bounding-box search: GET /properties?minLat=...&minLng=...&maxLat=...&maxLng=...
     if (minLat && minLng && maxLat && maxLng) {
       const coords = [minLat, minLng, maxLat, maxLng].map(parseFloat);
-      if (coords.some((c) => !isFinite(c))) throw new BadRequestException('Invalid bounding box coordinates');
-      return this.propertiesService.findAllWithinBounds(coords[0], coords[1], coords[2], coords[3], sharedFilters);
+      if (coords.some((c) => !isFinite(c)))
+        throw new BadRequestException('Invalid bounding box coordinates');
+      return this.propertiesService.findAllWithinBounds(
+        coords[0],
+        coords[1],
+        coords[2],
+        coords[3],
+        sharedFilters,
+      );
     }
 
     // Radius search: GET /properties?lat=...&lng=...&radius=...
     if (lat && lng && radius) {
-      const latN = parseFloat(lat), lngN = parseFloat(lng), radiusN = parseFloat(radius);
-      if (!isFinite(latN) || !isFinite(lngN) || !isFinite(radiusN) || radiusN <= 0)
+      const latN = parseFloat(lat),
+        lngN = parseFloat(lng),
+        radiusN = parseFloat(radius);
+      if (
+        !isFinite(latN) ||
+        !isFinite(lngN) ||
+        !isFinite(radiusN) ||
+        radiusN <= 0
+      )
         throw new BadRequestException('Invalid lat/lng/radius');
-      return this.propertiesService.findAllWithinRadius(latN, lngN, radiusN, sharedFilters);
+      return this.propertiesService.findAllWithinRadius(
+        latN,
+        lngN,
+        radiusN,
+        sharedFilters,
+      );
     }
 
     // Owner filter: GET /properties?owner=me
@@ -144,7 +179,10 @@ export class PropertiesController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  findOne(@CurrentUser() user: JwtAuthUser | undefined, @Param('id') id: string) {
+  findOne(
+    @CurrentUser() user: JwtAuthUser | undefined,
+    @Param('id') id: string,
+  ) {
     return this.propertiesService.findOne(id, user?.userId);
   }
 
