@@ -136,8 +136,7 @@ export class ChatService {
 
     if (conversations.length === 0) return [];
 
-    // Extract the current user's lastReadAt per conversation from data already loaded above,
-    // so the unread-count query needs no JOIN back to conversation_participants.
+    // lastReadAts are already loaded from participants above — pass them directly to avoid re-joining conversation_participants.
     const convIds: string[] = [];
     const lastReadAts: (Date | null)[] = [];
     for (const conv of conversations) {
