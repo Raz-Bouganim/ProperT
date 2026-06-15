@@ -10,6 +10,8 @@ import { MediaService } from './media.service';
 import { MediaProcessorService } from './media-processor.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/auth.guards';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtAuthUser } from '../auth/jwt-auth.types';
 
 @ApiTags('media')
 @Controller('media')
@@ -23,9 +25,11 @@ export class MediaController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get a presigned URL for direct S3 upload' })
   async getPresignedUrl(
+    @CurrentUser() user: JwtAuthUser,
     @Body() body: { fileName: string; contentType: string; fileSize?: number },
   ) {
     return this.mediaService.getPresignedUrl(
+      user.userId,
       body.fileName,
       body.contentType,
       body.fileSize,

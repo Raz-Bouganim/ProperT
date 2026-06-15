@@ -11,7 +11,7 @@ import { BookingCard, type BookingCardBooking } from "@/components/BookingCard";
 import { PropertyCard } from "@/components/PropertyCard";
 import type { LucideIcon } from "lucide-react";
 import {
-    Loader2, Plus, CalendarCheck, Heart, BellRing, Building2, Home, ArrowRight, X,
+    Loader2, Plus, CalendarCheck, Heart, BellRing, Building2, Home, ArrowRight, X, Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -52,9 +52,31 @@ type TabConfig = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-
 function isBookingPatch(v: unknown): v is Partial<BookingCardBooking> & { id: string } {
     return typeof v === "object" && v !== null && "id" in v && typeof (v as Record<string, unknown>).id === "string";
+}
+
+function createBookingPatchHandler(
+    setter: (updater: (prev: BookingCardBooking[]) => BookingCardBooking[]) => void
+) {
+    return (updated: unknown) => {
+        if (!isBookingPatch(updated)) return;
+        setter((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
+    };
+}
+
+function getCoverImageUrl(item: {
+    coverImageUrl?: string | null;
+    images?: Array<string | { url?: string }>;
+}): string {
+    const firstImg = item.images?.[0];
+    return (
+        item.coverImageUrl ||
+        (typeof firstImg === "object" && firstImg && "url" in firstImg
+            ? firstImg.url
+            : (firstImg as string | undefined)) ||
+        "/placeholder-property.svg"
+    );
 }
 
 // ── Animation variants ────────────────────────────────────────────────────────
@@ -279,15 +301,8 @@ export default function DashboardPage() {
         }
     };
 
-    const handleSeekerBookingPatched = (updated: unknown) => {
-        if (!isBookingPatch(updated)) return;
-        setSeekerBookings((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
-    };
-
-    const handleOwnerBookingPatched = (updated: unknown) => {
-        if (!isBookingPatch(updated)) return;
-        setOwnerBookings((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
-    };
+    const handleSeekerBookingPatched = createBookingPatchHandler(setSeekerBookings);
+    const handleOwnerBookingPatched = createBookingPatchHandler(setOwnerBookings);
 
     const pendingOwnerCount = useMemo(
         () => ownerBookings.filter((b) => b.status === "PENDING").length,
@@ -490,13 +505,7 @@ export default function DashboardPage() {
                                     animate="visible"
                                 >
                                     {favoriteProperties.map((p) => {
-                                        const firstImg = p.images?.[0];
-                                        const cover =
-                                            p.coverImageUrl ||
-                                            (typeof firstImg === "object" && firstImg && "url" in firstImg
-                                                ? firstImg.url
-                                                : firstImg) ||
-                                            "/placeholder-property.svg";
+                                        const cover = getCoverImageUrl(p);
                                         return (
                                             <motion.div key={p.id} variants={cardItem}>
                                                 <PropertyCard
@@ -566,13 +575,7 @@ export default function DashboardPage() {
                                     animate="visible"
                                 >
                                     {listings.map((listing) => {
-                                        const firstImg = listing.images?.[0];
-                                        const cover =
-                                            listing.coverImageUrl ||
-                                            (typeof firstImg === "object" && firstImg && "url" in firstImg
-                                                ? firstImg.url
-                                                : firstImg) ||
-                                            "/placeholder-property.svg";
+                                        const cover = getCoverImageUrl(listing);
                                         const isDraft = !listing.publishedAt;
                                         const propertyBookings = bookingsByProperty.get(listing.id) ?? [];
                                         return (
@@ -591,15 +594,23 @@ export default function DashboardPage() {
                                                     hideBedBath={listing.type === "OFFICE"}
                                                     ownerId={user.id}
                                                 />
-                                                {isDraft && (
-                                                    <Button
-                                                        type="button"
-                                                        className="w-full rounded-xl font-bold text-xs h-9"
-                                                        onClick={() => void publishDraft(listing)}
+                                                <div className="flex gap-2">
+                                                    <Link
+                                                        href={`/properties/${listing.id}/edit`}
+                                                        className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:border-primary/40 hover:text-primary transition-colors"
                                                     >
-                                                        Publish Listing
-                                                    </Button>
-                                                )}
+                                                        <Pencil className="w-3 h-3" /> Edit
+                                                    </Link>
+                                                    {isDraft && (
+                                                        <Button
+                                                            type="button"
+                                                            className="flex-1 rounded-xl font-bold text-xs h-9"
+                                                            onClick={() => void publishDraft(listing)}
+                                                        >
+                                                            Publish
+                                                        </Button>
+                                                    )}
+                                                </div>
                                                 {propertyBookings.length > 0 && (
                                                     <button
                                                         type="button"

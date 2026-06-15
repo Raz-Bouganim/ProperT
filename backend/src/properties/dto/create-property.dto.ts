@@ -8,6 +8,7 @@ import {
   ValidateNested,
   IsBoolean,
   IsIn,
+  IsUrl,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PropertyType, PropertyStatus } from '@prisma/client';
@@ -118,7 +119,7 @@ export class CreatePropertyDto {
   @Type(() => Number)
   longitude?: number;
 
-  @IsString({ each: true })
+  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] }, { each: true })
   @IsOptional()
   images?: string[];
 
@@ -131,7 +132,7 @@ export class CreatePropertyDto {
   @IsOptional()
   videoUrl?: string;
 
-  @IsString()
+  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
   @IsOptional()
   virtualTourUrl?: string;
 
@@ -162,7 +163,7 @@ export class CreatePropertyDto {
   @IsOptional()
   leaseDuration?: string;
 
-  @IsString()
+  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
   @IsOptional()
   floorPlanUrl?: string;
 

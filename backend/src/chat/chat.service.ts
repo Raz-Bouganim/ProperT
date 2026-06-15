@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { ConversationFolder } from './dto/conversations-query.dto';
 
 const PREVIEW_MAX = 512;
+const ATTACHMENT_PREVIEW = '[attachment]';
 export const MAX_MESSAGE_PAGE_SIZE = 50;
 
 const messageInclude = {
@@ -72,7 +73,7 @@ function previewFromMessage(
     return t.length > PREVIEW_MAX ? t.slice(0, PREVIEW_MAX) : t;
   }
   if (mediaUrl) {
-    return '[attachment]';
+    return ATTACHMENT_PREVIEW;
   }
   return '';
 }
@@ -154,9 +155,10 @@ export class ChatService {
       FROM messages m
       JOIN (
         SELECT
-          UNNEST(${convIds}::uuid[])        AS conversation_id,
+          -- Prisma passes UUIDs as text strings; ::text[] avoids a type-mismatch error
+          UNNEST(${convIds}::text[])            AS conversation_id,
           UNNEST(${lastReadAts}::timestamptz[]) AS last_read_at
-      ) AS thresholds ON thresholds.conversation_id = m.conversation_id
+      ) AS thresholds ON thresholds.conversation_id = m.conversation_id::text
       WHERE
             m.sender_id::text != ${userId}
         AND (thresholds.last_read_at IS NULL OR m.created_at > thresholds.last_read_at)
