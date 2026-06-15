@@ -114,7 +114,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
           Find Your Perfect
           <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-cyan-300">
-            Dream Home
+            Dream ProperT
           </span>
         </motion.h1>
 

@@ -77,6 +77,7 @@ model User {
   bookings         Booking[]
   favorites        Favorite[]
   viewLogs         PropertyView[]
+  uploadTokens     MediaUploadToken[]
   sentMessages              Message[]
   conversationParticipants  ConversationParticipant[]
   seekerConversations       Conversation[] @relation("ConversationSeeker")
@@ -311,4 +312,19 @@ model PropertyView {
   @@index([propertyId, viewedAt])
   @@index([userId, viewedAt])
   @@map("property_views")
+}
+
+/// Tracks presigned upload URLs issued per user so the property service can verify
+/// that submitted image URLs were actually uploaded by the property owner.
+model MediaUploadToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String   @db.VarChar(1024)
+  publicUrl String   @db.VarChar(2048) @map("public_url")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, publicUrl])
+  @@map("media_upload_tokens")
 }

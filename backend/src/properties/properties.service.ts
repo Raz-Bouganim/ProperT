@@ -242,6 +242,36 @@ export class PropertiesService {
     }
   }
 
+  /**
+   * Verifies that every URL in `newUrls` has a valid, unexpired MediaUploadToken
+   * owned by `userId`, then consumes those tokens so they cannot be replayed.
+   * Throws BadRequestException if any URL is unauthorized.
+   */
+  private async validateAndConsumeImageTokens(
+    userId: string,
+    newUrls: string[],
+  ): Promise<void> {
+    if (newUrls.length === 0) return;
+    const validTokens = await this.prisma.mediaUploadToken.findMany({
+      where: {
+        userId,
+        publicUrl: { in: newUrls },
+        expiresAt: { gt: new Date() },
+      },
+      select: { id: true, publicUrl: true },
+    });
+    const validUrlSet = new Set(validTokens.map((t) => t.publicUrl));
+    const unauthorized = newUrls.filter((url) => !validUrlSet.has(url));
+    if (unauthorized.length > 0) {
+      throw new BadRequestException(
+        'One or more images were not uploaded through the authorized upload flow.',
+      );
+    }
+    await this.prisma.mediaUploadToken.deleteMany({
+      where: { id: { in: validTokens.map((t) => t.id) } },
+    });
+  }
+
   private async invalidatePropertyCaches(): Promise<void> {
     await Promise.all([
       this.cache.del(ALL_CARDS_CACHE_KEY),
@@ -317,8 +347,16 @@ export class PropertiesService {
     const publishedAt =
       willPublish && isLiveMarketStatus(intent) ? new Date() : null;
     const bucketName = this.configService.getOrThrow<string>('S3_BUCKET_NAME');
-    const imageKeys =
-      images?.map((url) => publicUrlToObjectKey(url, bucketName)) ?? [];
+
+    const uniqueImages = [...new Set(images ?? [])];
+    await this.validateAndConsumeImageTokens(
+      createPropertyDto.ownerId!,
+      uniqueImages,
+    );
+
+    const imageKeys = uniqueImages.map((url) =>
+      publicUrlToObjectKey(url, bucketName),
+    );
 
     try {
       const row = await this.prisma.property.create({
@@ -359,9 +397,9 @@ export class PropertiesService {
               ? { create: mappedAvailabilities }
               : undefined,
           images:
-            images && images.length > 0
+            uniqueImages.length > 0
               ? {
-                  create: images.map((url, index) => ({
+                  create: uniqueImages.map((url, index) => ({
                     url,
                     key: publicUrlToObjectKey(url, bucketName),
                     altText: 'Property image',
@@ -920,6 +958,61 @@ export class PropertiesService {
       if (types.length > 0) {
         await this.prisma.propertyAmenity.createMany({
           data: types.map((amenity) => ({ propertyId: id, amenity })),
+        });
+      }
+    }
+
+    if (updatePropertyDto.images !== undefined) {
+      const bucketName =
+        this.configService.getOrThrow<string>('S3_BUCKET_NAME');
+      const submitted = [...new Set(updatePropertyDto.images)];
+
+      const isCurrentlyLive =
+        existing.publishedAt != null && isLiveMarketStatus(existing.status);
+      if (isCurrentlyLive && submitted.length === 0) {
+        throw new BadRequestException(
+          'Published listings require at least one image',
+        );
+      }
+
+      const currentImages = await this.prisma.propertyImage.findMany({
+        where: { propertyId: id },
+        select: { url: true, key: true },
+      });
+
+      const currentUrlSet = new Set(currentImages.map((img) => img.url));
+      const newUrls = submitted.filter((url) => !currentUrlSet.has(url));
+      await this.validateAndConsumeImageTokens(userId, newUrls);
+
+      const submittedSet = new Set(submitted);
+      const removedKeys = currentImages
+        .filter((img) => !submittedSet.has(img.url))
+        .map((img) => img.key);
+
+      await this.prisma.$transaction([
+        this.prisma.propertyImage.deleteMany({ where: { propertyId: id } }),
+        this.prisma.propertyImage.createMany({
+          data: submitted.map((url, index) => ({
+            url,
+            key: publicUrlToObjectKey(url, bucketName),
+            altText: 'Property image',
+            isPrimary: index === 0,
+            sortOrder: index,
+            propertyId: id,
+          })),
+        }),
+      ]);
+
+      if (removedKeys.length > 0) {
+        const cleanupResults = await Promise.allSettled(
+          removedKeys.map((key) => this.s3Adapter.deleteObject(key)),
+        );
+        cleanupResults.forEach((result, i) => {
+          if (result.status === 'rejected') {
+            this.logger.warn(
+              `Failed to delete S3 object ${removedKeys[i]}: ${String(result.reason)}`,
+            );
+          }
         });
       }
     }

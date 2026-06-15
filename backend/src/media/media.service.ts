@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { S3StorageAdapter } from './s3-storage.adapter';
+import { PrismaService } from '../prisma/prisma.service';
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
@@ -24,13 +25,19 @@ const ALLOWED_MIME_TYPES = new Set([
 
 const MAX_FILE_BYTES = 100 * 1024 * 1024; // 100 MB
 
+const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 h — upload must complete within 1 h (presign TTL), form submit within 24 h
+
 @Injectable()
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
 
-  constructor(private s3Adapter: S3StorageAdapter) {}
+  constructor(
+    private s3Adapter: S3StorageAdapter,
+    private prisma: PrismaService,
+  ) {}
 
   async getPresignedUrl(
+    userId: string,
     fileName: string,
     contentType: string,
     fileSize?: number,
@@ -50,6 +57,16 @@ export class MediaService {
     try {
       const { presignedUrl, publicUrl } =
         await this.s3Adapter.generatePresignedPutUrl(key, contentType, 3600);
+
+      await this.prisma.mediaUploadToken.create({
+        data: {
+          userId,
+          key,
+          publicUrl,
+          expiresAt: new Date(Date.now() + TOKEN_TTL_MS),
+        },
+      });
+
       return { url: presignedUrl, key, publicUrl };
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
