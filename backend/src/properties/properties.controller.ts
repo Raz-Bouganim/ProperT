@@ -152,7 +152,8 @@ export class PropertiesController {
       return this.propertiesService.findAll(user.userId);
     }
 
-    return this.propertiesService.findAll();
+    // No spatial filter — return all published properties with pagination/filters
+    return this.propertiesService.findAllPublished(sharedFilters);
   }
 
   @UseGuards(JwtAuthGuard)
