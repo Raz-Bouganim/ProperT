@@ -119,7 +119,7 @@ export class CreatePropertyDto {
   @Type(() => Number)
   longitude?: number;
 
-  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] }, { each: true })
+  @IsString({ each: true })
   @IsOptional()
   images?: string[];
 
