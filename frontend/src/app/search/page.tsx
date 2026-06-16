@@ -51,6 +51,7 @@ function SearchPageContent() {
     const abortControllerRef = useRef<AbortController | null>(null);
 
     // Search Params
+    const hasLocationFilter = searchParams.has("lat") && searchParams.has("lng") && searchParams.has("radius");
     const lat = parseFloat(searchParams.get("lat") || "40.7128");
     const lng = parseFloat(searchParams.get("lng") || "-74.0060");
     const radius = parseFloat(searchParams.get("radius") || "10");
@@ -86,8 +87,10 @@ function SearchPageContent() {
             // Use bbox only when map is open, bounds are known, and zoom is sufficient
             if (showMap && mapBounds && mapBounds.zoom >= MIN_ZOOM) {
                 url = `/properties?minLat=${mapBounds.minLat}&minLng=${mapBounds.minLng}&maxLat=${mapBounds.maxLat}&maxLng=${mapBounds.maxLng}&page=${page}&limit=${limit}`;
-            } else {
+            } else if (hasLocationFilter) {
                 url = `/properties?lat=${lat}&lng=${lng}&radius=${radius}&page=${page}&limit=${limit}`;
+            } else {
+                url = `/properties?page=${page}&limit=${limit}`;
             }
             if (minPrice) url += `&minPrice=${minPrice}`;
             if (maxPrice) url += `&maxPrice=${maxPrice}`;
@@ -112,7 +115,7 @@ function SearchPageContent() {
         } finally {
             setLoading(false);
         }
-    }, [lat, lng, radius, minPrice, maxPrice, beds, baths, propertyType, status, minSqft, maxSqft, maxLeaseDuration, amenities, page, showMap, mapBounds, sort]);
+    }, [hasLocationFilter, lat, lng, radius, minPrice, maxPrice, beds, baths, propertyType, status, minSqft, maxSqft, maxLeaseDuration, amenities, page, showMap, mapBounds, sort]);
 
     useEffect(() => {
         fetchProperties();

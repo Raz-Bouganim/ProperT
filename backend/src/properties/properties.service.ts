@@ -750,6 +750,65 @@ export class PropertiesService {
     return result;
   }
 
+  async findAllPublished(filters?: {
+    minPrice?: number;
+    maxPrice?: number;
+    beds?: number;
+    baths?: number;
+    propertyType?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+    sort?: string;
+    minSqft?: number;
+    maxSqft?: number;
+    maxLeaseDuration?: number;
+    amenities?: string[];
+  }) {
+    const cacheKey = this.buildSearchCacheKey({ scope: 'all', ...filters });
+    const cached = await this.cache.get<{
+      properties: unknown[];
+      totalCount: number;
+    }>(cacheKey);
+    if (cached) return cached;
+
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 9;
+    const skip = (page - 1) * limit;
+    const orderBy =
+      filters?.sort === 'price_asc'
+        ? { price: 'asc' as const }
+        : filters?.sort === 'price_desc'
+          ? { price: 'desc' as const }
+          : { createdAt: 'desc' as const };
+
+    const where: Prisma.PropertyWhereInput = {
+      deletedAt: null,
+      publishedAt: { not: null },
+      status: { in: [PropertyStatus.FOR_SALE, PropertyStatus.FOR_RENT] },
+    };
+
+    if (filters) this.applySearchFilters(where, filters);
+
+    const [totalCount, properties] = await Promise.all([
+      this.prisma.property.count({ where }),
+      this.prisma.property.findMany({
+        where,
+        select: PROPERTY_CARD_SELECT,
+        skip,
+        take: limit,
+        orderBy,
+      }),
+    ]);
+
+    const result = {
+      properties: properties.map(mapToPropertyCard),
+      totalCount,
+    };
+    await this.cache.set(cacheKey, result, SEARCH_TTL);
+    return result;
+  }
+
   /**
    * Public catalog surfaces only published rows elsewhere; this endpoint must hide drafts
    * unless `requesterUserId` matches `ownerId` (owner preview after save-as-draft).
